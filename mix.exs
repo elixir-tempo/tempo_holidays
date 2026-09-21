@@ -17,6 +17,9 @@ defmodule Tempo.Holidays.MixProject do
       package: package(),
       docs: docs(),
       dialyzer: [
+        # `:mix` for the update task's `Mix.*` calls; `:inets` for the httpc
+        # path reached through Localize's HTTP client.
+        plt_add_apps: [:mix, :inets],
         flags: [:error_handling, :unknown, :underspecs, :extra_return, :missing_return]
       ]
     ]
@@ -81,6 +84,21 @@ defmodule Tempo.Holidays.MixProject do
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
-    ]
+    ] ++ maybe_json_polyfill()
+  end
+
+  # `mix tempo.holidays.update` parses the downloaded bundle with `:json`.
+  # On OTP 26 that module does not exist, so json_polyfill (the EEP 68
+  # backport) supplies it — for THIS project's own dev/test/CI only, since
+  # `only:` deps never enter the hex package requirements. On OTP 27+ `:json`
+  # is built in and the polyfill's own build fails, so the conditional keeps
+  # it out there. An OTP 26 consumer who wants to run the task adds
+  # `{:json_polyfill, "~> 0.2 or ~> 1.0"}` to their own deps (see README).
+  defp maybe_json_polyfill do
+    if Code.ensure_loaded?(:json) do
+      []
+    else
+      [{:json_polyfill, "~> 0.2 or ~> 1.0", only: [:dev, :test]}]
+    end
   end
 end

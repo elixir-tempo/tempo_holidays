@@ -7,3 +7,5 @@
 * Rule compiler for date-holidays strings: fixed dates, weekday-in-month (`"2nd Monday in June"`, `"last Monday in May"`), Easter/orthodox-relative, and an observed-date substitution suffix (`"… if saturday then previous friday if sunday then next monday"`).
 
 * Materialisation merges abutting occurrences of the same holiday into one period, so a period split across two entries (to dodge a YAML year boundary) reads as the single span it describes.
+
+* `mix tempo.holidays.update` downloads the date-holidays dataset (over TLS via Localize's HTTP client), compiles the supported rules through `Tempo.Holidays.DateHolidays`, and writes `priv/holidays/<CC>.etf` — no JSON needed to load the result on any OTP.

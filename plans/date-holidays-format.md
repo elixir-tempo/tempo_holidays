@@ -62,8 +62,12 @@ holidays:
 
 * [x] `Tempo.Holidays.DateHolidays.compile_days/2` — maps a country's `days` entries to `%Holiday{}`, resolving name (inline `name.<lang>` → `_name` → rule) and type, dropping unsupported rules.
 
-* [ ] `mix tempo.holidays.update`: fetch the bundle over `:httpc` (verified TLS via `:public_key.cacerts_get/0`), parse, run each country's `days` through `compile_days/2`, write `priv/holidays/<CC>.json`; `Data` then loads from there.
+* [x] `mix tempo.holidays.update`: fetches the bundle via Localize's hardened HTTP client, parses with `:json`, runs each country's `days` through `compile_days/2`, and writes `priv/holidays/<CC>.etf`. `:json` on OTP 26 comes from json_polyfill (a dev/test dep here; consumers add it to run the task). ETF means loading needs no JSON on any release.
 
-* [ ] Resolve `_name` references against `names.yaml`/`names.json` so days keyed only by `_name` get real names.
+* [ ] `Data.for_territory/1` loads `priv/holidays/<CC>.etf` when present, falling back to the inline seed — so the downloaded data is actually used.
+
+* [ ] States/regions: the task compiles only the country-level `days`; sub-territory `days` (`US-AL`, …) are still to come.
+
+* [ ] Resolve `_name` references against `names.yaml`/`names.json` so days keyed only by `_name` get real names, not the reference string.
 
 * [ ] Grow the compiler tiers (see "Not yet handled"), most-common first — `<weekday> before|after <date>` (US Memorial) and lunar calendars lead.
