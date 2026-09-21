@@ -40,16 +40,47 @@ defmodule Tempo.Holidays.Data do
       {:error, {:unknown_territory, :ZZ}}
 
   """
-  @spec for_territory(atom() | String.t()) ::
+  @spec for_territory(atom() | String.t(), String.t() | nil, String.t() | nil) ::
           {:ok, [Holiday.t()]} | {:error, {:unknown_territory, term()}}
-  def for_territory(territory) when is_atom(territory) or is_binary(territory) do
-    case load(String.upcase(to_string(territory))) do
+  def for_territory(territory, division \\ nil, subdivision \\ nil)
+
+  def for_territory(territory, division, subdivision)
+      when is_atom(territory) or is_binary(territory) do
+    case load_first(candidate_codes(territory, division, subdivision)) do
       {:ok, holidays} -> {:ok, holidays}
       :error -> {:error, {:unknown_territory, territory}}
     end
   end
 
-  def for_territory(other), do: {:error, {:unknown_territory, other}}
+  def for_territory(other, _division, _subdivision), do: {:error, {:unknown_territory, other}}
+
+  # date-holidays keys sub-territory data by `<CC>-<STATE>-<REGION>`; try the
+  # most specific level present and fall back to the country, so an unknown
+  # state still yields the national holidays.
+  defp candidate_codes(territory, division, subdivision) do
+    country = upcase(territory)
+    state = upcase(division)
+    region = upcase(subdivision)
+
+    [
+      state && region && "#{country}-#{state}-#{region}",
+      state && "#{country}-#{state}",
+      country
+    ]
+    |> Enum.reject(&(&1 in [nil, false]))
+  end
+
+  defp load_first([]), do: :error
+
+  defp load_first([code | rest]) do
+    case load(code) do
+      {:ok, holidays} -> {:ok, holidays}
+      :error -> load_first(rest)
+    end
+  end
+
+  defp upcase(nil), do: nil
+  defp upcase(value), do: value |> to_string() |> String.upcase()
 
   @doc """
   The territories that carry data, as sorted CLDR codes.
@@ -71,6 +102,7 @@ defmodule Tempo.Holidays.Data do
       files
       |> Enum.filter(&String.ends_with?(&1, ".etf"))
       |> Enum.map(&Path.basename(&1, ".etf"))
+      |> Enum.reject(&String.contains?(&1, "-"))
       |> Enum.sort()
     else
       _ -> []

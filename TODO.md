@@ -7,11 +7,13 @@ at ~96% matched, and the gaps below are what remains.
 
 ## Open
 
-* [ ] **State/region tiers** — the build compiles only country-level `days`; sub-territory `days` (`US-AL`, AU state holidays like King's Birthday) are still to come. Analysis in [plans/date-holidays-format.md](plans/date-holidays-format.md).
+* [ ] **Per-occurrence `disable`/`enable`** — a holiday's `disable: ['YYYY-MM-DD']` / `enable:` metadata (GB's 2022 Jubilee move); the `states`/`regions` `false` disables are already handled by the build-time merge. A handful of fixture entries.
 
-* [ ] **Inter-holiday, disable/enable, and additional-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"`, `disable`/`enable` overrides (GB's 2022 Jubilee move), and "observe as well as" in-lieu days. Edge cases, each a handful of entries.
+* [ ] **Inter-holiday and additional-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"` and "observe as well as" in-lieu days. Edge cases.
 
-* [ ] **Localize integration** — localized holiday names (MF2), and accepting a `LanguageTag` (territory + language in one) wherever a territory code is taken today.
+* [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
+
+* [ ] **Package size** — the state/region etf duplicates the country data into each state file (~6.4 MB). A per-country nested etf merged at load would cut it; deferred as an optimisation.
 
 ## Blocked
 
@@ -22,6 +24,8 @@ at ~96% matched, and the gaps below are what remains.
 * [ ] **Tabular Umm al-Qura** — our *calculated* Umm al-Qura differs from date-holidays' *table* by a day some years (~205 fixture entries), plus day-overflow like `30 Safar` (a 29-day month). Blocked on a tabular Umm al-Qura in Calendrical.
 
 ## Done
+
+* [x] **Locale / LanguageTag requests + state/region data** — `recurrences/2`, `materialise/3` accept a territory code, a validated BCP 47 locale (string/atom/`Localize.LanguageTag`), or a holiday list, deriving territory + state (division) + region (subdivision), overridable by option. The build compiles country + state + region holidays (state `days` merged over the country's), and the loader picks the most specific level, falling back to the country. `en-US-u-sd-usca` → California; AU-NSW carries King's Birthday. 2026-09-21.
 
 * [x] **Conformance harness** — `Tempo.Holidays.Fixtures` + `Conformance` run every compiled rule against the full date-holidays fixture corpus (9,695 files) as an opt-in `:conformance` test; ~96% of rules match. 2026-09-21.
 

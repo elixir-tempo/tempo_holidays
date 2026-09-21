@@ -3,8 +3,10 @@ defmodule Tempo.Holidays.Build do
   Build-time generation of the compiled holiday data.
 
   Downloads a pinned [date-holidays](https://github.com/commenthol/date-holidays)
-  bundle and compiles every territory to `priv/holidays/<CC>.etf`. The version
-  is pinned exactly (not a range), so a build is reproducible: the same input
+  bundle and compiles every territory to `priv/holidays/<CC>.etf`, plus each
+  state (`<CC>-<STATE>.etf`) and region (`<CC>-<STATE>-<REGION>.etf`) with the
+  country's `days` merged in, as date-holidays inherits them. The version is
+  pinned exactly (not a range), so a build is reproducible: the same input
   yields the same output, and the data need not be vendored in git.
 
   `ensure_built/0` runs from the `:holidays` Mix compiler and is a no-op once
@@ -100,14 +102,49 @@ defmodule Tempo.Holidays.Build do
 
   # ── generation ──────────────────────────────────────────────────────
 
-  # A territory is written only when at least one of its rules compiles, so a
-  # lookup distinguishes "known, no compilable holidays yet" (absent) from an
-  # empty result.
+  # Writes the country and each state (`<CC>-<STATE>`) and region
+  # (`<CC>-<STATE>-<REGION>`). date-holidays inherits: a state's holidays are
+  # the country's `days` overridden by the state's own, so the raw `days` maps
+  # are merged before compiling (a state entry overrides or, when `false`,
+  # disables the country's rule with the same key).
   defp write_territory(directory, bundle, code, language) do
-    bundle
-    |> holidays_from_bundle(code, language)
-    |> write_etf(directory, code)
+    names = Map.get(bundle, "names", %{})
+    country_days = as_days(get_in(bundle, ["holidays", code, "days"]))
+    written = write_days(directory, code, country_days, names, language)
+
+    ["holidays", code, "states"]
+    |> then(&get_in(bundle, &1))
+    |> as_map()
+    |> Enum.reduce(written, fn {state, state_data}, count ->
+      count +
+        write_state(directory, "#{code}-#{state}", state_data, country_days, names, language)
+    end)
   end
+
+  defp write_state(directory, key, state_data, country_days, names, language) do
+    state_days = Map.merge(country_days, sub_days(state_data))
+    written = write_days(directory, key, state_days, names, language)
+
+    state_data
+    |> sub_regions()
+    |> Enum.reduce(written, fn {region, region_data}, count ->
+      region_days = Map.merge(state_days, sub_days(region_data))
+      count + write_days(directory, "#{key}-#{region}", region_days, names, language)
+    end)
+  end
+
+  defp write_days(directory, key, days, names, language) do
+    days
+    |> DateHolidays.compile_days(language: language, names: names)
+    |> write_etf(directory, key)
+  end
+
+  defp as_days(days) when is_map(days), do: days
+  defp as_days(_absent), do: %{}
+  defp as_map(map) when is_map(map), do: map
+  defp as_map(_absent), do: %{}
+  defp sub_days(data), do: as_days(is_map(data) && Map.get(data, "days"))
+  defp sub_regions(data), do: as_map(is_map(data) && Map.get(data, "regions"))
 
   defp write_etf([], _directory, _code), do: 0
 

@@ -2,7 +2,9 @@
 
 ## [v0.1.0] — unreleased
 
-* `Tempo.Holidays.recurrences/1` and `materialise/2` return a territory's holidays — every `:type`, for every territory in the dataset — as Tempo recurrences, projected onto any year and date-sorted. `for_territory/1` takes a CLDR code as an atom or string.
+* `Tempo.Holidays.recurrences/2` and `materialise/3` return a territory's holidays — every `:type`, for every territory in the dataset — as Tempo recurrences, projected onto any year and date-sorted.
+
+* Requests accept a CLDR territory code, a BCP 47 locale (string, atom, or `Localize.LanguageTag`), or a holiday list. A locale is validated through `Localize` and its territory, state (division) and region (subdivision) derived — `en-US-u-sd-usca` selects California — each overridable via `:territory`/`:division`/`:subdivision`. State and region holidays are compiled and shipped alongside the national set (`Tempo.Holidays.Locale`).
 
 * Rule compiler covering date-holidays' grammar: fixed dates and `P<n>D` spans, weekday-in-month, relative and nested weekdays (Election Day, Black Friday), month-anchor weekdays, Islamic/Hebrew/Persian calendar dates, Easter/orthodox-relative, and specific dates. Islamic dates use Umm al-Qura and are returned in-calendar — a lunar date can fall twice in one Gregorian year, so `materialise/2` returns a list.
 

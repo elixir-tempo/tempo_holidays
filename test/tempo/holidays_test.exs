@@ -31,7 +31,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "an unknown territory is an error, not a crash" do
-      assert {:error, {:unknown_territory, :ZZ}} = Holidays.recurrences(:ZZ)
+      assert {:error, {:unknown_territory, "ZZ"}} = Holidays.recurrences(:ZZ)
     end
 
     test "a territory code string is accepted, case-insensitively" do
@@ -39,8 +39,8 @@ defmodule Tempo.HolidaysTest do
       assert Enum.any?(holidays, &(&1.name == "New Year's Day"))
     end
 
-    test "a value that is neither atom nor string is an error, not a crash" do
-      assert {:error, {:unknown_territory, 123}} = Holidays.recurrences(123)
+    test "a value that is neither atom nor string is an invalid locale, not a crash" do
+      assert {:error, {:invalid_locale, 123}} = Holidays.recurrences(123)
     end
   end
 
@@ -75,7 +75,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "an unknown territory is an error, not a crash" do
-      assert {:error, {:unknown_territory, :ZZ}} = Holidays.materialise(:ZZ, ~o"2026")
+      assert {:error, {:unknown_territory, "ZZ"}} = Holidays.materialise(:ZZ, ~o"2026")
     end
   end
 
@@ -229,6 +229,26 @@ defmodule Tempo.HolidaysTest do
       assert Tempo.Interval.to(first) == ~o"1420Y10M4D[u-ca=islamic-umalqura]"
       assert Tempo.Interval.from(second) == ~o"1421Y9M30D[u-ca=islamic-umalqura]"
       assert Tempo.Interval.to(second) == ~o"1421Y10M4D[u-ca=islamic-umalqura]"
+    end
+  end
+
+  describe "locale and state resolution" do
+    test "a locale with a subdivision loads the state's holidays" do
+      {:ok, national} = Holidays.recurrences(:US)
+      {:ok, california} = Holidays.recurrences("en-US-u-sd-usca")
+
+      refute "Presidents' Day" in Enum.map(national, & &1.name)
+      assert "Presidents' Day" in Enum.map(california, & &1.name)
+    end
+
+    test "the division option selects a state — NSW carries King's Birthday" do
+      {:ok, nsw} = Holidays.materialise(:AU, ~o"2026", division: "NSW")
+      assert Enum.any?(nsw, fn {holiday, _interval} -> holiday.name == "King's Birthday" end)
+    end
+
+    test "an unknown state falls back to the country" do
+      {:ok, holidays} = Holidays.recurrences(:US, division: "ZZ")
+      assert Enum.any?(holidays, &(&1.name == "New Year's Day"))
     end
   end
 end

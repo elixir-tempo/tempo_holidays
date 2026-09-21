@@ -30,22 +30,31 @@ defmodule Tempo.Holidays do
 
   """
 
-  alias Tempo.Holidays.{Data, Holiday, Rule}
+  alias Tempo.Holidays.{Data, Holiday, Locale, Rule}
 
   @doc """
-  Return the holiday recurrences for a territory.
+  Return the holiday recurrences for a locale.
 
   ### Arguments
 
-  * `territory` is a CLDR territory code as an atom, such as `:AU`.
+  * `locale` names the target — a CLDR territory code (`:AU`, `"AU"`), a BCP 47
+    locale identifier (`"en-AU"`, `"en-US-u-sd-usca"`, or the same as an atom),
+    or a `t:Localize.LanguageTag.t/0`. A locale is validated and its territory,
+    state (division) and region (subdivision) are derived; see
+    `Tempo.Holidays.Locale`.
+
+  ### Options
+
+  * `:territory`, `:division`, `:subdivision` — override the level derived from
+    the locale.
 
   ### Returns
 
-  * `{:ok, [t:Tempo.Holidays.Holiday.t/0]}` — each holiday paired with the
-    recurrence rule that places it in any year.
+  * `{:ok, [t:Tempo.Holidays.Holiday.t/0]}` — the holidays for the most specific
+    level with data, falling back to the country.
 
-  * `{:error, {:unknown_territory, territory}}` when there is no data for
-    the territory.
+  * `{:error, {:unknown_territory, territory}}` or `{:error, {:invalid_locale,
+    locale}}`.
 
   ### Examples
 
@@ -54,25 +63,36 @@ defmodule Tempo.Holidays do
       ["New Year's Day", "Australia Day"]
 
   """
-  @spec recurrences(term()) :: {:ok, [Holiday.t()]} | {:error, {:unknown_territory, term()}}
-  def recurrences(territory), do: Data.for_territory(territory)
+  @spec recurrences(Localize.LanguageTag.t() | atom() | String.t(), keyword()) ::
+          {:ok, [Holiday.t()]} | {:error, {atom(), term()}}
+  def recurrences(locale, options \\ []) do
+    with {:ok, resolved} <- Locale.resolve(locale, options) do
+      Data.for_territory(resolved.territory, resolved.division, resolved.subdivision)
+    end
+  end
 
   @doc """
-  Project a territory's holidays onto `year`, date-sorted.
+  Project a locale's holidays onto `year`, date-sorted.
 
   ### Arguments
 
-  * `territory` is a CLDR territory code as an atom, such as `:AU`.
+  * `locale` names the target as for `recurrences/2`, or a list of
+    `t:Tempo.Holidays.Holiday.t/0` to project directly.
 
   * `year` is a year-resolution `t:Tempo.t/0` such as `~o"2026"`.
+
+  ### Options
+
+  * `:territory`, `:division`, `:subdivision` — override the level derived from
+    the locale (ignored when a holiday list is given).
 
   ### Returns
 
   * `{:ok, [{t:Tempo.Holidays.Holiday.t/0, t:Tempo.Interval.t/0}]}` — each
     holiday paired with the interval it occupies that year, earliest first.
 
-  * `{:error, {:unknown_territory, territory}}` when there is no data for
-    the territory.
+  * `{:error, {:unknown_territory, territory}}` or `{:error, {:invalid_locale,
+    locale}}`.
 
   ### Examples
 
@@ -83,21 +103,26 @@ defmodule Tempo.Holidays do
       {"New Year's Day", ~o"2026Y1M1D"}
 
   """
-  @spec materialise(term() | [Holiday.t()], Tempo.t()) ::
-          {:ok, [{Holiday.t(), Tempo.Interval.t()}]} | {:error, {:unknown_territory, term()}}
-  def materialise(holidays, %Tempo{} = year) when is_list(holidays) do
+  @spec materialise(
+          Localize.LanguageTag.t() | atom() | String.t() | [Holiday.t()],
+          Tempo.t(),
+          keyword()
+        ) :: {:ok, [{Holiday.t(), Tempo.Interval.t()}]} | {:error, {atom(), term()}}
+  def materialise(locale_or_holidays, year, options \\ [])
+
+  def materialise(holidays, %Tempo{} = year, _options) when is_list(holidays) do
     {:ok, materialise_all(holidays, year)}
   end
 
-  def materialise(territory, %Tempo{} = year) do
-    with {:ok, holidays} <- Data.for_territory(territory) do
+  def materialise(locale, %Tempo{} = year, options) do
+    with {:ok, holidays} <- recurrences(locale, options) do
       {:ok, materialise_all(holidays, year)}
     end
   end
 
   # A holiday whose rule cannot land in this year is dropped rather than
   # failing the whole set — the same partial-support contract the compiler
-  # keeps. The seed slice materialises cleanly in every year.
+  # keeps.
   defp materialise_all(holidays, year) do
     holidays
     |> Enum.flat_map(&materialise_one(&1, year))
