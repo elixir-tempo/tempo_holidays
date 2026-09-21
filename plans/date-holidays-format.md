@@ -71,4 +71,13 @@ holidays:
 
 * [x] Resolve `_name` references against the bundle's top-level `names` table — days keyed only by `_name` get real, localized names (~50 languages) instead of the reference string.
 
-* [ ] Grow the compiler tiers (see "Not yet handled"), most-common first — `<weekday> before|after <date>` (US Memorial) and lunar calendars lead.
+* [ ] Grow the compiler tiers (see "Not yet handled"), most-common first — lunar calendars (Islamic first: `30 Ramadan P4D`) and the nested/Month-anchor relative weekdays (Black Friday, Election Day) lead.
+
+### Calendar-native output
+
+Lunar / non-Gregorian holidays are returned **in their own calendar** — an
+Islamic holiday materialises to an `[u-ca=islamic]` Tempo value, not a
+Gregorian conversion. Tempo is calendar-aware, so there is no need to convert
+output to Gregorian; the caller converts if they want to. This also sidesteps
+the "an Islamic date falls 0, 1 or 2 times in a Gregorian year" problem — the
+rule is projected onto the corresponding year of its own calendar.

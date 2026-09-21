@@ -205,16 +205,21 @@ defmodule Tempo.Holidays.Compiler do
     case Regex.run(~r/^\s*(easter|orthodox)\s*([+-]?\d+)?\s*$/i, rule) do
       [_, anchor | rest] ->
         offset = rest |> List.first() |> parse_offset()
-
-        {:ok,
-         %Rule{
-           kind: String.to_existing_atom(String.downcase(anchor)),
-           offset: offset,
-           source: rule
-         }}
+        {:ok, %Rule{kind: easter_kind(anchor), offset: offset, source: rule}}
 
       nil ->
         nil
+    end
+  end
+
+  # An explicit map, never `String.to_existing_atom/1`: the atoms are
+  # interned here rather than depending on `:easter`/`:orthodox` already
+  # existing when a rule string is compiled (and the regex guarantees one
+  # of these two).
+  defp easter_kind(anchor) do
+    case String.downcase(anchor) do
+      "easter" -> :easter
+      "orthodox" -> :orthodox
     end
   end
 
