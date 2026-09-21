@@ -22,3 +22,9 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 tempo_holidays-*.tar
 
+# Per-developer session context handed between Claude Code sessions.
+CLAUDE.local.md
+
+# Precompiled-checksum file, generated at publish time.
+checksum.exs
+

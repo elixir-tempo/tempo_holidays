@@ -139,4 +139,47 @@ defmodule Tempo.HolidaysTest do
       assert anzac.substitute == nil
     end
   end
+
+  describe "US federal holidays" do
+    test "projects the 2026 federal holidays" do
+      expected = %{
+        "New Year's Day" => ~o"2026Y1M1D",
+        "Birthday of Martin Luther King, Jr." => ~o"2026Y1M19D",
+        "Washington's Birthday" => ~o"2026Y2M16D",
+        "Memorial Day" => ~o"2026Y5M25D",
+        "Juneteenth National Independence Day" => ~o"2026Y6M19D",
+        "Independence Day" => ~o"2026Y7M3D",
+        "Labor Day" => ~o"2026Y9M7D",
+        "Columbus Day" => ~o"2026Y10M12D",
+        "Veterans Day" => ~o"2026Y11M11D",
+        "Thanksgiving Day" => ~o"2026Y11M26D",
+        "Christmas Day" => ~o"2026Y12M25D"
+      }
+
+      assert {:ok, holidays} = Holidays.materialise(:US, ~o"2026")
+      assert length(holidays) == 11
+
+      for {holiday, interval} <- holidays do
+        assert Tempo.Interval.from(interval) == Map.fetch!(expected, holiday.name)
+      end
+    end
+
+    test "Memorial Day is the last Monday in May" do
+      {:ok, holidays} = Holidays.materialise(:US, ~o"2026")
+      assert date_of(holidays, "Memorial Day") == ~o"2026Y5M25D"
+    end
+
+    test "a Saturday holiday is observed the prior Friday" do
+      # Independence Day 2026 is Saturday 4 July; the US observes it on
+      # Friday the 3rd — the opposite direction to the AU weekend rule.
+      {:ok, holidays} = Holidays.materialise(:US, ~o"2026")
+      assert date_of(holidays, "Independence Day") == ~o"2026Y7M3D"
+    end
+
+    test "a Sunday holiday is observed the next Monday" do
+      # New Year's Day 2023 fell on Sunday 1 January; observed Monday the 2nd.
+      {:ok, holidays} = Holidays.materialise(:US, ~o"2023")
+      assert date_of(holidays, "New Year's Day") == ~o"2023Y1M2D"
+    end
+  end
 end

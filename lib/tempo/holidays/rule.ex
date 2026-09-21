@@ -24,13 +24,15 @@ defmodule Tempo.Holidays.Rule do
   @type kind :: :fixed | :weekday | :easter | :orthodox
 
   @typedoc """
-  An observed-date substitution: `{trigger_weekdays, target_weekday}` clauses
-  in ISO weekday numbering (Monday = 1 … Sunday = 7). When the materialised
-  date lands on one of the trigger weekdays, the holiday is observed on the
-  next occurrence of the target weekday. "If it falls on a weekend, take the
-  following Monday" is `[{[6, 7], 1}]`.
+  An observed-date substitution: `{trigger_weekdays, direction, target_weekday}`
+  clauses in ISO weekday numbering (Monday = 1 … Sunday = 7). When the
+  materialised date lands on one of the trigger weekdays, the holiday is
+  observed on the nearest `:next` or `:previous` occurrence of the target
+  weekday. "If it falls on a weekend, take the following Monday" is
+  `[{[6, 7], :next, 1}]`; the US rule "Saturday → prior Friday, Sunday →
+  next Monday" is `[{[6], :previous, 5}, {[7], :next, 1}]`.
   """
-  @type substitute :: [{[1..7], 1..7}]
+  @type substitute :: [{[1..7], :next | :previous, 1..7}]
 
   @type t :: %__MODULE__{
           kind: kind(),
@@ -112,17 +114,23 @@ defmodule Tempo.Holidays.Rule do
     date = Interval.from(interval)
     weekday = Tempo.day_of_week(date, :monday)
 
-    case Enum.find(clauses, fn {triggers, _target} -> weekday in triggers end) do
+    case Enum.find(clauses, fn {triggers, _direction, _target} -> weekday in triggers end) do
       nil -> {:ok, interval}
-      {_triggers, target} -> observe_on(date, weekday, target)
+      {_triggers, direction, target} -> observe_on(date, weekday, direction, target)
     end
   end
 
-  defp observe_on(date, weekday, target) do
-    days_forward = Integer.mod(target - weekday, 7)
+  defp observe_on(date, weekday, :next, target) do
+    shift_days(date, Integer.mod(target - weekday, 7))
+  end
 
+  defp observe_on(date, weekday, :previous, target) do
+    shift_days(date, -Integer.mod(weekday - target, 7))
+  end
+
+  defp shift_days(date, days) do
     date
-    |> Tempo.shift(day: days_forward)
+    |> Tempo.shift(day: days)
     |> Tempo.to_interval()
     |> first_interval()
   end

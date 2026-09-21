@@ -82,7 +82,11 @@ defmodule Tempo.Holidays.Compiler do
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("01-26 if weekend then next monday")
       iex> {rule.kind, rule.month, rule.day, rule.substitute}
-      {:fixed, 1, 26, [{[6, 7], 1}]}
+      {:fixed, 1, 26, [{[6, 7], :next, 1}]}
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("last Monday in May")
+      iex> {rule.kind, rule.count, rule.weekday, rule.month}
+      {:weekday, -1, 1, 5}
 
   """
   @spec compile(String.t()) :: {:ok, Rule.t()} | {:error, {:unsupported, String.t()}}
@@ -112,17 +116,18 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
-  # ── weekday-in-month: "2nd Monday in June" ──────────────────────────
+  # ── weekday-in-month: "2nd Monday in June", "last Monday in May" ─────
   defp compile_weekday(rule) do
-    pattern = ~r/^\s*(\d+)(?:st|nd|rd|th)\s+(\w+)\s+in\s+(\w+)\s*$/i
+    pattern = ~r/^\s*(\w+)\s+(\w+)\s+in\s+(\w+)\s*$/i
 
-    with [_, count, weekday, month] <- Regex.run(pattern, rule),
+    with [_, ordinal, weekday, month] <- Regex.run(pattern, rule),
+         {:ok, count} <- parse_ordinal(ordinal),
          {:ok, code} <- Map.fetch(@weekdays, String.downcase(weekday)),
          {:ok, month_number} <- Map.fetch(@months, String.downcase(month)) do
       {:ok,
        %Rule{
          kind: :weekday,
-         count: String.to_integer(count),
+         count: count,
          weekday: code,
          month: month_number,
          source: rule
@@ -132,12 +137,42 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
+  # An ordinal is a word (`first` … `fifth`, `last`) or a digit with an
+  # English suffix (`1st`, `2nd`). `last` is `-1` — the ISO `-1I` selector.
+  @word_ordinals %{
+    "first" => 1,
+    "second" => 2,
+    "third" => 3,
+    "fourth" => 4,
+    "fifth" => 5,
+    "last" => -1
+  }
+
+  defp parse_ordinal(ordinal) do
+    case Map.fetch(@word_ordinals, String.downcase(ordinal)) do
+      {:ok, count} ->
+        {:ok, count}
+
+      :error ->
+        case Regex.run(~r/^(\d+)(?:st|nd|rd|th)$/i, ordinal) do
+          [_, digits] -> {:ok, String.to_integer(digits)}
+          nil -> :error
+        end
+    end
+  end
+
   # ── easter-relative: "easter", "easter -2", "orthodox 1" ────────────
   defp compile_easter(rule) do
     case Regex.run(~r/^\s*(easter|orthodox)\s*([+-]?\d+)?\s*$/i, rule) do
       [_, anchor | rest] ->
         offset = rest |> List.first() |> parse_offset()
-        {:ok, %Rule{kind: String.to_existing_atom(String.downcase(anchor)), offset: offset, source: rule}}
+
+        {:ok,
+         %Rule{
+           kind: String.to_existing_atom(String.downcase(anchor)),
+           offset: offset,
+           source: rule
+         }}
 
       nil ->
         nil
@@ -150,11 +185,13 @@ defmodule Tempo.Holidays.Compiler do
 
   # ── observed-date substitution: "… if weekend then next monday" ─────
   #
-  # Splits any `if <weekdays> then next <weekday>` clauses off the base
-  # rule and compiles them to `{trigger_weekdays, target_weekday}` in ISO
-  # numbering. `weekend` expands to Saturday and Sunday; a comma list
-  # (`saturday,sunday`) is taken verbatim. Several clauses may chain.
-  @substitute_pattern ~r/if\s+([a-z,]+)\s+then\s+next\s+([a-z]+)/i
+  # Splits any `if <weekdays> then (next|previous) <weekday>` clauses off
+  # the base rule and compiles them to `{trigger_weekdays, direction,
+  # target_weekday}` in ISO numbering. `weekend` expands to Saturday and
+  # Sunday; a comma list (`saturday,sunday`) is taken verbatim. Several
+  # clauses may chain — the US rule is `if saturday then previous friday
+  # if sunday then next monday`.
+  @substitute_pattern ~r/if\s+([a-z,]+)\s+then\s+(next|previous)\s+([a-z]+)/i
 
   defp extract_substitution(rule) do
     clauses =
@@ -171,14 +208,17 @@ defmodule Tempo.Holidays.Compiler do
     {base, if(clauses == [], do: nil, else: clauses)}
   end
 
-  defp parse_substitute_clause([_match, triggers, target]) do
+  defp parse_substitute_clause([_match, triggers, direction, target]) do
     with {:ok, trigger_days} <- parse_weekday_set(triggers),
          {:ok, target_day} <- Map.fetch(@weekdays, String.downcase(target)) do
-      [{trigger_days, target_day}]
+      [{trigger_days, direction_atom(String.downcase(direction)), target_day}]
     else
       _ -> []
     end
   end
+
+  defp direction_atom("next"), do: :next
+  defp direction_atom("previous"), do: :previous
 
   defp parse_weekday_set(triggers) do
     case String.downcase(triggers) do

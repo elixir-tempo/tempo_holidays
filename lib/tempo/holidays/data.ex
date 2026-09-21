@@ -2,9 +2,9 @@ defmodule Tempo.Holidays.Data do
   @moduledoc """
   Built-in holiday definitions, keyed by CLDR territory.
 
-  This is the seed slice — Australia's national public holidays as
-  [date-holidays](https://github.com/commenthol/date-holidays) rule strings,
-  compiled to `t:Tempo.Holidays.Holiday.t/0` on demand. A later
+  This is the seed slice — Australia's and the United States' national public
+  holidays as [date-holidays](https://github.com/commenthol/date-holidays)
+  rule strings, compiled to `t:Tempo.Holidays.Holiday.t/0` on demand. A later
   `mix tempo.holidays.update` task will replace it with the full dataset
   compiled under `priv/holidays/`.
 
@@ -20,6 +20,10 @@ defmodule Tempo.Holidays.Data do
   # and Boxing Day also substitute, but their weekend cascade (Boxing Day
   # steps past Christmas' observed Monday) needs collision resolution across
   # holidays — deferred to that pass.
+  #
+  # The US federal holidays follow the "Saturday → prior Friday, Sunday →
+  # next Monday" observance on their fixed dates; the weekday-in-month days
+  # (MLK, Memorial, Labor, …) always land on a weekday, so they need none.
   @territories %{
     AU: [
       {"New Year's Day", "01-01 if weekend then next monday"},
@@ -30,6 +34,20 @@ defmodule Tempo.Holidays.Data do
       {"King's Birthday", "2nd Monday in June"},
       {"Christmas Day", "12-25"},
       {"Boxing Day", "12-26"}
+    ],
+    US: [
+      {"New Year's Day", "01-01 if saturday then previous friday if sunday then next monday"},
+      {"Birthday of Martin Luther King, Jr.", "3rd Monday in January"},
+      {"Washington's Birthday", "3rd Monday in February"},
+      {"Memorial Day", "last Monday in May"},
+      {"Juneteenth National Independence Day",
+       "06-19 if saturday then previous friday if sunday then next monday"},
+      {"Independence Day", "07-04 if saturday then previous friday if sunday then next monday"},
+      {"Labor Day", "1st Monday in September"},
+      {"Columbus Day", "2nd Monday in October"},
+      {"Veterans Day", "11-11 if saturday then previous friday if sunday then next monday"},
+      {"Thanksgiving Day", "4th Thursday in November"},
+      {"Christmas Day", "12-25 if saturday then previous friday if sunday then next monday"}
     ]
   }
 
@@ -78,11 +96,11 @@ defmodule Tempo.Holidays.Data do
   ### Examples
 
       iex> Tempo.Holidays.Data.territories()
-      [:AU]
+      [:AU, :US]
 
   """
   @spec territories() :: [atom()]
-  def territories, do: Map.keys(@territories)
+  def territories, do: @territories |> Map.keys() |> Enum.sort()
 
   # A rule string this slice cannot yet compile is dropped rather than
   # failing the whole territory — partial support is correct for partial
