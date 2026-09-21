@@ -3,19 +3,22 @@ defmodule Tempo.Holidays.Compiler do
   Compiles [date-holidays](https://github.com/commenthol/date-holidays) rule
   strings into `t:Tempo.Holidays.Rule.t/0`.
 
-  This is the slice covering the first three grammar tiers:
+  This is the slice covering the grammar tiers:
 
   * **Fixed** — `"MM-DD"` (e.g. `"12-25"`).
 
-  * **Weekday-in-month** — `"<n><ordinal> <Weekday> in <Month>"`
-    (e.g. `"2nd Monday in June"`).
+  * **Weekday-in-month** — `"<ordinal> <Weekday> in <Month>"`, where the
+    ordinal is a word (`first` … `fifth`, `last`) or a numeral (`"2nd Monday
+    in June"`, `"last Monday in May"`).
 
   * **Easter-relative** — `"easter"` / `"orthodox"` with an optional signed
     day offset (e.g. `"easter -2"` for Good Friday).
 
-  Any of these may carry an **observed-date substitution** suffix —
-  `"… if weekend then next monday"`, or an explicit weekday list
-  (`"… if saturday,sunday then next monday"`) — compiled to the rule's
+  Any of these may carry an **observed-date substitution** suffix — one or
+  more `"if <weekdays> then (next|previous) <weekday>"` clauses, with
+  `weekend` shorthand for `saturday,sunday`. "If it falls on a weekend, take
+  the following Monday" and the US "if saturday then previous friday if
+  sunday then next monday" both compile to the rule's
   `t:Tempo.Holidays.Rule.substitute/0`.
 
   Rule strings it does not yet understand return `{:error, {:unsupported,
