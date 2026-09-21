@@ -7,11 +7,13 @@ defmodule Tempo.Holidays.Rule do
   string by `Tempo.Holidays.Compiler`. `materialise/2` projects it onto a
   concrete year, yielding the `t:Tempo.Interval.t/0` for that occurrence.
 
-  Each `:kind` maps to the machinery that can express it: `:fixed` and
-  `:weekday` are Tempo-native ISO 8601-2 selections (`FL12M25DN`,
-  `FL6M2I1KN`); `:easter` / `:orthodox` are computed through Calendrical's
+  Each `:kind` maps to the machinery that can express it: `:fixed`,
+  `:weekday` and `:relative_weekday` are Tempo-native date selections and
+  arithmetic; `:easter` / `:orthodox` are computed through Calendrical's
   ecclesiastical calendar, since Easter is not expressible as an ISO 8601
-  recurrence.
+  recurrence; and `:islamic` is materialised in the Islamic calendar,
+  returned as an `[u-ca=islamic-civil]` value rather than converted to
+  Gregorian.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on
   a weekend, observe it the following Monday" — applied after the base date
@@ -19,6 +21,7 @@ defmodule Tempo.Holidays.Rule do
 
   """
 
+  alias Calendrical.Islamic.Civil
   alias Tempo.Interval
 
   @type kind :: :fixed | :weekday | :relative_weekday | :islamic | :easter | :orthodox
@@ -50,17 +53,24 @@ defmodule Tempo.Holidays.Rule do
   defstruct [:kind, :month, :day, :count, :weekday, :direction, :offset, :substitute, :source]
 
   @doc """
-  Project a rule onto `year`, returning the occurrence as an interval.
+  Project a rule onto a Gregorian `year`, returning its occurrences as
+  intervals.
+
+  Most holidays fall exactly once a year, but a lunar-calendar holiday can
+  fall zero, one or two times within a single Gregorian year — Eid al-Fitr
+  fell twice in 2000 — so the result is a list, earliest first.
 
   ### Arguments
 
   * `rule` is a `t:t/0`.
 
-  * `year` is a year-resolution `t:Tempo.t/0` such as `~o"2026"`.
+  * `year` is a year-resolution Gregorian `t:Tempo.t/0` such as `~o"2026"`.
 
   ### Returns
 
-  * `{:ok, t:Tempo.Interval.t/0}` — the holiday's span in that year.
+  * `{:ok, [t:Tempo.Interval.t/0]}` — the holiday's spans in that Gregorian
+    year, earliest first. Usually one; empty when the rule does not fall in
+    the year, two for a lunar holiday that recurs within it.
 
   * `{:error, reason}` when the rule cannot be projected.
 
@@ -68,29 +78,29 @@ defmodule Tempo.Holidays.Rule do
 
       iex> import Tempo.Sigils
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
-      iex> {:ok, interval} = Tempo.Holidays.Rule.materialise(rule, ~o"2026")
+      iex> {:ok, [interval]} = Tempo.Holidays.Rule.materialise(rule, ~o"2026")
       iex> Tempo.Interval.from(interval)
       ~o"2026Y12M25D"
 
   """
-  @spec materialise(t(), Tempo.t()) :: {:ok, Interval.t()} | {:error, term()}
+  @spec materialise(t(), Tempo.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   def materialise(%__MODULE__{} = rule, %Tempo{} = year) do
-    with {:ok, interval} <- materialise_base(rule, year) do
-      apply_substitute(interval, rule.substitute)
+    with {:ok, intervals} <- materialise_base(rule, year) do
+      substitute_all(intervals, rule.substitute)
     end
   end
 
   defp materialise_base(%__MODULE__{kind: :fixed, month: month, day: day}, %Tempo{} = year) do
     with {:ok, selector} <- Tempo.from_iso8601(month_day(month, day)),
          {:ok, set} <- Tempo.select(year, selector) do
-      first_interval(set)
+      wrap_one(first_interval(set))
     end
   end
 
   defp materialise_base(%__MODULE__{kind: :weekday} = rule, %Tempo{} = year) do
     with {:ok, recurrence} <- Tempo.from_iso8601(weekday_iso(rule)),
          {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
-      first_interval(set)
+      wrap_one(first_interval(set))
     end
   end
 
@@ -106,23 +116,26 @@ defmodule Tempo.Holidays.Rule do
       |> Tempo.shift(day: shift)
       |> Tempo.to_interval()
       |> first_interval()
+      |> wrap_one()
     end
   end
 
   # An Islamic holiday is calculated — and returned — in the Islamic
-  # calendar, per Tempo's calendar-awareness: `year` names the *Hijri* year,
-  # and the result is an `[u-ca=islamic-civil]` interval, not a Gregorian
-  # conversion. A `count` greater than one spans that many days (the `P<n>D`
-  # form, e.g. the four days of Eid al-Fitr).
+  # calendar, per Tempo's calendar-awareness: the result is an
+  # `[u-ca=islamic-civil]` interval, not a Gregorian conversion. `year` is
+  # the *Gregorian* year, and `Calendrical`'s `dates_in_gregorian_year/3`
+  # finds which Hijri occurrences of the date fall in it — zero, one, or
+  # (as for Eid al-Fitr in 2000) two. A `count` greater than one spans that
+  # many days (the `P<n>D` form, e.g. the four days of Eid al-Fitr).
   defp materialise_base(
          %__MODULE__{kind: :islamic, month: month, day: day, count: count},
          %Tempo{} = year
        ) do
-    with {:ok, base} <-
-           Tempo.from_iso8601("#{Tempo.year(year)}Y#{month}M#{day}D[u-ca=islamic-civil]"),
-         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
-      {:ok, span_days(interval, base, count)}
-    end
+    gregorian_year = Tempo.year(year)
+
+    gregorian_year
+    |> Civil.dates_in_gregorian_year(month, day)
+    |> reduce_ok(&islamic_interval(&1, count))
   end
 
   defp materialise_base(%__MODULE__{kind: kind, offset: offset}, %Tempo{} = year)
@@ -132,6 +145,19 @@ defmodule Tempo.Holidays.Rule do
     |> Tempo.shift(day: offset || 0)
     |> Tempo.to_interval()
     |> first_interval()
+    |> wrap_one()
+  end
+
+  # One Hijri occurrence (a `t:Date.t/0` in the Islamic calendar) becomes an
+  # `[u-ca=islamic-civil]` interval, spanning `count` days for a multi-day
+  # holiday. The date's own Hijri year is used, so the value stays in
+  # calendar rather than being converted to Gregorian.
+  defp islamic_interval(%Date{} = date, count) do
+    with {:ok, base} <-
+           Tempo.from_iso8601("#{date.year}Y#{date.month}M#{date.day}D[u-ca=islamic-civil]"),
+         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
+      {:ok, span_days(interval, base, count)}
+    end
   end
 
   # A one-day interval already spans a single day; a longer holiday moves
@@ -141,13 +167,15 @@ defmodule Tempo.Holidays.Rule do
 
   # ── observed-date substitution ──────────────────────────────────────
 
-  # When the holiday lands on a trigger weekday, observe it on the next
-  # occurrence of the target weekday. A no-op when the rule names no
-  # substitution or the date is not triggered.
-  defp apply_substitute(interval, nil), do: {:ok, interval}
-  defp apply_substitute(interval, []), do: {:ok, interval}
+  # Apply the substitution to every occurrence. A no-op when the rule names
+  # no substitution.
+  defp substitute_all(intervals, nil), do: {:ok, intervals}
+  defp substitute_all(intervals, []), do: {:ok, intervals}
+  defp substitute_all(intervals, clauses), do: reduce_ok(intervals, &substitute_one(&1, clauses))
 
-  defp apply_substitute(interval, clauses) do
+  # When the holiday lands on a trigger weekday, observe it on the next
+  # occurrence of the target weekday. A no-op when the date is not triggered.
+  defp substitute_one(interval, clauses) do
     date = Interval.from(interval)
     weekday = Tempo.day_of_week(date, :monday)
 
@@ -212,6 +240,25 @@ defmodule Tempo.Holidays.Rule do
       nil -> {:error, :no_occurrence}
     end
   end
+
+  # A single-occurrence kind yields one interval; lift it into the
+  # one-element list `materialise/2` returns, propagating any error.
+  defp wrap_one({:ok, %Interval{} = interval}), do: {:ok, [interval]}
+  defp wrap_one({:error, _} = error), do: error
+
+  # Map an `{:ok, _} | {:error, _}` function over `items`, collecting the
+  # values in order into `{:ok, list}`, or returning the first error.
+  defp reduce_ok(items, fun) do
+    items
+    |> Enum.reduce_while([], &collect_ok(fun.(&1), &2))
+    |> finish_ok()
+  end
+
+  defp collect_ok({:ok, value}, acc), do: {:cont, [value | acc]}
+  defp collect_ok({:error, _} = error, _acc), do: {:halt, error}
+
+  defp finish_ok({:error, _} = error), do: error
+  defp finish_ok(acc) when is_list(acc), do: {:ok, Enum.reverse(acc)}
 
   defp month_day(month, day), do: "#{pad(month)}-#{pad(day)}"
   defp pad(number), do: String.pad_leading(Integer.to_string(number), 2, "0")

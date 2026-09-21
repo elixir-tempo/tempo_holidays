@@ -9,7 +9,7 @@ more than a line here.
 
 * [ ] **Additional-day (in-lieu) holidays** — AU Christmas/Boxing keep their date on a weekend *and* add an observed weekday (unlike the New Year / Australia Day shift), needing per-holiday semantics and collision resolution across the added days. Waits on the real dataset, which encodes the per-territory rules.
 
-* [ ] **Compiler tiers beyond the current set** — lunar calendars (Islamic, Hebrew, Chinese, Persian, Bengali via Calendrical), equinox/solstice and solar terms (via Astro / lunisolar calendars), active-range and disable/enable qualifiers, and holiday `:type`.
+* [ ] **Compiler tiers beyond the current set** — lunar calendars (Hebrew, Chinese, Persian, Bengali via Calendrical, like the Islamic tier), equinox/solstice and solar terms (via Astro / lunisolar calendars), active-range and disable/enable qualifiers, and holiday `:type`.
 
 * [ ] **Cross-year range holidays** — school-holiday periods expressed as `:range` rules; the name-aware coalescing that merges their split entries is already in place.
 
@@ -18,6 +18,8 @@ more than a line here.
 * [ ] **More territories** — AU and US are the seed; extend once the download task lands.
 
 ## Done
+
+* [x] **Islamic (Hijri) tier** — holidays projected onto a Gregorian year via Calendrical's `dates_in_gregorian_year/3` and returned in `[u-ca=islamic-civil]`; `materialise/2` returns a list, so a lunar date that falls twice in a Gregorian year (Eid al-Fitr in 2000) yields both occurrences. 2026-09-21.
 
 * [x] **AU and US public-holiday slices** — `Tempo.Holidays.recurrences/1` and `materialise/2` over each territory's national holidays, date-sorted. 2026-09-21.
 

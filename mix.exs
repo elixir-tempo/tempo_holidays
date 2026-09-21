@@ -76,7 +76,10 @@ defmodule Tempo.Holidays.MixProject do
     [
       # Path dep during co-development; becomes {:ex_tempo, "~> 1.6"} before publish.
       {:ex_tempo, path: "../tempo"},
-      {:calendrical, "~> 1.3"},
+      # Path dep: the Islamic tier needs Calendrical's dates_in_gregorian_year,
+      # unreleased as of 1.3.0. `override` because ex_tempo/localize pull the
+      # hex calendrical as a child. Becomes {:calendrical, "~> 1.4"} before publish.
+      {:calendrical, path: "../../localize/calendrical", override: true},
       {:astro, "~> 2.5"},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.

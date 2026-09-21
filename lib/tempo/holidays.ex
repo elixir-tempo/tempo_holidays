@@ -101,7 +101,7 @@ defmodule Tempo.Holidays do
 
   defp materialise_one(%Holiday{rule: rule} = holiday, year) do
     case Rule.materialise(rule, year) do
-      {:ok, interval} -> [{holiday, interval}]
+      {:ok, intervals} -> Enum.map(intervals, &{holiday, &1})
       {:error, _} -> []
     end
   end

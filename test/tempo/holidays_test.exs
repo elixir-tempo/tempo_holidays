@@ -187,38 +187,52 @@ defmodule Tempo.HolidaysTest do
     test "the weekday before a date — US Memorial Day (monday before 06-01)" do
       {:ok, rule} = Compiler.compile("monday before 06-01")
 
-      assert {:ok, interval} = Rule.materialise(rule, ~o"2026")
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
       assert Tempo.Interval.from(interval) == ~o"2026Y5M25D"
 
       # Re-projects: the last Monday of May 2027 is the 31st.
-      assert {:ok, interval_2027} = Rule.materialise(rule, ~o"2027")
+      assert {:ok, [interval_2027]} = Rule.materialise(rule, ~o"2027")
       assert Tempo.Interval.from(interval_2027) == ~o"2027Y5M31D"
     end
 
     test "the weekday after a date (friday after 11-11)" do
       {:ok, rule} = Compiler.compile("friday after 11-11")
 
-      assert {:ok, interval} = Rule.materialise(rule, ~o"2026")
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
       assert Tempo.Interval.from(interval) == ~o"2026Y11M13D"
     end
   end
 
   describe "Islamic (Hijri) holidays" do
     test "materialise in the Islamic calendar, not Gregorian" do
-      # Islamic New Year — 1 Muharram of the Hijri year 1447.
+      # Islamic New Year — 1 Muharram. Projected onto the Gregorian year
+      # 2025, which holds 1 Muharram of the Hijri year 1447.
       {:ok, rule} = Compiler.compile("1 Muharram")
 
-      assert {:ok, interval} = Rule.materialise(rule, ~o"1447")
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"1447Y1M1D[u-ca=islamic-civil]"
     end
 
     test "a P<n>D span covers that many days, crossing months in-calendar" do
       # Eid al-Fitr — "30 Ramadan P4D" runs from 30 Ramadan into Shawwal.
+      # 30 Ramadan 1447 falls in the Gregorian year 2026.
       {:ok, rule} = Compiler.compile("30 Ramadan P4D")
 
-      assert {:ok, interval} = Rule.materialise(rule, ~o"1447")
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
       assert Tempo.Interval.from(interval) == ~o"1447Y9M30D[u-ca=islamic-civil]"
       assert Tempo.Interval.to(interval) == ~o"1447Y10M4D[u-ca=islamic-civil]"
+    end
+
+    test "a lunar date can fall twice in one Gregorian year" do
+      # 30 Ramadan (Eid al-Fitr's eve) fell in both Hijri 1420 and 1421
+      # within the Gregorian year 2000 — the recurrence yields both.
+      {:ok, rule} = Compiler.compile("30 Ramadan P4D")
+
+      assert {:ok, [first, second]} = Rule.materialise(rule, ~o"2000")
+      assert Tempo.Interval.from(first) == ~o"1420Y9M30D[u-ca=islamic-civil]"
+      assert Tempo.Interval.to(first) == ~o"1420Y10M4D[u-ca=islamic-civil]"
+      assert Tempo.Interval.from(second) == ~o"1421Y9M30D[u-ca=islamic-civil]"
+      assert Tempo.Interval.to(second) == ~o"1421Y10M4D[u-ca=islamic-civil]"
     end
   end
 end
