@@ -84,8 +84,11 @@ defmodule Mix.Tasks.Tempo.Holidays.Update do
   @spec holidays_from_bundle(map(), String.t(), String.t()) :: [Tempo.Holidays.Holiday.t()]
   def holidays_from_bundle(bundle, code, language) do
     case get_in(bundle, ["holidays", code, "days"]) do
-      days when is_map(days) -> DateHolidays.compile_days(days, language: language)
-      _absent -> []
+      days when is_map(days) ->
+        DateHolidays.compile_days(days, language: language, names: Map.get(bundle, "names", %{}))
+
+      _absent ->
+        []
     end
   end
 

@@ -54,12 +54,27 @@ defmodule Tempo.Holidays.DateHolidaysTest do
         Map.new(DateHolidays.compile_days(days, language: "es"), &{&1.rule.month, &1.name})
 
       assert spanish[1] == "Natalicio de Martin Luther King, Jr."
-      # No `_name` resolution yet, so the reference stands in for the name.
+      # With no names table given, a `_name` reference stands in for its name.
       assert spanish[5] == "05-01"
 
       # A language the entry lacks falls back to English.
       german = Map.new(DateHolidays.compile_days(days, language: "de"), &{&1.rule.month, &1.name})
       assert german[1] == "Martin Luther King Jr. Day"
+    end
+
+    test "resolves a _name reference against the bundle's names table" do
+      days = %{"01-01" => %{"_name" => "01-01"}}
+      names = %{"01-01" => %{"name" => %{"en" => "New Year's Day", "fr" => "Nouvel An"}}}
+
+      assert [english] = DateHolidays.compile_days(days, names: names)
+      assert english.name == "New Year's Day"
+
+      assert [french] = DateHolidays.compile_days(days, names: names, language: "fr")
+      assert french.name == "Nouvel An"
+
+      # A reference absent from the table stands in for its own name.
+      absent = DateHolidays.compile_days(%{"01-06" => %{"_name" => "01-06"}}, names: names)
+      assert [%{name: "01-06"}] = absent
     end
   end
 end

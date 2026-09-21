@@ -69,6 +69,6 @@ holidays:
 
 * [ ] States/regions: the task compiles only the country-level `days`; sub-territory `days` (`US-AL`, …) are still to come.
 
-* [ ] Resolve `_name` references against `names.yaml`/`names.json` so days keyed only by `_name` get real names, not the reference string.
+* [x] Resolve `_name` references against the bundle's top-level `names` table — days keyed only by `_name` get real, localized names (~50 languages) instead of the reference string.
 
 * [ ] Grow the compiler tiers (see "Not yet handled"), most-common first — `<weekday> before|after <date>` (US Memorial) and lunar calendars lead.

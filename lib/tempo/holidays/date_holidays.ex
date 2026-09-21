@@ -63,7 +63,8 @@ defmodule Tempo.Holidays.DateHolidays do
   @spec compile_days(map(), keyword()) :: [Holiday.t()]
   def compile_days(days, options \\ []) when is_map(days) do
     language = Keyword.get(options, :language, "en")
-    Enum.flat_map(days, fn {rule, meta} -> compile_day(rule, meta, language) end)
+    names = Keyword.get(options, :names, %{})
+    Enum.flat_map(days, fn {rule, meta} -> compile_day(rule, meta, language, names) end)
   end
 
   @doc """
@@ -76,6 +77,10 @@ defmodule Tempo.Holidays.DateHolidays do
   * `meta` is its metadata map (`"name"`, `"_name"`, `"type"`, …).
 
   * `language` is the ISO 639-1 code for name selection.
+
+  * `names` is the bundle's shared `_name` translation table — the
+    top-level `"names"` map — used to resolve a `_name` reference. Defaults
+    to `%{}` (references then stand in for their own names).
 
   ### Returns
 
@@ -91,32 +96,52 @@ defmodule Tempo.Holidays.DateHolidays do
       iex> {holiday.name, holiday.type, holiday.rule.kind}
       {"Independence Day", :public, :fixed}
 
+      iex> names = %{"01-01" => %{"name" => %{"en" => "New Year's Day", "fr" => "Nouvel An"}}}
+      iex> [holiday] = Tempo.Holidays.DateHolidays.compile_day("01-01", %{"_name" => "01-01"}, "fr", names)
+      iex> holiday.name
+      "Nouvel An"
+
   """
-  @spec compile_day(String.t(), map(), String.t()) :: [Holiday.t()]
-  def compile_day(rule, meta, language) when is_binary(rule) and is_map(meta) do
+  @spec compile_day(String.t(), map(), String.t(), map()) :: [Holiday.t()]
+  def compile_day(rule, meta, language, names \\ %{}) when is_binary(rule) and is_map(meta) do
     case Compiler.compile(rule) do
       {:ok, compiled} ->
-        [%Holiday{name: name(meta, language, rule), type: type(meta), rule: compiled}]
+        [%Holiday{name: name(meta, language, names, rule), type: type(meta), rule: compiled}]
 
       {:error, _unsupported} ->
         []
     end
   end
 
-  # Prefer the requested language, then English, then the `_name` reference
-  # (resolved against `names.yaml` in a later pass), then the rule itself.
-  defp name(meta, language, fallback) do
-    inline_name(meta, language) || underscore_name(meta) || fallback
+  # Prefer the requested language on an inline name, then the `_name`
+  # reference resolved against the bundle's shared names table (by language,
+  # then English), then the reference or rule string — so a name always
+  # comes out.
+  defp name(meta, language, names, fallback) do
+    inline_name(meta, language) || referenced_name(meta, names, language) || fallback
   end
 
-  defp inline_name(%{"name" => names}, language) when is_map(names) do
-    Map.get(names, language) || Map.get(names, "en")
+  defp inline_name(%{"name" => translations}, language) when is_map(translations) do
+    Map.get(translations, language) || Map.get(translations, "en")
   end
 
   defp inline_name(_meta, _language), do: nil
 
-  defp underscore_name(%{"_name" => reference}) when is_binary(reference), do: reference
-  defp underscore_name(_meta), do: nil
+  defp referenced_name(%{"_name" => reference}, names, language) when is_binary(reference) do
+    resolve_reference(names, reference, language) || reference
+  end
+
+  defp referenced_name(_meta, _names, _language), do: nil
+
+  defp resolve_reference(names, reference, language) do
+    case Map.get(names, reference) do
+      %{"name" => translations} when is_map(translations) ->
+        Map.get(translations, language) || Map.get(translations, "en")
+
+      _absent ->
+        nil
+    end
+  end
 
   defp type(%{"type" => type}) when is_binary(type), do: Map.get(@types, type, :public)
   defp type(_meta), do: :public
