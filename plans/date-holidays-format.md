@@ -37,6 +37,7 @@ holidays:
 
 * Fixed date `MM-DD`.
 * Weekday-in-month `<ordinal> <weekday> in <Month>` (`first`…`fifth`, `last`).
+* Relative weekday `<weekday> before|after <MM-DD>` (US Memorial `monday before 06-01`).
 * Easter / orthodox relative.
 * Observed-date substitution `if <weekdays> then (next|previous) <weekday>`, incl. the `and if …` connector and chained clauses.
 
@@ -44,7 +45,7 @@ holidays:
 
 * Lunar/other calendars: Hijra, Hebrew, Chinese (lunar & solar), Bengali, Persian — via Calendrical.
 * Equinox / solstice / solar terms — via Astro.
-* `<weekday> before|after <date>` (`monday before 06-01` = US Memorial Day).
+* `<weekday> before|after <Month>` (start-of-month anchor) and the nested form `<weekday> after <Nth weekday in Month>` (Black Friday, Election Day) — only the `<MM-DD>` anchor is handled so far.
 * Fixed-date-at-start-of-month; time-of-day (`10-31 18:00`) and non-24h durations.
 * Additional-day / "observe **as well as** a substitute" (AU Christmas/Boxing).
 * "Change weekday if date already falls on a holiday" (the cascade / collision).

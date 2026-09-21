@@ -13,7 +13,6 @@ defmodule Tempo.Holidays.DateHolidaysTest do
         "12-25" => %{"_name" => "12-25"},
         "4th thursday in November" => %{"name" => %{"en" => "Thanksgiving Day"}},
         "last monday in May" => %{"name" => %{"en" => "Memorial Day"}},
-        "monday before 06-01" => %{"name" => %{"en" => "Old Memorial Day"}},
         "10-31 18:00" => %{"name" => %{"en" => "Halloween"}},
         "1st day of Ramadan" => %{"name" => %{"en" => "Ramadan"}}
       }

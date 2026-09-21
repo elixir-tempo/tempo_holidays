@@ -11,6 +11,10 @@ defmodule Tempo.Holidays.Compiler do
     ordinal is a word (`first` … `fifth`, `last`) or a numeral (`"2nd Monday
     in June"`, `"last Monday in May"`).
 
+  * **Relative weekday** — `"<weekday> before|after <MM-DD>"`, the nearest
+    weekday strictly before or after a fixed date (`"monday before 06-01"`
+    is US Memorial Day).
+
   * **Easter-relative** — `"easter"` / `"orthodox"` with an optional signed
     day offset (e.g. `"easter -2"` for Good Friday).
 
@@ -91,12 +95,17 @@ defmodule Tempo.Holidays.Compiler do
       iex> {rule.kind, rule.count, rule.weekday, rule.month}
       {:weekday, -1, 1, 5}
 
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("monday before 06-01")
+      iex> {rule.kind, rule.weekday, rule.direction, rule.month, rule.day}
+      {:relative_weekday, 1, :before, 6, 1}
+
   """
   @spec compile(String.t()) :: {:ok, Rule.t()} | {:error, {:unsupported, String.t()}}
   def compile(rule) when is_binary(rule) do
     {base, substitute} = extract_substitution(rule)
 
-    case compile_fixed(base) || compile_weekday(base) || compile_easter(base) do
+    case compile_fixed(base) || compile_weekday(base) || compile_relative_weekday(base) ||
+           compile_easter(base) do
       {:ok, compiled} -> {:ok, %{compiled | substitute: substitute, source: rule}}
       nil -> {:error, {:unsupported, rule}}
     end
@@ -161,6 +170,33 @@ defmodule Tempo.Holidays.Compiler do
           [_, digits] -> {:ok, String.to_integer(digits)}
           nil -> :error
         end
+    end
+  end
+
+  # ── relative weekday: "monday before 06-01", "friday after 11-11" ───
+  defp compile_relative_weekday(rule) do
+    pattern = ~r/^\s*(\w+)\s+(before|after)\s+(\d{1,2})-(\d{1,2})\s*$/i
+
+    with [_, weekday, direction, month, day] <- Regex.run(pattern, rule),
+         {:ok, code} <- Map.fetch(@weekdays, String.downcase(weekday)) do
+      {:ok,
+       %Rule{
+         kind: :relative_weekday,
+         weekday: code,
+         direction: relative_direction(direction),
+         month: String.to_integer(month),
+         day: String.to_integer(day),
+         source: rule
+       }}
+    else
+      _ -> nil
+    end
+  end
+
+  defp relative_direction(direction) do
+    case String.downcase(direction) do
+      "before" -> :before
+      "after" -> :after
     end
   end
 

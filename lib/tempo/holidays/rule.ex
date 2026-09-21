@@ -21,7 +21,7 @@ defmodule Tempo.Holidays.Rule do
 
   alias Tempo.Interval
 
-  @type kind :: :fixed | :weekday | :easter | :orthodox
+  @type kind :: :fixed | :weekday | :relative_weekday | :easter | :orthodox
 
   @typedoc """
   An observed-date substitution: `{trigger_weekdays, direction, target_weekday}`
@@ -40,13 +40,14 @@ defmodule Tempo.Holidays.Rule do
           day: pos_integer() | nil,
           count: integer() | nil,
           weekday: 1..7 | nil,
+          direction: :before | :after | nil,
           offset: integer() | nil,
           substitute: substitute() | nil,
           source: String.t() | nil
         }
 
   @enforce_keys [:kind]
-  defstruct [:kind, :month, :day, :count, :weekday, :offset, :substitute, :source]
+  defstruct [:kind, :month, :day, :count, :weekday, :direction, :offset, :substitute, :source]
 
   @doc """
   Project a rule onto `year`, returning the occurrence as an interval.
@@ -90,6 +91,21 @@ defmodule Tempo.Holidays.Rule do
     with {:ok, recurrence} <- Tempo.from_iso8601(weekday_iso(rule)),
          {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
       first_interval(set)
+    end
+  end
+
+  defp materialise_base(
+         %__MODULE__{kind: :relative_weekday, weekday: target, direction: direction} = rule,
+         %Tempo{} = year
+       ) do
+    with {:ok, anchor} <-
+           Tempo.from_iso8601("#{Tempo.year(year)}-#{month_day(rule.month, rule.day)}") do
+      shift = relative_shift(direction, Tempo.day_of_week(anchor, :monday), target)
+
+      anchor
+      |> Tempo.shift(day: shift)
+      |> Tempo.to_interval()
+      |> first_interval()
     end
   end
 
@@ -143,6 +159,20 @@ defmodule Tempo.Holidays.Rule do
   # needed; the bound year supplies it.
   defp weekday_iso(%__MODULE__{month: month, count: count, weekday: weekday}) do
     "R/../P1Y/FL#{month}M#{count}I#{weekday}KN"
+  end
+
+  # The signed day offset from an anchor date (whose weekday is
+  # `anchor_weekday`) to the nearest `target` weekday strictly before or
+  # after it. "The Monday before June 1" steps back to the previous Monday
+  # even when June 1 is itself a Monday.
+  defp relative_shift(:before, anchor_weekday, target), do: -strict_step(anchor_weekday - target)
+  defp relative_shift(:after, anchor_weekday, target), do: strict_step(target - anchor_weekday)
+
+  defp strict_step(delta) do
+    case Integer.mod(delta, 7) do
+      0 -> 7
+      step -> step
+    end
   end
 
   defp easter_date(:easter, year), do: Calendrical.Ecclesiastical.easter_sunday(year)

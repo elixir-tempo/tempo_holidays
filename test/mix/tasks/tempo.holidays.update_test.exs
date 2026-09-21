@@ -12,8 +12,8 @@ defmodule Mix.Tasks.Tempo.Holidays.UpdateTest do
             "days" => %{
               "12-25" => %{"name" => %{"en" => "Christmas Day"}},
               "4th thursday in November" => %{"name" => %{"en" => "Thanksgiving Day"}},
-              # unsupported grammar — dropped
-              "monday before 06-01" => %{"name" => %{"en" => "Memorial Day"}}
+              # unsupported grammar (time-of-day) — dropped
+              "10-31 18:00" => %{"name" => %{"en" => "Halloween"}}
             }
           }
         }

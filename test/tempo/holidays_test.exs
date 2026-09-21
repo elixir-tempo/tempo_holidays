@@ -4,7 +4,7 @@ defmodule Tempo.HolidaysTest do
   import Tempo.Sigils
 
   alias Tempo.Holidays
-  alias Tempo.Holidays.{Compiler, Holiday}
+  alias Tempo.Holidays.{Compiler, Holiday, Rule}
 
   defp date_of(holidays, name) do
     holidays
@@ -180,6 +180,26 @@ defmodule Tempo.HolidaysTest do
       # New Year's Day 2023 fell on Sunday 1 January; observed Monday the 2nd.
       {:ok, holidays} = Holidays.materialise(:US, ~o"2023")
       assert date_of(holidays, "New Year's Day") == ~o"2023Y1M2D"
+    end
+  end
+
+  describe "relative-weekday holidays" do
+    test "the weekday before a date — US Memorial Day (monday before 06-01)" do
+      {:ok, rule} = Compiler.compile("monday before 06-01")
+
+      assert {:ok, interval} = Rule.materialise(rule, ~o"2026")
+      assert Tempo.Interval.from(interval) == ~o"2026Y5M25D"
+
+      # Re-projects: the last Monday of May 2027 is the 31st.
+      assert {:ok, interval_2027} = Rule.materialise(rule, ~o"2027")
+      assert Tempo.Interval.from(interval_2027) == ~o"2027Y5M31D"
+    end
+
+    test "the weekday after a date (friday after 11-11)" do
+      {:ok, rule} = Compiler.compile("friday after 11-11")
+
+      assert {:ok, interval} = Rule.materialise(rule, ~o"2026")
+      assert Tempo.Interval.from(interval) == ~o"2026Y11M13D"
     end
   end
 end
