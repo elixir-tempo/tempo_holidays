@@ -46,37 +46,33 @@ defmodule Tempo.Holidays.Data do
 
   def for_territory(territory, division, subdivision)
       when is_atom(territory) or is_binary(territory) do
-    case load_first(candidate_codes(territory, division, subdivision)) do
-      {:ok, holidays} -> {:ok, holidays}
+    case load(upcase(territory)) do
+      {:ok, country} -> {:ok, effective(country, upcase(division), upcase(subdivision))}
       :error -> {:error, {:unknown_territory, territory}}
     end
   end
 
   def for_territory(other, _division, _subdivision), do: {:error, {:unknown_territory, other}}
 
-  # date-holidays keys sub-territory data by `<CC>-<STATE>-<REGION>`; try the
-  # most specific level present and fall back to the country, so an unknown
-  # state still yields the national holidays.
-  defp candidate_codes(territory, division, subdivision) do
-    country = upcase(territory)
-    state = upcase(division)
-    region = upcase(subdivision)
+  # A state's holidays are the country's overridden by its own; each state
+  # stores only its own holidays and the rule keys it defines, so the country's
+  # holidays with those keys are dropped and the state's added. An unknown state
+  # or region falls back to the level above, so a bad subdivision still yields
+  # the national set.
+  defp effective(%{country: country}, nil, _subdivision), do: country
 
-    [
-      state && region && "#{country}-#{state}-#{region}",
-      state && "#{country}-#{state}",
-      country
-    ]
-    |> Enum.reject(&(&1 in [nil, false]))
+  defp effective(%{country: country, states: states}, division, subdivision) do
+    case Map.get(states, division) do
+      nil -> country
+      state -> country |> merge(state) |> merge(Map.get(state.regions, subdivision))
+    end
   end
 
-  defp load_first([]), do: :error
+  defp merge(base, nil), do: base
 
-  defp load_first([code | rest]) do
-    case load(code) do
-      {:ok, holidays} -> {:ok, holidays}
-      :error -> load_first(rest)
-    end
+  defp merge(base, %{holidays: additions, keys: keys}) do
+    overridden = MapSet.new(keys)
+    Enum.reject(base, &(&1.rule.source in overridden)) ++ additions
   end
 
   defp upcase(nil), do: nil
@@ -102,7 +98,6 @@ defmodule Tempo.Holidays.Data do
       files
       |> Enum.filter(&String.ends_with?(&1, ".etf"))
       |> Enum.map(&Path.basename(&1, ".etf"))
-      |> Enum.reject(&String.contains?(&1, "-"))
       |> Enum.sort()
     else
       _ -> []

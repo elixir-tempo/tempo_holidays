@@ -13,8 +13,6 @@ at ~96% matched, and the gaps below are what remains.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
 
-* [ ] **Package size** — the state/region etf duplicates the country data into each state file (~6.4 MB). A per-country nested etf merged at load would cut it; deferred as an optimisation.
-
 ## Blocked
 
 * [ ] **Hebrew / Chinese / Bengali / Ethiopian / Coptic / Julian calendar dates** — need Tempo `[u-ca=…]` support and settled month numbering (Hebrew leap-month Adar I/II shifts Nisan onward). Blocked on Calendrical calendar coverage.

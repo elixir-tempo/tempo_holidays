@@ -3,9 +3,10 @@ defmodule Tempo.Holidays.Build do
   Build-time generation of the compiled holiday data.
 
   Downloads a pinned [date-holidays](https://github.com/commenthol/date-holidays)
-  bundle and compiles every territory to `priv/holidays/<CC>.etf`, plus each
-  state (`<CC>-<STATE>.etf`) and region (`<CC>-<STATE>-<REGION>.etf`) with the
-  country's `days` merged in, as date-holidays inherits them. The version is
+  bundle and compiles every territory to one nested `priv/holidays/<CC>.etf` —
+  the country's holidays plus each state's and region's *own* holidays and the
+  rule keys they override, which `Tempo.Holidays.Data` merges at load time (so
+  the country's holidays are not duplicated into every state). The version is
   pinned exactly (not a range), so a build is reproducible: the same input
   yields the same output, and the data need not be vendored in git.
 
@@ -102,42 +103,53 @@ defmodule Tempo.Holidays.Build do
 
   # ── generation ──────────────────────────────────────────────────────
 
-  # Writes the country and each state (`<CC>-<STATE>`) and region
-  # (`<CC>-<STATE>-<REGION>`). date-holidays inherits: a state's holidays are
-  # the country's `days` overridden by the state's own, so the raw `days` maps
-  # are merged before compiling (a state entry overrides or, when `false`,
-  # disables the country's rule with the same key).
+  # Writes one nested file per country — `%{country: [...], states: %{STATE =>
+  # %{holidays: [...], keys: [...], regions: %{...}}}}`. date-holidays inherits:
+  # a state's holidays are the country's overridden by its own, but rather than
+  # duplicate the country's holidays into every state file, each state stores
+  # only its *own* holidays plus the rule keys it defines (`keys`), and the
+  # loader merges at read time — a state key overrides or, when `false`,
+  # disables the country's holiday with the same key.
   defp write_territory(directory, bundle, code, language) do
     names = Map.get(bundle, "names", %{})
-    country_days = as_days(get_in(bundle, ["holidays", code, "days"]))
-    written = write_days(directory, code, country_days, names, language)
+    country = compile_days(get_in(bundle, ["holidays", code, "days"]), names, language)
 
-    ["holidays", code, "states"]
-    |> then(&get_in(bundle, &1))
-    |> as_map()
-    |> Enum.reduce(written, fn {state, state_data}, count ->
-      count +
-        write_state(directory, "#{code}-#{state}", state_data, country_days, names, language)
-    end)
+    states =
+      ["holidays", code, "states"]
+      |> then(&get_in(bundle, &1))
+      |> as_map()
+      |> Enum.map(fn {state, data} -> {state, compile_state(data, names, language)} end)
+      |> Enum.reject(fn {_state, entry} -> empty_state?(entry) end)
+      |> Map.new()
+
+    write_country(directory, code, %{country: country, states: states})
   end
 
-  defp write_state(directory, key, state_data, country_days, names, language) do
-    state_days = Map.merge(country_days, sub_days(state_data))
-    written = write_days(directory, key, state_days, names, language)
+  defp compile_state(state_data, names, language) do
+    days = sub_days(state_data)
 
-    state_data
-    |> sub_regions()
-    |> Enum.reduce(written, fn {region, region_data}, count ->
-      region_days = Map.merge(state_days, sub_days(region_data))
-      count + write_days(directory, "#{key}-#{region}", region_days, names, language)
-    end)
+    regions =
+      state_data
+      |> sub_regions()
+      |> Enum.map(fn {region, data} ->
+        {region, compile_level(sub_days(data), names, language)}
+      end)
+      |> Enum.reject(fn {_region, entry} -> entry.keys == [] end)
+      |> Map.new()
+
+    days |> compile_level(names, language) |> Map.put(:regions, regions)
   end
 
-  defp write_days(directory, key, days, names, language) do
-    days
-    |> DateHolidays.compile_days(language: language, names: names)
-    |> write_etf(directory, key)
+  defp compile_level(days, names, language) do
+    %{holidays: compile_days(days, names, language), keys: Map.keys(days)}
   end
+
+  defp compile_days(days, names, language) do
+    days |> as_days() |> DateHolidays.compile_days(language: language, names: names)
+  end
+
+  defp empty_state?(%{holidays: [], keys: [], regions: regions}), do: regions == %{}
+  defp empty_state?(_entry), do: false
 
   defp as_days(days) when is_map(days), do: days
   defp as_days(_absent), do: %{}
@@ -146,10 +158,12 @@ defmodule Tempo.Holidays.Build do
   defp sub_days(data), do: as_days(is_map(data) && Map.get(data, "days"))
   defp sub_regions(data), do: as_map(is_map(data) && Map.get(data, "regions"))
 
-  defp write_etf([], _directory, _code), do: 0
+  defp write_country(_directory, _code, %{country: [], states: states})
+       when map_size(states) == 0,
+       do: 0
 
-  defp write_etf(holidays, directory, code) do
-    File.write!(Path.join(directory, "#{code}.etf"), :erlang.term_to_binary(holidays))
+  defp write_country(directory, code, territory) do
+    File.write!(Path.join(directory, "#{code}.etf"), :erlang.term_to_binary(territory))
     1
   end
 
