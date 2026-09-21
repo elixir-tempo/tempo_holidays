@@ -13,7 +13,7 @@ defmodule Tempo.Holidays.DateHolidaysTest do
         "12-25" => %{"_name" => "12-25"},
         "4th thursday in November" => %{"name" => %{"en" => "Thanksgiving Day"}},
         "last monday in May" => %{"name" => %{"en" => "Memorial Day"}},
-        "chinese 01-0-01" => %{"name" => %{"en" => "Chinese New Year"}},
+        "bengali-revised 1-1" => %{"name" => %{"en" => "Bengali New Year"}},
         "1st day of Ramadan" => %{"name" => %{"en" => "Ramadan"}}
       }
 
@@ -60,6 +60,30 @@ defmodule Tempo.Holidays.DateHolidaysTest do
       # A language the entry lacks falls back to English.
       german = Map.new(DateHolidays.compile_days(days, language: "de"), &{&1.rule.month, &1.name})
       assert german[1] == "Martin Luther King Jr. Day"
+    end
+
+    test "attaches disable, enable and active metadata as occurrence gates" do
+      days = %{
+        "1st monday before 06-01" => %{
+          "name" => %{"en" => "Spring bank holiday"},
+          "disable" => ["2022-05-30"],
+          "enable" => ["2022-06-02"]
+        },
+        "10-19" => %{
+          "name" => %{"en" => "Mother Teresa Day"},
+          "active" => [%{"from" => 2004}]
+        }
+      }
+
+      holidays = Map.new(DateHolidays.compile_days(days), &{&1.name, &1})
+
+      spring = holidays["Spring bank holiday"].rule
+      assert spring.disable == [~D[2022-05-30]]
+      assert spring.enable == [~D[2022-06-02]]
+
+      # An integer `from` year means that year's 1 January, and the window is
+      # open-ended above.
+      assert holidays["Mother Teresa Day"].rule.active == [{~D[2004-01-01], nil}]
     end
 
     test "resolves a _name reference against the bundle's names table" do

@@ -232,6 +232,172 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
+  describe "occurrence-level metadata gates (active / disable / enable)" do
+    test "a disable+enable pair moves a real holiday — GB Spring bank holiday, 2022 Jubilee" do
+      # In 2022 the Spring bank holiday was moved off the last-Monday-of-May
+      # (30 May) to Thursday 2 June for the Platinum Jubilee, expressed in the
+      # data as disable 2022-05-30 + enable 2022-06-02.
+      {:ok, holidays} = Holidays.materialise(:GB, ~o"2022")
+
+      assert ~o"2022Y6M2D" in dates_of(holidays, "Spring bank holiday")
+      refute ~o"2022Y5M30D" in dates_of(holidays, "Spring bank holiday")
+
+      # A year the move does not touch keeps the computed last Monday of May.
+      {:ok, holidays_2021} = Holidays.materialise(:GB, ~o"2021")
+      assert ~o"2021Y5M31D" in dates_of(holidays_2021, "Spring bank holiday")
+    end
+
+    test "a disabled occurrence is dropped — GB Early May bank holiday, 2020" do
+      # The 2020 Early May bank holiday was disabled (moved to VE Day, 8 May).
+      {:ok, holidays_2020} = Holidays.materialise(:GB, ~o"2020")
+      refute ~o"2020Y5M4D" in dates_of(holidays_2020, "Early May bank holiday")
+
+      {:ok, holidays_2021} = Holidays.materialise(:GB, ~o"2021")
+      assert ~o"2021Y5M3D" in dates_of(holidays_2021, "Early May bank holiday")
+    end
+
+    test "an active window gates a rule to its years" do
+      {:ok, base} = Compiler.compile("03-20")
+      rule = %{base | active: [{~D[2010-01-01], nil}]}
+
+      assert {:ok, []} = Rule.materialise(rule, ~o"2009")
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2010")
+      assert Tempo.Interval.from(interval) == ~o"2010Y3M20D"
+    end
+
+    test "a disable+enable pair moves a hand-built occurrence, leaving other years alone" do
+      {:ok, base} = Compiler.compile("03-20")
+      rule = %{base | disable: [~D[2010-03-20]], enable: [~D[2010-03-22]]}
+
+      assert {:ok, [moved]} = Rule.materialise(rule, ~o"2010")
+      assert Tempo.Interval.from(moved) == ~o"2010Y3M22D"
+
+      assert {:ok, [untouched]} = Rule.materialise(rule, ~o"2011")
+      assert Tempo.Interval.from(untouched) == ~o"2011Y3M20D"
+    end
+  end
+
+  describe "Hebrew calendar holidays" do
+    test "materialise in the Hebrew calendar, not Gregorian" do
+      # Rosh Hashanah — 1 Tishrei. Projected onto Gregorian 2025, which holds
+      # 1 Tishrei of the Hebrew year 5786.
+      {:ok, rule} = Compiler.compile("1 Tishrei")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"5786Y1M1D[u-ca=hebrew]"
+    end
+
+    test "Adar II carries Purim in both leap and non-leap years" do
+      # date-holidays writes Purim as "14 AdarII"; Calendrical's civil month 7
+      # is the Adar before Nisan — Adar in an ordinary year, Adar II in a leap
+      # year — so the same number serves both.
+      {:ok, rule} = Compiler.compile("14 AdarII")
+
+      # 2025 → Hebrew 5785, an ordinary year.
+      assert {:ok, [ordinary]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(ordinary) == ~o"5785Y7M14D[u-ca=hebrew]"
+
+      # 2024 → Hebrew 5784, a leap year; month 7 is Adar II.
+      assert {:ok, [leap]} = Rule.materialise(rule, ~o"2024")
+      assert Tempo.Interval.from(leap) == ~o"5784Y7M14D[u-ca=hebrew]"
+    end
+  end
+
+  describe "Julian calendar holidays" do
+    test "a Julian fixed date is converted to Gregorian" do
+      # Orthodox Christmas — julian 12-25 — is 7 January Gregorian this century.
+      {:ok, rule} = Compiler.compile("julian 12-25")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y1M7D"
+    end
+
+    test "a P<n>D span covers that many Gregorian days" do
+      {:ok, rule} = Compiler.compile("julian 12-25 P2D")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y1M7D"
+      assert Tempo.Interval.to(interval) == ~o"2025Y1M9D"
+    end
+  end
+
+  describe "lunisolar calendar holidays (Chinese, Korean)" do
+    test "Chinese New Year is returned in the Chinese calendar" do
+      {:ok, rule} = Compiler.compile("chinese 01-0-01")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"4662Y1M1D[u-ca=chinese]"
+    end
+
+    test "the traditional month is resolved past an intercalary month" do
+      # Mid-Autumn is traditional month 8; the Chinese year 4662 carries a leap
+      # month 6, so the ordinal month of the returned date is 9.
+      {:ok, rule} = Compiler.compile("chinese 08-0-15")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"4662Y9M15D[u-ca=chinese]"
+    end
+
+    test "day 0 is the eve — the last day of the previous month" do
+      {:ok, rule} = Compiler.compile("chinese 01-0-00")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"4661Y12M29D[u-ca=chinese]"
+    end
+
+    test "Korean Seollal is returned in the Korean (dangi) calendar with its span" do
+      {:ok, rule} = Compiler.compile("korean 01-0-01 P3D")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"4358Y1M1D[u-ca=dangi]"
+      assert Tempo.Interval.to(interval) == ~o"4358Y1M4D[u-ca=dangi]"
+    end
+  end
+
+  describe "Chinese solar-term holidays" do
+    test "Qingming is the day the sun reaches 15° ecliptic longitude, in China time" do
+      {:ok, rule} = Compiler.compile("chinese 5-01 solarterm")
+
+      # Qingming is 4 April in 2025, 5 April in 2023.
+      assert {:ok, [y2025]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(y2025) == ~o"2025Y4M4D"
+
+      assert {:ok, [y2023]} = Rule.materialise(rule, ~o"2023")
+      assert Tempo.Interval.from(y2023) == ~o"2023Y4M5D"
+    end
+  end
+
+  describe "equinox and solstice holidays" do
+    test "Japan's Vernal Equinox Day is the March equinox in JST" do
+      {:ok, rule} = Compiler.compile("march equinox in +09:00")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y3M20D"
+    end
+
+    test "Japan's Autumnal Equinox Day is the September equinox in JST" do
+      {:ok, rule} = Compiler.compile("september equinox in +09:00")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y9M23D"
+    end
+
+    test "a solstice with no timezone is computed in GMT" do
+      {:ok, rule} = Compiler.compile("december solstice")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y12M21D"
+    end
+
+    test "a numeric-offset timezone HH:MM survives time-stripping" do
+      # `strip_time` must not mistake the `:00` of `+09:00` for a clock time.
+      {:ok, rule} = Compiler.compile("march equinox in +09:00")
+
+      assert rule.kind == :equinox
+      assert rule.timezone == "+09:00"
+    end
+  end
+
   describe "locale and state resolution" do
     test "a locale with a subdivision loads the state's holidays" do
       {:ok, national} = Holidays.recurrences(:US)

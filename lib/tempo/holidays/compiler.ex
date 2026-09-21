@@ -15,8 +15,24 @@ defmodule Tempo.Holidays.Compiler do
     weekday strictly before or after a fixed date (`"monday before 06-01"`
     is US Memorial Day).
 
-  * **Islamic (Hijri)** — `"<day> <Islamic month>"` with an optional `P<n>D`
-    span (`"9 Dhu al-Hijjah P4D"`). Materialised in the Islamic calendar.
+  * **Calendar dates** — `"<day> <month>"` in the Islamic (`"9 Dhu al-Hijjah
+    P4D"`), Hebrew (`"15 Nisan"`) or Persian (`"1 Farvardin"`) calendar, with
+    an optional `P<n>D` span. Materialised in that calendar.
+
+  * **Julian fixed** — `"julian MM-DD"` (`"julian 12-25"` is Orthodox
+    Christmas), a fixed date in the Julian calendar, converted to Gregorian.
+
+  * **Lunisolar** — Chinese `"chinese <month>-<leap>-<day>"` (`"chinese
+    01-0-01"` is Chinese New Year) and Korean `"korean <month>-<leap>-<day>"`
+    (`"korean 01-0-01"` is Seollal), returned in that calendar; plus the Chinese
+    solar term `"chinese <term>-<day> solarterm"` (`"chinese 5-01 solarterm"` is
+    Qingming), the day the sun reaches the term's longitude in China Standard
+    Time.
+
+  * **Equinox / solstice** — `"march equinox in +09:00"` (Japan's Vernal
+    Equinox Day), `"december solstice"`, with an optional `"<n> days
+    before/after"` and `"in <timezone>"`. A named zone needs the host app's
+    time-zone database; a numeric offset and GMT do not.
 
   * **Easter-relative** — `"easter"` / `"orthodox"` with an optional signed
     day offset (e.g. `"easter -2"` for Good Friday).
@@ -101,6 +117,35 @@ defmodule Tempo.Holidays.Compiler do
     "esfand" => 12
   }
 
+  # Hebrew month names → Calendrical's CLDR *civil* numbering (Tishrei = 1 …
+  # Elul = 13), which is what `Calendrical.Hebrew` expects. The leap month
+  # Adar I is position 6 (leap years only); the Adar that carries Purim is
+  # position 7 — Adar in an ordinary year, Adar II in a leap year. date-holidays
+  # writes that Adar as "AdarII" (the Adar before Nisan) in every year, so both
+  # "adar" and "adarii" map to 7. Common alternate spellings are included.
+  @hebrew_months %{
+    "tishrei" => 1,
+    "tishri" => 1,
+    "cheshvan" => 2,
+    "heshvan" => 2,
+    "marcheshvan" => 2,
+    "kislev" => 3,
+    "tevet" => 4,
+    "shvat" => 5,
+    "shevat" => 5,
+    "adari" => 6,
+    "adar" => 7,
+    "adarii" => 7,
+    "nisan" => 8,
+    "iyyar" => 9,
+    "iyar" => 9,
+    "sivan" => 10,
+    "tamuz" => 11,
+    "tammuz" => 11,
+    "av" => 12,
+    "elul" => 13
+  }
+
   @doc """
   Compile a date-holidays rule string into a `t:Tempo.Holidays.Rule.t/0`.
 
@@ -153,9 +198,7 @@ defmodule Tempo.Holidays.Compiler do
     {base, substitute} = extract_substitution(without_conditions)
     mode = substitution_mode(without_conditions, substitute)
 
-    case compile_specific_date(base) || compile_fixed(base) || compile_weekday(base) ||
-           compile_nested_weekday(base) || compile_relative_weekday(base) ||
-           compile_calendar(base) || compile_easter(base) do
+    case compile_base(base) do
       {:ok, compiled} ->
         {:ok, apply_conditions(compiled, conditions, substitute, mode, rule)}
 
@@ -167,6 +210,25 @@ defmodule Tempo.Holidays.Compiler do
   # An entry without a rule string (or any non-binary input) is not a
   # compilable rule; a library function never raises on caller input.
   def compile(other), do: {:error, {:unsupported, other}}
+
+  # Each grammar tier, tried in order; the first to match the base rule
+  # (conditions and substitution already stripped) wins, else `nil`.
+  defp compile_base(base) do
+    [
+      &compile_specific_date/1,
+      &compile_fixed/1,
+      &compile_weekday/1,
+      &compile_nested_weekday/1,
+      &compile_relative_weekday/1,
+      &compile_julian/1,
+      &compile_lunisolar/1,
+      &compile_chinese_solar/1,
+      &compile_solar_event/1,
+      &compile_calendar/1,
+      &compile_easter/1
+    ]
+    |> Enum.find_value(fn tier -> tier.(base) end)
+  end
 
   # A specific `YYYY-MM-DD` is a one-off holiday: a fixed date active only in
   # that year.
@@ -296,11 +358,13 @@ defmodule Tempo.Holidays.Compiler do
 
   # A time of day does not change which day a holiday falls on, so a time
   # token (`12:00`) and any time-valued substitution (`if sunday then 00:00`)
-  # are dropped before the date grammar is matched.
+  # are dropped before the date grammar is matched. The `\d{1,2}:\d{2}` clock
+  # is guarded by a lookbehind so it does not eat the `HH:MM` of a timezone
+  # offset (`march equinox in +09:00`).
   defp strip_time(rule) do
     rule
     |> String.replace(~r/(?:\band\b\s*)?if\s+[a-z, ]+?\s+then\s+\d{1,2}:\d{2}/i, "")
-    |> String.replace(~r/\d{1,2}:\d{2}/, "")
+    |> String.replace(~r/(?<![+\-\d])\d{1,2}:\d{2}/, "")
     |> String.replace(~r/\s+PT\S+/i, "")
     |> String.trim()
   end
@@ -458,11 +522,90 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
+  # ── julian fixed date: "julian 12-25", "julian 12-25 P2D" ───────────
+  #
+  # A fixed date in the Julian calendar — Orthodox Christmas is `julian 12-25`
+  # (Gregorian 7 January). The materialiser projects it onto the Gregorian year
+  # through Calendrical's Julian calendar and converts it to Gregorian. An
+  # optional `P<n>D` span carries into `count`.
+  defp compile_julian(rule) do
+    case Regex.run(~r/^\s*julian\s+(\d{1,2})-(\d{1,2})(?:\s+P(\d+)DT?)?\s*$/i, rule) do
+      [_, month, day | rest] ->
+        {:ok,
+         %Rule{
+           kind: :julian,
+           calendar: Calendrical.Julian,
+           month: String.to_integer(month),
+           day: String.to_integer(day),
+           count: rest |> List.first() |> parse_span(),
+           source: rule
+         }}
+
+      nil ->
+        nil
+    end
+  end
+
+  # date-holidays writes its two lunisolar calendars — Chinese (`chinese …`) and
+  # Korean (`korean …`) — with the same shape, so they share a compiler tier.
+  @lunisolar_calendars %{"chinese" => Calendrical.Chinese, "korean" => Calendrical.Korean}
+
+  # ── lunisolar: "chinese|korean <month>-<leap>-<day>" ────────────────
+  #
+  # The lunar form in *traditional* month numbering: `<leap>` is `1` for a leap
+  # month, `0` otherwise. `chinese 01-0-01` is Chinese New Year, `chinese
+  # 01-0-00` its eve (day 0 = the day before); `korean 01-0-01` is Seollal. The
+  # optional absolute `<cycle>-<year>` prefix is used by no holiday, so it is
+  # not accepted.
+  defp compile_lunisolar(rule) do
+    case Regex.run(
+           ~r/^\s*(chinese|korean)\s+(\d{1,2})-([01])-(\d{1,2})(?:\s+P(\d+)D)?\s*$/i,
+           rule
+         ) do
+      [_, system, month, leap, day | rest] ->
+        {:ok,
+         %Rule{
+           kind: :lunisolar,
+           calendar: Map.fetch!(@lunisolar_calendars, String.downcase(system)),
+           month: String.to_integer(month),
+           day: String.to_integer(day),
+           leap_month: leap == "1",
+           count: rest |> List.first() |> parse_span(),
+           source: rule
+         }}
+
+      nil ->
+        nil
+    end
+  end
+
+  # ── chinese solar term: "chinese <term>-<day> solarterm" ────────────
+  #
+  # The `<term>` is the 1-based index into the 24 solar terms (1 = 立春 Lichun,
+  # 5 = 清明 Qingming); `<day>` is the 1-based day within that term (day 1 is the
+  # term's own date). The materialiser resolves the term to the day the sun
+  # reaches its ecliptic longitude, in China Standard Time.
+  defp compile_chinese_solar(rule) do
+    case Regex.run(~r/^\s*chinese\s+(\d{1,2})-(\d{1,2})\s+solarterm\s*$/i, rule) do
+      [_, term, day] ->
+        {:ok,
+         %Rule{
+           kind: :solar_term,
+           count: String.to_integer(term),
+           day: String.to_integer(day),
+           source: rule
+         }}
+
+      nil ->
+        nil
+    end
+  end
+
   # ── calendar date: "1 Muharram", "9 Dhu al-Hijjah P4D", "1 Farvardin" ─
   #
   # `<day> <calendar month>`, with an optional `P<n>D` span. The month name
-  # picks the calendar (Islamic Umm al-Qura or Persian); the materialiser
-  # projects it onto the Gregorian year through that calendar.
+  # picks the calendar (Islamic Umm al-Qura, Hebrew, or Persian); the
+  # materialiser projects it onto the Gregorian year through that calendar.
   defp compile_calendar(rule) do
     pattern = ~r/^\s*(\d{1,2})\s+([a-z][a-z' -]+?)(?:\s+P(\d+)D)?\s*$/i
 
@@ -489,6 +632,9 @@ defmodule Tempo.Holidays.Compiler do
       Map.has_key?(@islamic_months, name) ->
         {:islamic, Calendrical.Islamic.UmmAlQura, @islamic_months[name]}
 
+      Map.has_key?(@hebrew_months, name) ->
+        {:hebrew, Calendrical.Hebrew, @hebrew_months[name]}
+
       Map.has_key?(@persian_months, name) ->
         {:persian, Calendrical.Persian, @persian_months[name]}
 
@@ -500,6 +646,53 @@ defmodule Tempo.Holidays.Compiler do
   defp parse_span(nil), do: 1
   defp parse_span(""), do: 1
   defp parse_span(days), do: String.to_integer(days)
+
+  # ── equinox / solstice: "march equinox in +09:00", "december solstice" ─
+  #
+  # `(<n> days (before|after) )?(march|september) equinox | (june|december)
+  # solstice( in <timezone>)?`. The season must match the event (a March
+  # solstice is rejected). No timezone means GMT; a numeric offset or a named
+  # zone fixes the civil date. `<n> days before/after` shifts it.
+  defp compile_solar_event(rule) do
+    pattern =
+      ~r/^\s*(?:(\d+)\s+days?\s+(before|after)\s+)?(march|september|june|december)\s+(equinox|solstice)(?:\s+in\s+(\S+))?\s*$/i
+
+    with [_, days, direction, season, event | rest] <- Regex.run(pattern, rule),
+         kind <- solar_event_kind(String.downcase(event)),
+         {:ok, month} <- solar_event_month(String.downcase(season), kind) do
+      {:ok,
+       %Rule{
+         kind: kind,
+         month: month,
+         offset: solar_event_offset(days, direction),
+         timezone: rest |> List.first() |> presence(),
+         source: rule
+       }}
+    else
+      _ -> nil
+    end
+  end
+
+  defp solar_event_kind("equinox"), do: :equinox
+  defp solar_event_kind("solstice"), do: :solstice
+
+  # The season must belong to the event, giving the month that identifies it.
+  defp solar_event_month("march", :equinox), do: {:ok, 3}
+  defp solar_event_month("september", :equinox), do: {:ok, 9}
+  defp solar_event_month("june", :solstice), do: {:ok, 6}
+  defp solar_event_month("december", :solstice), do: {:ok, 12}
+  defp solar_event_month(_season, _kind), do: :error
+
+  defp solar_event_offset(days, _direction) when days in [nil, ""], do: 0
+
+  defp solar_event_offset(days, direction) do
+    magnitude = String.to_integer(days)
+    if String.downcase(direction) == "before", do: -magnitude, else: magnitude
+  end
+
+  defp presence(nil), do: nil
+  defp presence(""), do: nil
+  defp presence(value), do: value
 
   # ── easter-relative: "easter", "easter -2", "orthodox 1" ────────────
   defp compile_easter(rule) do

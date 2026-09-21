@@ -12,8 +12,8 @@ defmodule Tempo.Holidays.BuildTest do
             "days" => %{
               "12-25" => %{"name" => %{"en" => "Christmas Day"}},
               "4th thursday in November" => %{"name" => %{"en" => "Thanksgiving Day"}},
-              # unsupported grammar (Chinese calendar) — dropped
-              "chinese 01-0-01" => %{"name" => %{"en" => "Chinese New Year"}},
+              # unsupported grammar (Bengali calendar, no Calendrical support) — dropped
+              "bengali-revised 1-1" => %{"name" => %{"en" => "Bengali New Year"}},
               # date-holidays disables an inherited holiday with `false` — dropped
               "1st monday in May" => false
             }

@@ -7,21 +7,31 @@ at ~96% matched, and the gaps below are what remains.
 
 ## Open
 
-* [ ] **Per-occurrence `disable`/`enable`** — a holiday's `disable: ['YYYY-MM-DD']` / `enable:` metadata (GB's 2022 Jubilee move); the `states`/`regions` `false` disables are already handled by the build-time merge. A handful of fixture entries.
+* [ ] **Year-boundary substitution** — when a holiday's observed date crosses the Gregorian year boundary (New Year on a weekend → observed 31 Dec of the *prior* year), date-holidays attributes it to the year the observed date falls in. `materialise/2` should yield occurrences whose observed date lands in the requested year. The bulk of the current non-calendar mismatches (~216 across a 9-country subset).
 
-* [ ] **Inter-holiday and additional-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"` and "observe as well as" in-lieu days. Edge cases.
+* [ ] **Inter-holiday / bridge-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"`, `<rule> if is holiday then next <weekday>`, and "observe as well as" in-lieu days; needs a country-level second pass over the other holidays. A handful of entries.
+
+* [ ] **IANA-zone equinox/solstice** — only Chile's `june solstice in America/Santiago`. Numeric offsets and GMT work with no dependency; a named zone needs a host time-zone database (`Tz` is only an *optional* transitive dep). Decision: add `{:tz, …}` as a direct dep, or leave the one rule unsupported.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
 
 ## Blocked
 
-* [ ] **Hebrew / Chinese / Bengali / Ethiopian / Coptic / Julian calendar dates** — need Tempo `[u-ca=…]` support and settled month numbering (Hebrew leap-month Adar I/II shifts Nisan onward). Blocked on Calendrical calendar coverage.
+* [ ] **Vietnamese (`vietnamese <month>-<leap>-<day>`) lunisolar dates** — Vietnamese lunar (Tet et al., ~10 rules) is Chinese-lunisolar at the UTC+7 meridian; there is no `Calendrical.Vietnamese`. The machinery exists (`Calendrical.Lunisolar.gregorian_date_for_lunar/5` takes a location), so this is an upstream addition to Calendrical, not a Tempo helper (rule 9). Analysis in [plans/vietnamese-calendar.md](plans/vietnamese-calendar.md).
 
-* [ ] **Equinox / solstice / solar terms** — the astronomical tier. Blocked on Astro integration.
+* [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream.
 
-* [ ] **Tabular Umm al-Qura** — our *calculated* Umm al-Qura differs from date-holidays' *table* by a day some years (~205 fixture entries), plus day-overflow like `30 Safar` (a 29-day month). Blocked on a tabular Umm al-Qura in Calendrical.
+* [ ] **Tabular Umm al-Qura** — our *calculated* Umm al-Qura differs from date-holidays' *table* by a day some years, plus day-overflow like `30 Safar` (a 29-day month). Many are corrected in-data by the `disable`/`enable` gates now handled; the residual is blocked on a tabular Umm al-Qura in Calendrical.
 
 ## Done
+
+* [x] **Equinox / solstice tier** — `<march|september> equinox` / `<june|december> solstice` via `Astro.equinox/2`,`Astro.solstice/2`, with an optional `<n> days before/after` and `in <timezone>`; the civil date is taken in that timezone (Japan's Vernal/Autumnal Equinox Days in `+09:00`), GMT when none. Fixed a latent `strip_time` bug that ate the `HH:MM` of a `+HH:MM` offset. Named IANA zones skip cleanly without a host tz database (the remaining astronomical gap, below). 2026-09-22.
+
+* [x] **Chinese, Korean and solar-term tiers** — lunar `chinese|korean <month>-<leap>-<day>` (with `P<n>D` span and day-0 eve) via `gregorian_date_for_lunar/3`, returned in-calendar (`[u-ca=chinese]` / `[u-ca=dangi]`) with the traditional→ordinal month resolved past intercalary months; and `chinese <term>-<day> solarterm` (Qingming) via `Calendrical.Lunisolar.solar_longitude_on_or_after/3` in China time. Scoped conformance for CN/HK/TW/SG/MY/…: 0 chinese mismatches (was ~1575). 2026-09-22.
+
+* [x] **Hebrew and Julian calendar tiers** — `<day> <Hebrew month>` via `Calendrical.Hebrew.dates_in_gregorian_year/3` (month names → CLDR-civil numbering; `AdarII` → month 7 in both leap and ordinary years), and `julian MM-DD` via `Calendrical.Julian.dates_in_gregorian_year/3` converted to Gregorian (covers Orthodox/Coptic/Ethiopian Christmas). Scoped conformance for IL/RU/RS/UA/EG/ER/ME: 0 calendar mismatches, 1 unsupported. 2026-09-22.
+
+* [x] **Occurrence-level metadata gates** — `active` windows (`[from, to)`), `disable`d and `enable`d dates from date-holidays metadata, applied to the computed dates in `Tempo.Holidays.Rule`; a `disable`+`enable` pair moves an occurrence (UK 2022 Jubilee). The conformance harness enriches each compiled rule with the built data's gates so the metric reflects them. Localize bumped to `~> 1.3`. 2026-09-22.
 
 * [x] **Locale / LanguageTag requests + state/region data** — `recurrences/2`, `materialise/3` accept a territory code, a validated BCP 47 locale (string/atom/`Localize.LanguageTag`), or a holiday list, deriving territory + state (division) + region (subdivision), overridable by option. The build compiles country + state + region holidays (state `days` merged over the country's), and the loader picks the most specific level, falling back to the country. `en-US-u-sd-usca` → California; AU-NSW carries King's Birthday. 2026-09-21.
 

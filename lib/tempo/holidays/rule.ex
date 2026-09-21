@@ -14,13 +14,21 @@ defmodule Tempo.Holidays.Rule do
   ecclesiastical calendar, since Easter is not expressible as an ISO 8601
   recurrence; and `:islamic`, `:hebrew` and `:persian` are materialised in
   their own calendar (Islamic via Umm al-Qura), returned as an
-  `[u-ca=…]`-tagged value rather than converted to Gregorian.
+  `[u-ca=…]`-tagged value rather than converted to Gregorian. `:julian` is a
+  fixed date in the Julian calendar (Orthodox Christmas and the like); it has
+  no CLDR calendar tag, so it is converted to Gregorian.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — in one of three modes (`:add`
   keeps the date and adds the observed day, `:shift` moves it, `:substitute_only`
   is the observed day alone), plus year conditions (`:from_year`/`:to_year`,
   even/odd `:year_parity`, and `:leap`) that gate whether it occurs at all.
+
+  Finally it may carry date-holidays' occurrence-level metadata gates, applied
+  to the computed dates: `:active` restricts the rule to one or more half-open
+  `[from, to)` windows, `:disable` removes specific dates, and `:enable` adds
+  explicit dates (a `:disable` + `:enable` pair is how the data *moves* an
+  occurrence — the UK 2022 Spring bank holiday to the Jubilee Thursday).
 
   """
 
@@ -34,6 +42,11 @@ defmodule Tempo.Holidays.Rule do
           | :islamic
           | :hebrew
           | :persian
+          | :julian
+          | :lunisolar
+          | :solar_term
+          | :equinox
+          | :solstice
           | :easter
           | :orthodox
 
@@ -58,6 +71,8 @@ defmodule Tempo.Holidays.Rule do
           direction: :before | :after | nil,
           offset: integer() | nil,
           calendar: module() | nil,
+          leap_month: boolean() | nil,
+          timezone: String.t() | nil,
           substitute: substitute() | nil,
           substitute_mode: :shift | :add | :substitute_only | nil,
           from_year: integer() | nil,
@@ -66,6 +81,9 @@ defmodule Tempo.Holidays.Rule do
           leap: :leap | :non_leap | nil,
           every_years: pos_integer() | nil,
           weekday_gate: {:only | :except, [1..7]} | nil,
+          active: [{Date.t() | nil, Date.t() | nil}] | nil,
+          disable: [Date.t()] | nil,
+          enable: [Date.t()] | nil,
           source: String.t() | nil
         }
 
@@ -80,6 +98,8 @@ defmodule Tempo.Holidays.Rule do
     :direction,
     :offset,
     :calendar,
+    :leap_month,
+    :timezone,
     :substitute,
     :substitute_mode,
     :from_year,
@@ -88,6 +108,9 @@ defmodule Tempo.Holidays.Rule do
     :leap,
     :every_years,
     :weekday_gate,
+    :active,
+    :disable,
+    :enable,
     :source
   ]
 
@@ -125,10 +148,13 @@ defmodule Tempo.Holidays.Rule do
   @spec materialise(t(), Tempo.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   def materialise(%__MODULE__{} = rule, %Tempo{} = year) do
     if active_in_year?(rule, Tempo.year(year)) do
-      with {:ok, intervals} <- materialise_base(rule, year) do
-        intervals
+      with {:ok, base} <- materialise_base(rule, year) do
+        base
+        |> filter_active(rule.active)
+        |> reject_disabled(rule.disable)
         |> gate_by_weekday(rule.weekday_gate)
         |> substitute_all(rule.substitute, rule.substitute_mode)
+        |> append_enabled(rule.enable, year)
       end
     else
       {:ok, []}
@@ -149,6 +175,76 @@ defmodule Tempo.Holidays.Rule do
       end
     end)
   end
+
+  # ── occurrence-level metadata gates: active / disable / enable ──────
+  #
+  # date-holidays' `active`, `disable` and `enable` metadata operate on the
+  # rule's *computed* dates (see the upstream `docs/specification.md`), so they
+  # are applied to the materialised occurrences, not gated at the year level.
+
+  # `active` restricts the rule to one or more half-open `[from, to)` windows;
+  # an occurrence whose date falls outside every window is dropped.
+  defp filter_active(intervals, nil), do: intervals
+
+  defp filter_active(intervals, ranges) do
+    Enum.filter(intervals, fn interval ->
+      case occurrence_days(interval) do
+        {:ok, days} -> Enum.any?(ranges, &within_range?(days, &1))
+        :error -> false
+      end
+    end)
+  end
+
+  defp within_range?(days, {from, to}) do
+    (is_nil(from) or days >= date_days(from)) and (is_nil(to) or days < date_days(to))
+  end
+
+  # `disable` removes specific occurrences by their computed Gregorian date.
+  defp reject_disabled(intervals, nil), do: intervals
+
+  defp reject_disabled(intervals, disabled) do
+    blocked = MapSet.new(disabled, &date_days/1)
+
+    Enum.reject(intervals, fn interval ->
+      case occurrence_days(interval) do
+        {:ok, days} -> MapSet.member?(blocked, days)
+        :error -> false
+      end
+    end)
+  end
+
+  # `enable` adds explicit observed dates — the target of a disable/enable move
+  # — materialised as single days, keeping only those in the requested year.
+  defp append_enabled({:error, _} = error, _enable, _year), do: error
+  defp append_enabled({:ok, intervals}, nil, _year), do: {:ok, intervals}
+
+  defp append_enabled({:ok, intervals}, enabled, year) do
+    target = Tempo.year(year)
+
+    with {:ok, added} <-
+           enabled |> Enum.filter(&(&1.year == target)) |> reduce_ok(&enabled_interval/1) do
+      {:ok, intervals ++ added}
+    end
+  end
+
+  defp enabled_interval(%Date{} = date) do
+    date |> Tempo.from_elixir() |> Tempo.to_interval() |> first_interval()
+  end
+
+  # An occurrence's date as a proleptic-Gregorian day count, so a value in any
+  # calendar (an Islamic or Hebrew holiday) compares with the Gregorian
+  # `active`/`disable` dates. `:error` when the value will not convert.
+  defp occurrence_days(interval) do
+    with tempo <- Interval.from(interval),
+         {:ok, date} <- Tempo.to_date(tempo),
+         {:ok, iso} <- Date.convert(date, Calendar.ISO) do
+      {:ok, Date.to_gregorian_days(iso)}
+    else
+      _ -> :error
+    end
+  end
+
+  defp date_days(%Date{} = date), do: Date.to_gregorian_days(date)
 
   # A `since <year>` / `prior to <year>` window, an even/odd-year filter, and a
   # leap/non-leap-year filter each gate the whole rule: when the year fails any
@@ -251,6 +347,85 @@ defmodule Tempo.Holidays.Rule do
     |> reduce_ok(&calendar_interval(&1, tag, count))
   end
 
+  # A lunisolar date — Chinese (`chinese …`) or Korean (`korean …`). date-holidays
+  # writes `<month>-<leap>-<day>` in *traditional* month numbering, which drifts
+  # from the calendar's ordinal months in a year carrying an intercalary month,
+  # so Calendrical resolves the traditional month to a Gregorian date; that is
+  # converted back into the source calendar (ordinal months) and returned
+  # in-calendar (`[u-ca=chinese]`, `[u-ca=dangi]`).
+  defp materialise_base(
+         %__MODULE__{kind: :lunisolar, calendar: calendar} = rule,
+         %Tempo{} = year
+       ) do
+    lunar_month = if rule.leap_month, do: {rule.month, :leap}, else: rule.month
+
+    Tempo.year(year)
+    |> calendar.gregorian_date_for_lunar(lunar_month, rule.day)
+    |> lunisolar_interval(calendar, rule.count)
+  end
+
+  # A Chinese solar term — `chinese <term>-<day> solarterm`. The term index maps
+  # to an ecliptic longitude (term 1 = 立春 at 315°, then every 15°), and the day
+  # the sun reaches it, in China Standard Time, is the term's date; `<day>` is a
+  # 1-based offset into the term. Solar, so returned as a Gregorian civil date.
+  defp materialise_base(%__MODULE__{kind: :solar_term, count: term, day: day}, %Tempo{} = year) do
+    longitude = rem(300 + term * 15, 360)
+    start = Calendrical.Gregorian.date_to_iso_days(Tempo.year(year), 1, 1)
+
+    moment =
+      Calendrical.Lunisolar.solar_longitude_on_or_after(
+        longitude,
+        start,
+        &Calendrical.Chinese.location/1
+      )
+
+    {term_year, term_month, term_day} =
+      Calendrical.Gregorian.date_from_iso_days(trunc(moment))
+
+    with {:ok, base} <- Tempo.from_iso8601("#{term_year}Y#{term_month}M#{term_day}D") do
+      base
+      |> Tempo.shift(day: day - 1)
+      |> Tempo.to_interval()
+      |> first_interval()
+      |> wrap_one()
+    end
+  end
+
+  # An equinox or solstice, its civil date in the rule's timezone (GMT when
+  # none is named). Astro gives the UTC instant; a numeric offset (`+09:00`)
+  # shifts it directly, a named zone (`America/Santiago`) needs the host app's
+  # configured time-zone database and errors cleanly without one. `offset`
+  # carries an `<n> days before/after` adjustment.
+  defp materialise_base(
+         %__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone},
+         %Tempo{} = year
+       )
+       when kind in [:equinox, :solstice] do
+    with {:ok, utc} <- solar_event_utc(kind, month, Tempo.year(year)),
+         {:ok, date} <- solar_event_date(utc, timezone),
+         {:ok, base} <- Tempo.from_iso8601("#{date.year}Y#{date.month}M#{date.day}D") do
+      base
+      |> Tempo.shift(day: offset || 0)
+      |> Tempo.to_interval()
+      |> first_interval()
+      |> wrap_one()
+    end
+  end
+
+  # A Julian fixed date (Orthodox Christmas et al.). date-holidays writes these
+  # as `julian MM-DD`; the Julian calendar has no CLDR `u-ca` tag, so each
+  # occurrence is converted to Gregorian rather than returned in-calendar. A
+  # single Gregorian year can hold zero, one or two, as with any calendar whose
+  # year drifts against the Gregorian one.
+  defp materialise_base(
+         %__MODULE__{kind: :julian, month: month, day: day, count: count},
+         %Tempo{} = year
+       ) do
+    Tempo.year(year)
+    |> Calendrical.Julian.dates_in_gregorian_year(month, day)
+    |> reduce_ok(&julian_interval(&1, count))
+  end
+
   defp materialise_base(%__MODULE__{kind: kind, offset: offset}, %Tempo{} = year)
        when kind in [:easter, :orthodox] do
     easter_date(kind, Tempo.year(year))
@@ -268,6 +443,77 @@ defmodule Tempo.Holidays.Rule do
   defp calendar_interval(%Date{} = date, tag, count) do
     with {:ok, base} <-
            Tempo.from_iso8601("#{date.year}Y#{date.month}M#{date.day}D[u-ca=#{tag}]"),
+         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
+      {:ok, span_days(interval, base, count)}
+    end
+  end
+
+  # One lunisolar occurrence: `gregorian_date_for_lunar/3` gives the Gregorian
+  # date, which is converted into the source calendar (ordinal months) and
+  # returned in-calendar, spanning `count` days.
+  defp lunisolar_interval(%Date{} = gregorian, calendar, count) do
+    tag = calendar_tag(calendar)
+
+    with {:ok, in_calendar} <- Date.convert(gregorian, calendar),
+         {:ok, base} <-
+           Tempo.from_iso8601(
+             "#{in_calendar.year}Y#{in_calendar.month}M#{in_calendar.day}D[u-ca=#{tag}]"
+           ),
+         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
+      {:ok, [span_days(interval, base, count)]}
+    end
+  end
+
+  # The UTC instant of the named event in the given Gregorian year.
+  defp solar_event_utc(:equinox, 3, year), do: Astro.equinox(year, :march)
+  defp solar_event_utc(:equinox, 9, year), do: Astro.equinox(year, :september)
+  defp solar_event_utc(:solstice, 6, year), do: Astro.solstice(year, :june)
+  defp solar_event_utc(:solstice, 12, year), do: Astro.solstice(year, :december)
+
+  # The event's civil date in its timezone. No timezone is GMT; a numeric
+  # offset shifts the UTC instant directly; a named zone goes through the host
+  # app's configured time-zone database (a clean error, skipped upstream, when
+  # none is configured).
+  defp solar_event_date(%DateTime{} = utc, nil), do: {:ok, DateTime.to_date(utc)}
+
+  defp solar_event_date(%DateTime{} = utc, timezone) do
+    case offset_seconds(timezone) do
+      {:ok, seconds} -> {:ok, utc |> DateTime.add(seconds, :second) |> DateTime.to_date()}
+      :error -> named_zone_date(utc, timezone)
+    end
+  end
+
+  defp named_zone_date(%DateTime{} = utc, timezone) do
+    case DateTime.shift_zone(utc, timezone) do
+      {:ok, local} -> {:ok, DateTime.to_date(local)}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  # A fixed UTC offset — `GMT`/`UTC`, `+09`, `+09:00`, `-0430` — as seconds,
+  # or `:error` for a named zone.
+  defp offset_seconds(timezone) do
+    case Regex.run(~r/^\s*(?:GMT|UTC)?([+-])(\d{1,2}):?(\d{2})?\s*$/i, timezone) do
+      [_, sign, hours | rest] ->
+        minutes = rest |> List.first() |> to_minutes()
+        magnitude = (String.to_integer(hours) * 60 + minutes) * 60
+        {:ok, if(sign == "-", do: -magnitude, else: magnitude)}
+
+      _no_offset ->
+        if String.upcase(String.trim(timezone)) in ["GMT", "UTC", "Z"], do: {:ok, 0}, else: :error
+    end
+  end
+
+  defp to_minutes(nil), do: 0
+  defp to_minutes(""), do: 0
+  defp to_minutes(minutes), do: String.to_integer(minutes)
+
+  # One Julian occurrence, converted to Gregorian and spanning `count` days.
+  # `Tempo.from_elixir/1` needs a Gregorian date, so the Julian date is
+  # converted first; this also sidesteps Calendrical's Julian `day_of_week`.
+  defp julian_interval(%Date{} = julian_date, count) do
+    with {:ok, gregorian} <- Date.convert(julian_date, Calendrical.Gregorian),
+         base <- Tempo.from_elixir(gregorian),
          {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
       {:ok, span_days(interval, base, count)}
     end

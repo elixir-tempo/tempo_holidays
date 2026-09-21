@@ -53,7 +53,7 @@ defmodule Tempo.Holidays.DateHolidays do
 
       iex> days = %{
       ...>   "12-25" => %{"name" => %{"en" => "Christmas Day"}},
-      ...>   "chinese 01-0-01" => %{"name" => %{"en" => "Chinese New Year"}}
+      ...>   "bengali-revised 1-1" => %{"name" => %{"en" => "Bengali New Year"}}
       ...> }
       iex> holidays = Tempo.Holidays.DateHolidays.compile_days(days)
       iex> Enum.map(holidays, & &1.name)
@@ -119,7 +119,13 @@ defmodule Tempo.Holidays.DateHolidays do
   def compile_day(rule, meta, language, names) when is_binary(rule) and is_map(meta) do
     case Compiler.compile(rule) do
       {:ok, compiled} ->
-        [%Holiday{name: name(meta, language, names, rule), type: type(meta), rule: compiled}]
+        holiday = %Holiday{
+          name: name(meta, language, names, rule),
+          type: type(meta),
+          rule: with_gates(compiled, meta)
+        }
+
+        [holiday]
 
       {:error, _unsupported} ->
         []
@@ -162,4 +168,60 @@ defmodule Tempo.Holidays.DateHolidays do
 
   defp type(%{"type" => type}) when is_binary(type), do: Map.get(@types, type, :public)
   defp type(_meta), do: :public
+
+  # ── occurrence-level metadata gates ─────────────────────────────────
+  #
+  # Attach date-holidays' `active` windows, `disable`d dates and `enable`d
+  # dates (see the upstream `docs/specification.md`) onto the compiled rule.
+  # Malformed entries in downloaded data are dropped, never raised on.
+  defp with_gates(rule, meta) do
+    %{
+      rule
+      | active: active_ranges(meta),
+        disable: iso_dates(Map.get(meta, "disable")),
+        enable: iso_dates(Map.get(meta, "enable"))
+    }
+  end
+
+  # `active` is a list of `%{"from" => bound, "to" => bound}` windows, each
+  # bound an integer year (meaning its January 1st) or an ISO date, half-open.
+  defp active_ranges(%{"active" => ranges}) when is_list(ranges) do
+    case Enum.flat_map(ranges, &active_range/1) do
+      [] -> nil
+      parsed -> parsed
+    end
+  end
+
+  defp active_ranges(_meta), do: nil
+
+  defp active_range(range) when is_map(range) do
+    [{active_bound(Map.get(range, "from")), active_bound(Map.get(range, "to"))}]
+  end
+
+  defp active_range(_other), do: []
+
+  defp active_bound(year) when is_integer(year), do: date_or_nil(Date.new(year, 1, 1))
+  defp active_bound(string) when is_binary(string), do: date_or_nil(Date.from_iso8601(string))
+  defp active_bound(_absent), do: nil
+
+  defp iso_dates(list) when is_list(list) do
+    case Enum.flat_map(list, &iso_date/1) do
+      [] -> nil
+      dates -> dates
+    end
+  end
+
+  defp iso_dates(_absent), do: nil
+
+  defp iso_date(string) when is_binary(string) do
+    case Date.from_iso8601(string) do
+      {:ok, date} -> [date]
+      {:error, _reason} -> []
+    end
+  end
+
+  defp iso_date(_other), do: []
+
+  defp date_or_nil({:ok, %Date{} = date}), do: date
+  defp date_or_nil({:error, _reason}), do: nil
 end

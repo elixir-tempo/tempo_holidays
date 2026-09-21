@@ -6,9 +6,11 @@
 
 * Requests accept a CLDR territory code, a BCP 47 locale (string, atom, or `Localize.LanguageTag`), or a holiday list. A locale is validated through `Localize` and its territory, state (division) and region (subdivision) derived — `en-US-u-sd-usca` selects California — each overridable via `:territory`/`:division`/`:subdivision`. State and region holidays are compiled and shipped alongside the national set (`Tempo.Holidays.Locale`).
 
-* Rule compiler covering date-holidays' grammar: fixed dates and `P<n>D` spans, weekday-in-month, relative and nested weekdays (Election Day, Black Friday), month-anchor weekdays, Islamic/Hebrew/Persian calendar dates, Easter/orthodox-relative, and specific dates. Islamic dates use Umm al-Qura and are returned in-calendar — a lunar date can fall twice in one Gregorian year, so `materialise/2` returns a list.
+* Rule compiler covering date-holidays' grammar: fixed dates and `P<n>D` spans, weekday-in-month, relative and nested weekdays (Election Day, Black Friday), month-anchor weekdays, Islamic/Hebrew/Persian calendar dates, `julian MM-DD` fixed dates (Orthodox/Coptic/Ethiopian Christmas, converted to Gregorian), Chinese and Korean lunisolar dates and Chinese solar terms (Qingming), equinox/solstice dates (Japan's Equinox Days, timezone-aware), Easter/orthodox-relative, and specific dates. Islamic dates use Umm al-Qura and are returned in-calendar — a lunar date can fall twice in one Gregorian year, so `materialise/2` returns a list.
 
 * Rule modifiers: observed-date substitution in `and if` (add), `if` (shift) and `substitutes` (observed-only) modes; and `since`/`prior to`, even/odd, leap, `every N years`, and `on`/`not on <weekday>` filters that gate whether a holiday occurs.
+
+* Occurrence-level metadata gates from date-holidays: `active` windows (half-open `[from, to)`), `disable`d dates and `enable`d dates — a `disable`+`enable` pair moves an occurrence, as with the UK 2022 Spring bank holiday to the Platinum Jubilee Thursday.
 
 * An opt-in conformance test (`mix test --include conformance`) checks every compiled rule's dates against the full date-holidays fixture corpus (9,695 files); ~96% match, with the remainder tracked as the calendars and edge cases still to land.
 

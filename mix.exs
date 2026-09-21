@@ -96,7 +96,7 @@ defmodule Tempo.Holidays.MixProject do
       {:astro, "~> 2.5"},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
-      {:localize, "~> 1.0"},
+      {:localize, "~> 1.3"},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

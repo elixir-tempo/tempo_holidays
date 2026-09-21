@@ -8,7 +8,7 @@ defmodule Tempo.Holidays.Conformance do
   # not per-entry). Reports totals and per-feature breakdowns so the gaps can
   # be driven to zero.
 
-  alias Tempo.Holidays.{Compiler, Rule}
+  alias Tempo.Holidays.{Compiler, Data, Rule}
 
   @type stats :: %{
           rules: non_neg_integer(),
@@ -22,14 +22,43 @@ defmodule Tempo.Holidays.Conformance do
   @spec run([Tempo.Holidays.Fixtures.fixture()], keyword()) :: stats()
   def run(fixtures, options \\ []) do
     sample_limit = Keyword.get(options, :samples, 25)
+    gate_indices = gate_indices(fixtures)
 
     fixtures
-    |> Enum.reduce(initial(), &check_fixture(&1, &2, sample_limit))
+    |> Enum.reduce(initial(), &check_fixture(&1, &2, gate_indices, sample_limit))
   end
 
   defp initial, do: %{rules: 0, matched: 0, unsupported: %{}, mismatched: %{}, samples: []}
 
-  defp check_fixture(%{year: year, holidays: holidays, territory: territory}, acc, limit) do
+  # date-holidays' `active`/`disable`/`enable` metadata lives on the source
+  # `days`, not in the fixture output, so re-compiling a bare rule string
+  # cannot see it. Load the *built* runtime data once per distinct territory
+  # and index its gates by rule source, so each fixture rule is materialised
+  # with the same gates the shipped data carries.
+  defp gate_indices(fixtures) do
+    fixtures
+    |> Enum.map(& &1.territory)
+    |> Enum.uniq()
+    |> Map.new(&{&1, gate_index(&1)})
+  end
+
+  defp gate_index(territory) do
+    {code, division} = split_territory(territory)
+
+    case Data.for_territory(code, division) do
+      {:ok, holidays} -> Enum.group_by(holidays, & &1.rule.source, & &1.rule)
+      {:error, _absent} -> %{}
+    end
+  end
+
+  defp split_territory(territory) do
+    case String.split(territory, "-", parts: 2) do
+      [code] -> {code, nil}
+      [code, division] -> {code, division}
+    end
+  end
+
+  defp check_fixture(%{year: year, holidays: holidays, territory: territory}, acc, indices, limit) do
     {:ok, year_tempo} = Tempo.from_iso8601("#{year}")
     # date-holidays deduplicates dates across a country's entries (an actual
     # date and its substitute may come from two different rules), so a rule's
@@ -37,30 +66,43 @@ defmodule Tempo.Holidays.Conformance do
     # its own entries exactly.
     all_dates = holidays |> Enum.map(& &1.date) |> MapSet.new()
 
-    holidays
-    |> Enum.filter(&is_binary(&1.rule))
-    |> Enum.group_by(& &1.rule, & &1.date)
-    |> Enum.reduce(acc, fn {rule, dates}, acc ->
-      check_rule(rule, MapSet.new(dates), all_dates, year_tempo, territory, year, acc, limit)
-    end)
-  end
-
-  defp check_rule(rule, expected, all_dates, year_tempo, territory, year, acc, limit) do
-    acc = %{acc | rules: acc.rules + 1}
-
-    context = %{
-      rule: rule,
-      expected: expected,
+    base = %{
       all_dates: all_dates,
       year_tempo: year_tempo,
       territory: territory,
       year: year,
+      gates: Map.get(indices, territory, %{}),
       limit: limit
     }
 
+    holidays
+    |> Enum.filter(&is_binary(&1.rule))
+    |> Enum.group_by(& &1.rule, & &1.date)
+    |> Enum.reduce(acc, fn {rule, dates}, acc ->
+      check_rule(rule, MapSet.new(dates), base, acc)
+    end)
+  end
+
+  defp check_rule(rule, expected, base, acc) do
+    acc = %{acc | rules: acc.rules + 1}
+    context = Map.merge(base, %{rule: rule, expected: expected})
+
     case Compiler.compile(rule) do
-      {:ok, compiled} -> check_materialised(compiled, context, acc)
+      {:ok, compiled} -> check_materialised(attach_gates(compiled, context.gates), context, acc)
       {:error, _} -> bump(acc, :unsupported, feature(rule))
+    end
+  end
+
+  # Copy the built rule's occurrence-level gates onto the freshly compiled
+  # rule; a source the built data does not carry leaves the rule ungated,
+  # exactly as before this enrichment existed.
+  defp attach_gates(compiled, gates) do
+    case Map.get(gates, compiled.source) do
+      [%Rule{} = built | _] ->
+        %{compiled | active: built.active, disable: built.disable, enable: built.enable}
+
+      _absent ->
+        compiled
     end
   end
 
