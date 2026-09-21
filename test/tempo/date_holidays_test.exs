@@ -33,8 +33,10 @@ defmodule Tempo.Holidays.DateHolidaysTest do
 
       holidays = Map.new(DateHolidays.compile_days(days), &{&1.name, &1})
 
+      # The leading `and` makes this clause — and, persisting, the following
+      # bare `if` — additive.
       assert holidays["Independence Day"].rule.substitute ==
-               [{[6], :previous, 5}, {[7], :next, 1}]
+               [{[6], :previous, 5, :add}, {[7], :next, 1, :add}]
 
       assert holidays["easter"].type == :observance
     end

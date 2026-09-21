@@ -21,6 +21,8 @@ at over 99% matched, and the gaps below are what remains.
 
 ## Done
 
+* [x] **Per-clause substitution + enable-as-move** — studied `date-holidays-parser`'s `Rule.dateIfThen` and `PostRule.disable`: each `if`/`and if`/`substitutes` clause carries its own mode with a *persistent* modifier (a leading `and` makes it and every later clause additive), and the first clause a date triggers fires and locks it. Fixed the mixed shift/add rules (Tonga) and the `substitutes … and if …` case (Japan). `disable`+`enable` is now a move — the enable is added only when a disable matches a computed date (fixes St Vincent's Carnival, whose disable date didn't match). 2026-09-22.
+
 * [x] **Grammar coverage refinements** — Easter/orthodox `P<n>D` spans (`easter -6 P5D`); calendar durations with a time suffix (`1 Shawwal P3DT0H0M`); a weekday after the Nth weekday after a date (`monday after 3rd sunday after 09-01`, new `:nested_after_date` kind, ~30 entries); and the `and` chaining a `since` condition to a bare `if` (a move, not an added observance — Zambia). 2026-09-22.
 
 * [x] **Year-boundary substitution** — `materialise/2` gathers a substituted rule's occurrences across the target year and its two neighbours and keeps those whose observed date lands in the target Gregorian year, matching date-holidays' attribution (New Year on a weekend → observed 31 Dec belongs to the prior year). 2026-09-22.

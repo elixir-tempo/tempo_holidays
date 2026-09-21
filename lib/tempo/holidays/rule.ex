@@ -19,10 +19,12 @@ defmodule Tempo.Holidays.Rule do
   no CLDR calendar tag, so it is converted to Gregorian.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
-  weekend, observe it the following Monday" — in one of three modes (`:add`
-  keeps the date and adds the observed day, `:shift` moves it, `:substitute_only`
-  is the observed day alone), plus year conditions (`:from_year`/`:to_year`,
-  even/odd `:year_parity`, and `:leap`) that gate whether it occurs at all.
+  weekend, observe it the following Monday" — as ordered clauses, each with its
+  own mode (`:shift` moves the date, `:add` keeps it and adds the observed day,
+  `:substitute_only` is the observed day alone); the first clause a date
+  triggers fires and the rest leave it alone. Plus year conditions
+  (`:from_year`/`:to_year`, even/odd `:year_parity`, and `:leap`) that gate
+  whether it occurs at all.
 
   Finally it may carry date-holidays' occurrence-level metadata gates, applied
   to the computed dates: `:active` restricts the rule to one or more half-open
@@ -52,15 +54,17 @@ defmodule Tempo.Holidays.Rule do
           | :orthodox
 
   @typedoc """
-  An observed-date substitution: `{trigger_weekdays, direction, target_weekday}`
-  clauses in ISO weekday numbering (Monday = 1 … Sunday = 7). When the
-  materialised date lands on one of the trigger weekdays, the holiday is
-  observed on the nearest `:next` or `:previous` occurrence of the target
-  weekday. "If it falls on a weekend, take the following Monday" is
-  `[{[6, 7], :next, 1}]`; the US rule "Saturday → prior Friday, Sunday →
-  next Monday" is `[{[6], :previous, 5}, {[7], :next, 1}]`.
+  An observed-date substitution: ordered
+  `{trigger_weekdays, direction, target_weekday, mode}` clauses in ISO weekday
+  numbering (Monday = 1 … Sunday = 7). When a materialised date lands on one of
+  a clause's trigger weekdays, that clause fires and no later clause touches the
+  date; its `mode` decides what happens — `:shift` moves the holiday to the
+  target weekday, `:add` keeps the original and adds the observed day, and
+  `:substitute_only` yields the observed day alone (and drops the holiday when no
+  clause fires). "If it falls on a weekend, take the following Monday" is
+  `[{[6, 7], :next, 1, :shift}]`.
   """
-  @type substitute :: [{[1..7], :next | :previous, 1..7}]
+  @type substitute :: [{[1..7], :next | :previous, 1..7, :shift | :add | :substitute_only}]
 
   @type t :: %__MODULE__{
           kind: kind(),
@@ -75,7 +79,6 @@ defmodule Tempo.Holidays.Rule do
           leap_month: boolean() | nil,
           timezone: String.t() | nil,
           substitute: substitute() | nil,
-          substitute_mode: :shift | :add | :substitute_only | nil,
           from_year: integer() | nil,
           to_year: integer() | nil,
           year_parity: :even | :odd | nil,
@@ -102,7 +105,6 @@ defmodule Tempo.Holidays.Rule do
     :leap_month,
     :timezone,
     :substitute,
-    :substitute_mode,
     :from_year,
     :to_year,
     :year_parity,
@@ -148,30 +150,26 @@ defmodule Tempo.Holidays.Rule do
   """
   @spec materialise(t(), Tempo.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   def materialise(%__MODULE__{} = rule, %Tempo{} = year) do
-    case boundary_years(rule, Tempo.year(year)) do
-      [_only] -> materialise_in_year(rule, year)
-      years -> materialise_across_boundary(rule, year, years)
+    with {:ok, occurrences} <- gather_occurrences(rule, year) do
+      move_disabled(occurrences, rule, year)
     end
   end
 
-  # The common case: no substitution can cross the year boundary, so every
-  # occurrence stays in `year` and no re-projection or filtering is needed.
-  defp materialise_in_year(rule, year) do
-    with {:ok, occurrences} <- occurrences_for_year(rule, year) do
-      append_enabled(occurrences, rule.enable, year)
-    end
-  end
-
-  # The boundary case: materialise the target year and its neighbours, then
-  # keep only the occurrences whose observed date lands in the target year.
-  defp materialise_across_boundary(rule, year, years) do
+  # Gather the occurrences before the `disable`/`enable` post-step. The common
+  # case is a single year; a substituted rule that could cross the Gregorian
+  # year boundary is materialised across the target year and its neighbours and
+  # filtered back to the target.
+  defp gather_occurrences(rule, year) do
     target = Tempo.year(year)
 
-    with {:ok, groups} <- reduce_ok(years, &occurrences_for(rule, &1)) do
-      groups
-      |> List.flatten()
-      |> Enum.filter(&in_gregorian_year?(&1, target))
-      |> append_enabled(rule.enable, year)
+    case boundary_years(rule, target) do
+      [_only] ->
+        occurrences_for_year(rule, year)
+
+      years ->
+        with {:ok, groups} <- reduce_ok(years, &occurrences_for(rule, &1)) do
+          {:ok, groups |> List.flatten() |> Enum.filter(&in_gregorian_year?(&1, target))}
+        end
     end
   end
 
@@ -210,17 +208,16 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # Every gate but `enable` (which names absolute dates) applies within the year
-  # being materialised, so the year conditions, active windows, disable list,
-  # weekday gate and substitution are all evaluated per year.
+  # The per-year gates: the year conditions, active windows, weekday gate and
+  # substitution. `disable`/`enable` are a separate post-step (see
+  # `move_disabled/3`) applied once to the gathered occurrences.
   defp occurrences_for_year(rule, year) do
     if active_in_year?(rule, Tempo.year(year)) do
       with {:ok, base} <- materialise_base(rule, year) do
         base
         |> filter_active(rule.active)
-        |> reject_disabled(rule.disable)
         |> gate_by_weekday(rule.weekday_gate)
-        |> substitute_all(rule.substitute, rule.substitute_mode)
+        |> substitute_all(rule.substitute)
       end
     else
       {:ok, []}
@@ -255,6 +252,28 @@ defmodule Tempo.Holidays.Rule do
   # rule's *computed* dates (see the upstream `docs/specification.md`), so they
   # are applied to the materialised occurrences, not gated at the year level.
 
+  # `disable`/`enable` are a *move*, mirroring date-holidays' `PostRule.disable`:
+  # only when a `disable` date equals a computed occurrence is that occurrence
+  # dropped and the year's `enable` dates added in its place. A `disable` that
+  # matches nothing — or an `enable` with no matching `disable` — does nothing.
+  defp move_disabled(occurrences, %__MODULE__{disable: disable}, _year)
+       when disable in [nil, []],
+       do: {:ok, occurrences}
+
+  defp move_disabled(occurrences, rule, year) do
+    blocked = MapSet.new(rule.disable, &date_days/1)
+    {matched, survivors} = Enum.split_with(occurrences, &disabled?(&1, blocked))
+
+    if matched == [], do: {:ok, survivors}, else: append_enabled(survivors, rule.enable, year)
+  end
+
+  defp disabled?(interval, blocked) do
+    case occurrence_days(interval) do
+      {:ok, days} -> MapSet.member?(blocked, days)
+      :error -> false
+    end
+  end
+
   # `active` restricts the rule to one or more half-open `[from, to)` windows;
   # an occurrence whose date falls outside every window is dropped.
   defp filter_active(intervals, nil), do: intervals
@@ -270,20 +289,6 @@ defmodule Tempo.Holidays.Rule do
 
   defp within_range?(days, {from, to}) do
     (is_nil(from) or days >= date_days(from)) and (is_nil(to) or days < date_days(to))
-  end
-
-  # `disable` removes specific occurrences by their computed Gregorian date.
-  defp reject_disabled(intervals, nil), do: intervals
-
-  defp reject_disabled(intervals, disabled) do
-    blocked = MapSet.new(disabled, &date_days/1)
-
-    Enum.reject(intervals, fn interval ->
-      case occurrence_days(interval) do
-        {:ok, days} -> MapSet.member?(blocked, days)
-        :error -> false
-      end
-    end)
   end
 
   # `enable` adds explicit observed dates — the target of a disable/enable move
@@ -630,57 +635,62 @@ defmodule Tempo.Holidays.Rule do
 
   # ── observed-date substitution ──────────────────────────────────────
 
-  # Apply the substitution to every occurrence. date-holidays distinguishes
-  # two forms: a bare "if <weekday> then <target>" *moves* the holiday to the
-  # observed day (`:shift`), while "and if …" keeps the original date and
-  # *adds* the observed day (`:add`). A no-op when the rule names no
-  # substitution.
-  defp substitute_all(intervals, nil, _mode), do: {:ok, intervals}
-  defp substitute_all(intervals, [], _mode), do: {:ok, intervals}
+  # Apply the ordered substitution clauses to every occurrence, mirroring
+  # date-holidays: the first clause whose trigger a date matches fires and
+  # locks the date, so no later clause touches it. A `:shift` clause moves the
+  # date to the observed day; `:add` keeps the original and adds the observed
+  # day; `:substitute_only` yields the observed day, and drops the occurrence
+  # when no clause fires. A no-op when the rule names no substitution.
+  defp substitute_all(intervals, nil), do: {:ok, intervals}
+  defp substitute_all(intervals, []), do: {:ok, intervals}
 
-  defp substitute_all(intervals, clauses, mode) do
-    with {:ok, per_occurrence} <- reduce_ok(intervals, &substitute_one(&1, clauses, mode)) do
+  defp substitute_all(intervals, clauses) do
+    with {:ok, per_occurrence} <- reduce_ok(intervals, &substitute_one(&1, clauses)) do
       {:ok, List.flatten(per_occurrence)}
     end
   end
 
-  defp substitute_one(interval, clauses, mode) do
+  defp substitute_one(interval, clauses) do
     date = Interval.from(interval)
     weekday = Tempo.day_of_week(date, :monday)
-
-    case Enum.find(clauses, fn {triggers, _direction, _target} -> weekday in triggers end) do
-      nil -> untriggered(interval, mode)
-      {_triggers, direction, target} -> observed(interval, date, weekday, direction, target, mode)
-    end
+    apply_clauses(clauses, interval, date, weekday, false)
   end
 
-  # A `substitutes …` rule *is* the substitute, so it contributes nothing on a
-  # day that does not trigger it; the other modes keep the original date.
-  defp untriggered(_interval, :substitute_only), do: {:ok, []}
-  defp untriggered(interval, _mode), do: {:ok, [interval]}
-
-  # `:add` keeps the original date and adds the observed day; `:shift` and
-  # `:substitute_only` replace the original with the observed day.
-  defp observed(interval, date, weekday, direction, target, :add) do
-    with {:ok, day} <- observe_on(date, weekday, direction, target) do
-      {:ok, [interval, day]}
-    end
+  # No clause fired: keep the occurrence, unless a `:substitute_only` clause it
+  # failed to trigger has marked it for removal.
+  defp apply_clauses([], interval, _date, _weekday, dropped) do
+    {:ok, if(dropped, do: [], else: [interval])}
   end
 
-  defp observed(_interval, date, weekday, direction, target, mode)
-       when mode in [:shift, :substitute_only] do
-    with {:ok, day} <- observe_on(date, weekday, direction, target) do
-      {:ok, [day]}
+  defp apply_clauses(
+         [{triggers, direction, target, mode} | rest],
+         interval,
+         date,
+         weekday,
+         dropped
+       ) do
+    if weekday in triggers do
+      # This clause fires and locks the date; `:add` also keeps the original.
+      with {:ok, observed} <- observe_on(date, weekday, direction, target) do
+        {:ok, if(mode == :add, do: [interval, observed], else: [observed])}
+      end
+    else
+      apply_clauses(rest, interval, date, weekday, dropped or mode == :substitute_only)
     end
   end
 
   defp observe_on(date, weekday, :next, target) do
-    shift_days(date, Integer.mod(target - weekday, 7))
+    shift_days(date, nonzero_shift(Integer.mod(target - weekday, 7), 7))
   end
 
   defp observe_on(date, weekday, :previous, target) do
-    shift_days(date, -Integer.mod(weekday - target, 7))
+    shift_days(date, nonzero_shift(-Integer.mod(weekday - target, 7), -7))
   end
+
+  # date-holidays moves a full week when the observed target is the date's own
+  # weekday, rather than leaving it in place.
+  defp nonzero_shift(0, fallback), do: fallback
+  defp nonzero_shift(offset, _fallback), do: offset
 
   defp shift_days(date, days) do
     date

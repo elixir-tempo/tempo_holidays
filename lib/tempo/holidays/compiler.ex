@@ -175,7 +175,7 @@ defmodule Tempo.Holidays.Compiler do
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("01-26 if weekend then next monday")
       iex> {rule.kind, rule.month, rule.day, rule.substitute}
-      {:fixed, 1, 26, [{[6, 7], :next, 1}]}
+      {:fixed, 1, 26, [{[6, 7], :next, 1, :shift}]}
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("last Monday in May")
       iex> {rule.kind, rule.count, rule.weekday, rule.month}
@@ -196,11 +196,10 @@ defmodule Tempo.Holidays.Compiler do
       rule |> strip_time() |> strip_index() |> extract_year_conditions()
 
     {base, substitute} = extract_substitution(without_conditions)
-    mode = substitution_mode(without_conditions, substitute)
 
     case compile_base(base) do
       {:ok, compiled} ->
-        {:ok, apply_conditions(compiled, conditions, substitute, mode, rule)}
+        {:ok, apply_conditions(compiled, conditions, substitute, rule)}
 
       nil ->
         {:error, {:unsupported, rule}}
@@ -255,11 +254,10 @@ defmodule Tempo.Holidays.Compiler do
 
   # Carry the year conditions onto the compiled rule. A tier that set its own
   # window (a specific date) keeps it when the rule named no `since`/`until`.
-  defp apply_conditions(compiled, conditions, substitute, mode, rule) do
+  defp apply_conditions(compiled, conditions, substitute, rule) do
     %{
       compiled
       | substitute: substitute,
-        substitute_mode: mode,
         from_year: conditions.from_year || compiled.from_year,
         to_year: conditions.to_year || compiled.to_year,
         year_parity: conditions.year_parity,
@@ -268,20 +266,6 @@ defmodule Tempo.Holidays.Compiler do
         weekday_gate: conditions.weekday_gate,
         source: rule
     }
-  end
-
-  # A `substitutes …` rule *is* the observed day, contributing only when
-  # triggered (`:substitute_only`); "and if …" adds the observed day to the
-  # original (`:add`); a bare "if …" moves the holiday to it (`:shift`). `nil`
-  # when the rule carries no substitution.
-  defp substitution_mode(_rule, nil), do: nil
-
-  defp substitution_mode(rule, _clauses) do
-    cond do
-      Regex.match?(~r/\bsubstitutes\b/i, rule) -> :substitute_only
-      Regex.match?(~r/\band\s+if\b/i, rule) -> :add
-      true -> :shift
-    end
   end
 
   # `since <year>` sets the first active year; `prior to <year>` / `until
@@ -756,19 +740,25 @@ defmodule Tempo.Holidays.Compiler do
 
   # ── observed-date substitution: "… if weekend then next monday" ─────
   #
-  # Splits any `if <weekdays> then (next|previous) <weekday>` clauses off
+  # Splits any `(and )?if <weekdays> then (next|previous) <weekday>` clauses off
   # the base rule and compiles them to `{trigger_weekdays, direction,
-  # target_weekday}` in ISO numbering. `weekend` expands to Saturday and
-  # Sunday; a comma list (`saturday,sunday`) is taken verbatim. Several
-  # clauses may chain — the US rule is `if saturday then previous friday
-  # if sunday then next monday`.
-  @substitute_pattern ~r/if\s+([a-z, ]+?)\s+then\s+(next|previous)\s+([a-z]+)/i
+  # target_weekday, mode}` in ISO numbering. Each clause's mode follows
+  # date-holidays' *persistent* modifier: a bare `if` moves the holiday
+  # (`:shift`); an `and` before a clause makes it — and every later clause —
+  # add the observed day (`:add`); a `substitutes` prefix makes the leading
+  # clauses observed-only (`:substitute_only`) until an `and` overrides. So the
+  # US `and if sunday … if saturday …` is all-add, while Tonga's `if … then …
+  # and if … then …` is shift-then-add. `weekend` expands to Saturday and
+  # Sunday; a comma list (`saturday,sunday`) is taken verbatim.
+  @substitute_pattern ~r/(\band\b\s+)?if\s+([a-z, ]+?)\s+then\s+(next|previous)\s+([a-z]+)/i
 
   defp extract_substitution(rule) do
-    clauses =
+    initial_mode = if Regex.match?(~r/\bsubstitutes\b/i, rule), do: :substitute_only, else: :shift
+
+    {clauses, _final_mode} =
       @substitute_pattern
       |> Regex.scan(rule)
-      |> Enum.flat_map(&parse_substitute_clause/1)
+      |> Enum.flat_map_reduce(initial_mode, &parse_substitute_clause/2)
 
     base =
       rule
@@ -780,12 +770,16 @@ defmodule Tempo.Holidays.Compiler do
     {base, if(clauses == [], do: nil, else: clauses)}
   end
 
-  defp parse_substitute_clause([_match, triggers, direction, target]) do
+  # `and` before a clause flips the running mode to `:add` and it persists to
+  # every later clause; otherwise the mode carries over unchanged.
+  defp parse_substitute_clause([_match, and_group, triggers, direction, target], mode) do
+    mode = if and_group == "", do: mode, else: :add
+
     with {:ok, trigger_days} <- parse_weekday_set(triggers),
          {:ok, target_day} <- Map.fetch(@weekdays, String.downcase(target)) do
-      [{trigger_days, direction_atom(String.downcase(direction)), target_day}]
+      {[{trigger_days, direction_atom(String.downcase(direction)), target_day, mode}], mode}
     else
-      _ -> []
+      _ -> {[], mode}
     end
   end
 

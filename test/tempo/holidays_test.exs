@@ -436,13 +436,31 @@ defmodule Tempo.HolidaysTest do
       # `since 2022 and if sunday …` chains the year condition to a bare `if`
       # (move), unlike the additive `and if`. 28 April 2024 is a Sunday.
       {:ok, chained} = Compiler.compile("04-28 since 2022 and if sunday then next monday")
-      assert chained.substitute_mode == :shift
+      assert chained.substitute == [{[7], :next, 1, :shift}]
       assert {:ok, [interval]} = Rule.materialise(chained, ~o"2024")
       assert Tempo.Interval.from(interval) == ~o"2024Y4M29D"
 
       # A genuine additive `and if` still keeps the original and adds the observed.
       {:ok, additive} = Compiler.compile("03-02 and if sunday then next monday")
-      assert additive.substitute_mode == :add
+      assert additive.substitute == [{[7], :next, 1, :add}]
+    end
+
+    test "clause modes are per-clause: a shift clause then an additive one" do
+      # Tonga: the bare `if …` moves the holiday; the later `and if …` adds.
+      {:ok, rule} =
+        Compiler.compile(
+          "06-04 if thursday,friday,saturday,sunday then next monday and if tuesday then previous monday"
+        )
+
+      assert rule.substitute == [
+               {[4, 5, 6, 7], :next, 1, :shift},
+               {[2], :previous, 1, :add}
+             ]
+
+      # 4 June 2028 is a Sunday: the shift clause fires and moves it to Monday
+      # the 5th, dropping the 4th (not an add).
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2028")
+      assert Tempo.Interval.from(interval) == ~o"2028Y6M5D"
     end
   end
 
