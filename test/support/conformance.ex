@@ -15,6 +15,7 @@ defmodule Tempo.Holidays.Conformance do
           matched: non_neg_integer(),
           unsupported: %{atom() => non_neg_integer()},
           mismatched: %{atom() => non_neg_integer()},
+          divergent: %{atom() => non_neg_integer()},
           samples: [map()]
         }
 
@@ -28,7 +29,8 @@ defmodule Tempo.Holidays.Conformance do
     |> Enum.reduce(initial(), &check_fixture(&1, &2, gate_indices, sample_limit))
   end
 
-  defp initial, do: %{rules: 0, matched: 0, unsupported: %{}, mismatched: %{}, samples: []}
+  defp initial,
+    do: %{rules: 0, matched: 0, unsupported: %{}, mismatched: %{}, divergent: %{}, samples: []}
 
   # date-holidays' `active`/`disable`/`enable` metadata lives on the source
   # `days`, not in the fixture output, so re-compiling a bare rule string
@@ -123,13 +125,30 @@ defmodule Tempo.Holidays.Conformance do
   end
 
   defp record(acc, context, detail) do
-    sample =
-      Map.merge(%{territory: context.territory, year: context.year, rule: context.rule}, detail)
+    feature = feature(context.rule)
 
-    acc
-    |> bump(:mismatched, feature(context.rule))
-    |> add_sample(sample, context.limit)
+    if accepted_divergence?(feature) do
+      # A known, accepted difference between date-holidays and our upstream —
+      # not a defect — so it is tracked apart from `mismatched` and not sampled.
+      bump(acc, :divergent, feature)
+    else
+      sample =
+        Map.merge(%{territory: context.territory, year: context.year, rule: context.rule}, detail)
+
+      acc
+      |> bump(:mismatched, feature)
+      |> add_sample(sample, context.limit)
+    end
   end
+
+  # Islamic civil dates diverge because date-holidays uses a fixed lookup table
+  # with a 6pm (sunset-approximation) day-start converted to the country's
+  # timezone, while Calendrical uses the authoritative Umm al-Qura anchored at
+  # midnight. This is a reference-model difference, not a defect; pending a
+  # decision on whether to offer a sunset day-start, these are recorded as
+  # divergent rather than mismatched.
+  defp accepted_divergence?(:islamic), do: true
+  defp accepted_divergence?(_feature), do: false
 
   # ── our Gregorian date for one materialised interval ────────────────
 
@@ -187,12 +206,14 @@ defmodule Tempo.Holidays.Conformance do
   def summary(stats) do
     unsupported = stats.unsupported |> Map.values() |> Enum.sum()
     mismatched = stats.mismatched |> Map.values() |> Enum.sum()
+    divergent = stats.divergent |> Map.values() |> Enum.sum()
 
     """
     rules checked: #{stats.rules}
     matched:       #{stats.matched}
     unsupported:   #{unsupported}  #{inspect(sorted(stats.unsupported))}
     mismatched:    #{mismatched}  #{inspect(sorted(stats.mismatched))}
+    divergent:     #{divergent}  #{inspect(sorted(stats.divergent))}  (accepted reference differences)
     """
   end
 

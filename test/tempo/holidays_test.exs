@@ -406,6 +406,46 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
+  describe "grammar extensions" do
+    test "an Easter-relative rule carries a P<n>D span" do
+      {:ok, rule} = Compiler.compile("easter 47 P4D")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      # Easter 2025 is 20 April; +47 days is 6 June, spanning four days.
+      assert Tempo.Interval.from(interval) == ~o"2025Y6M6D"
+      assert Tempo.Interval.to(interval) == ~o"2025Y6M10D"
+    end
+
+    test "a calendar span tolerates a full duration suffix (P3DT0H0M)" do
+      {:ok, with_time} = Compiler.compile("1 Shawwal P3DT0H0M")
+      {:ok, plain} = Compiler.compile("1 Shawwal P3D")
+
+      assert with_time.count == 3
+      assert with_time.count == plain.count
+    end
+
+    test "a weekday after the Nth weekday after a fixed date" do
+      # The Thursday after the first Sunday on or after 1 September.
+      {:ok, rule} = Compiler.compile("thursday after 1st sunday after 09-01")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y9M11D"
+    end
+
+    test "the 'and' chaining a since-condition to a bare if is a shift, not an add" do
+      # `since 2022 and if sunday …` chains the year condition to a bare `if`
+      # (move), unlike the additive `and if`. 28 April 2024 is a Sunday.
+      {:ok, chained} = Compiler.compile("04-28 since 2022 and if sunday then next monday")
+      assert chained.substitute_mode == :shift
+      assert {:ok, [interval]} = Rule.materialise(chained, ~o"2024")
+      assert Tempo.Interval.from(interval) == ~o"2024Y4M29D"
+
+      # A genuine additive `and if` still keeps the original and adds the observed.
+      {:ok, additive} = Compiler.compile("03-02 and if sunday then next monday")
+      assert additive.substitute_mode == :add
+    end
+  end
+
   describe "year-boundary substitution" do
     test "an observed date crossing the year boundary is attributed to its own year" do
       # US New Year: 1 Jan observed the previous Friday when it is a Saturday.

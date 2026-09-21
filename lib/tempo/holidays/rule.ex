@@ -39,6 +39,7 @@ defmodule Tempo.Holidays.Rule do
           | :weekday
           | :relative_weekday
           | :nested_weekday
+          | :nested_after_date
           | :islamic
           | :hebrew
           | :persian
@@ -400,6 +401,30 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
+  # "monday after 3rd sunday after 09-01": the Nth inner weekday on or after a
+  # fixed date, then the outer weekday after that. Both steps use the inclusive
+  # "after" that date-holidays applies.
+  defp materialise_base(
+         %__MODULE__{kind: :nested_after_date, weekday: outer, inner_weekday: inner} = rule,
+         %Tempo{} = year
+       ) do
+    with {:ok, anchor} <-
+           Tempo.from_iso8601("#{Tempo.year(year)}-#{month_day(rule.month, rule.day)}") do
+      inner_date =
+        Tempo.shift(anchor,
+          day: relative_shift(:after, Tempo.day_of_week(anchor, :monday), inner, rule.count)
+        )
+
+      outer_shift = relative_shift(:after, Tempo.day_of_week(inner_date, :monday), outer, 1)
+
+      inner_date
+      |> Tempo.shift(day: outer_shift)
+      |> Tempo.to_interval()
+      |> first_interval()
+      |> wrap_one()
+    end
+  end
+
   # A non-Gregorian-calendar holiday (Islamic, Hebrew, Persian) is calculated
   # and returned in its own calendar, per Tempo's calendar-awareness — not
   # converted to Gregorian. `year` is the *Gregorian* year, and `Calendrical`'s
@@ -497,14 +522,16 @@ defmodule Tempo.Holidays.Rule do
     |> reduce_ok(&julian_interval(&1, count))
   end
 
-  defp materialise_base(%__MODULE__{kind: kind, offset: offset}, %Tempo{} = year)
+  defp materialise_base(%__MODULE__{kind: kind, offset: offset, count: count}, %Tempo{} = year)
        when kind in [:easter, :orthodox] do
-    easter_date(kind, Tempo.year(year))
-    |> Tempo.from_elixir()
-    |> Tempo.shift(day: offset || 0)
-    |> Tempo.to_interval()
-    |> first_interval()
-    |> wrap_one()
+    base =
+      easter_date(kind, Tempo.year(year))
+      |> Tempo.from_elixir()
+      |> Tempo.shift(day: offset || 0)
+
+    with {:ok, interval} <- base |> Tempo.to_interval() |> first_interval() do
+      {:ok, [span_days(interval, base, count)]}
+    end
   end
 
   # One occurrence (a `t:Date.t/0` in the target calendar) becomes an interval

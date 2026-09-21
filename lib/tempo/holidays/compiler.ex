@@ -219,6 +219,7 @@ defmodule Tempo.Holidays.Compiler do
       &compile_fixed/1,
       &compile_weekday/1,
       &compile_nested_weekday/1,
+      &compile_nested_after_date/1,
       &compile_relative_weekday/1,
       &compile_julian/1,
       &compile_lunisolar/1,
@@ -299,8 +300,11 @@ defmodule Tempo.Holidays.Compiler do
 
     base =
       rule
-      |> String.replace(~r/\b(?:and\s+)?since\s+\d{4}/i, "")
-      |> String.replace(~r/\b(?:and\s+)?(?:prior\s+to|until)\s+\d{4}/i, "")
+      |> String.replace(~r/\b(?:and\s+)?since\s+\d{4}(?:-\d{2}-\d{2})?(?:\s+and\b)?/i, "")
+      |> String.replace(
+        ~r/\b(?:and\s+)?(?:prior\s+to|until)\s+\d{4}(?:-\d{2}-\d{2})?(?:\s+and\b)?/i,
+        ""
+      )
       |> String.replace(~r/\bin\s+(?:even|odd|non-?leap|leap)\s+years?\b/i, "")
       |> String.replace(~r/\bevery\s+\d+\s+years?\b/i, "")
       |> String.replace(@weekday_gate_strip, "")
@@ -522,6 +526,34 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
+  # ── nested weekday after a date: "monday after 3rd sunday after 09-01" ─
+  #
+  # An outer weekday relative to the Nth inner weekday *after a fixed date* —
+  # "monday after 3rd sunday after 09-01" is the Monday after the third Sunday
+  # on or after 1 September. Distinct from `compile_nested_weekday`, whose inner
+  # anchor is a weekday-in-month.
+  defp compile_nested_after_date(rule) do
+    pattern =
+      ~r/^\s*(\w+)\s+after\s+(\d+)(?:st|nd|rd|th)\s+(\w+)\s+after\s+(\d{1,2})-(\d{1,2})\s*$/i
+
+    with [_, outer, ordinal, inner, month, day] <- Regex.run(pattern, rule),
+         {:ok, outer_code} <- Map.fetch(@weekdays, String.downcase(outer)),
+         {:ok, inner_code} <- Map.fetch(@weekdays, String.downcase(inner)) do
+      {:ok,
+       %Rule{
+         kind: :nested_after_date,
+         weekday: outer_code,
+         inner_weekday: inner_code,
+         count: String.to_integer(ordinal),
+         month: String.to_integer(month),
+         day: String.to_integer(day),
+         source: rule
+       }}
+    else
+      _ -> nil
+    end
+  end
+
   # ── julian fixed date: "julian 12-25", "julian 12-25 P2D" ───────────
   #
   # A fixed date in the Julian calendar — Orthodox Christmas is `julian 12-25`
@@ -607,7 +639,7 @@ defmodule Tempo.Holidays.Compiler do
   # picks the calendar (Islamic Umm al-Qura, Hebrew, or Persian); the
   # materialiser projects it onto the Gregorian year through that calendar.
   defp compile_calendar(rule) do
-    pattern = ~r/^\s*(\d{1,2})\s+([a-z][a-z' -]+?)(?:\s+P(\d+)D)?\s*$/i
+    pattern = ~r/^\s*(\d{1,2})\s+([a-z][a-z' -]+?)(?:\s+P(\d+)D(?:T\S*)?)?\s*$/i
 
     with [_, day, month_name | rest] <- Regex.run(pattern, rule),
          {kind, calendar, month} <- calendar_month(String.downcase(String.trim(month_name))) do
@@ -696,10 +728,11 @@ defmodule Tempo.Holidays.Compiler do
 
   # ── easter-relative: "easter", "easter -2", "orthodox 1" ────────────
   defp compile_easter(rule) do
-    case Regex.run(~r/^\s*(easter|orthodox)\s*([+-]?\d+)?\s*$/i, rule) do
+    case Regex.run(~r/^\s*(easter|orthodox)\s*([+-]?\d+)?(?:\s+P(\d+)D(?:T\S*)?)?\s*$/i, rule) do
       [_, anchor | rest] ->
-        offset = rest |> List.first() |> parse_offset()
-        {:ok, %Rule{kind: easter_kind(anchor), offset: offset, source: rule}}
+        offset = rest |> Enum.at(0) |> parse_offset()
+        count = rest |> Enum.at(1) |> parse_span()
+        {:ok, %Rule{kind: easter_kind(anchor), offset: offset, count: count, source: rule}}
 
       nil ->
         nil

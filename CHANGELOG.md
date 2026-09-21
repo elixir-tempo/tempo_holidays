@@ -12,7 +12,9 @@
 
 * Occurrence-level metadata gates from date-holidays: `active` windows (half-open `[from, to)`), `disable`d dates and `enable`d dates — a `disable`+`enable` pair moves an occurrence, as with the UK 2022 Spring bank holiday to the Platinum Jubilee Thursday.
 
-* An opt-in conformance test (`mix test --include conformance`) checks every compiled rule's dates against the full date-holidays fixture corpus (9,695 files); ~96% match, with the remainder tracked as the calendars and edge cases still to land.
+* Grammar coverage refinements: Easter/orthodox `P<n>D` spans (`easter -6 P5D`), calendar durations with a time suffix (`1 Shawwal P3DT0H0M`), a weekday after the Nth weekday after a date (`monday after 3rd sunday after 09-01`), and the `and` that chains a `since` condition to a bare `if` (a move, not an added observance).
+
+* An opt-in conformance test (`mix test --include conformance`) checks every compiled rule's dates against the full date-holidays fixture corpus (9,695 files); over 99% match, with the remainder tracked as the calendars and edge cases still to land.
 
 * Materialisation merges abutting occurrences of the same holiday into one period, so a period split across two entries (to dodge a YAML year boundary) reads as the single span it describes.
 

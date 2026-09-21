@@ -3,7 +3,7 @@
 Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs
 more than a line here. Conformance against the full date-holidays fixture
 corpus (`mix test --include conformance`) drives the remaining tiers; it sits
-at ~96% matched, and the gaps below are what remains.
+at over 99% matched, and the gaps below are what remains.
 
 ## Open
 
@@ -17,9 +17,11 @@ at ~96% matched, and the gaps below are what remains.
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream.
 
-* [ ] **Tabular Umm al-Qura** — our *calculated* Umm al-Qura differs from date-holidays' *table* by a day some years, plus day-overflow like `30 Safar` (a 29-day month). Many are corrected in-data by the `disable`/`enable` gates now handled; the residual is blocked on a tabular Umm al-Qura in Calendrical.
+* [ ] **Islamic residual (~19 mismatches)** — three sub-cases: (a) day-**overflow** (`30 Safar` in a 29-day month) — date-holidays rolls it into the next month (`first_day_of_month + (day-1)`), which Calendrical's `dates_in_gregorian_year` rejects; (b) off-by-one **type A** (`3 Jumada 1446`) — date-holidays matches Calendrical's **astronomical** UmmAlQura (`.Astronomical.first_day_of_month`), not the tabular default this lib uses; (c) off-by-one **type B** (`12 Rabi 1437`) — both Calendrical variants say 12-23, date-holidays says 12-24, a table disagreement. (a) and (b) need a Calendrical-side path (astronomical `dates_in_gregorian_year` with overflow rollover); analysis carries the reproducers. Also the lunar-twice-in-a-Gregorian-year attribution differs.
 
 ## Done
+
+* [x] **Grammar coverage refinements** — Easter/orthodox `P<n>D` spans (`easter -6 P5D`); calendar durations with a time suffix (`1 Shawwal P3DT0H0M`); a weekday after the Nth weekday after a date (`monday after 3rd sunday after 09-01`, new `:nested_after_date` kind, ~30 entries); and the `and` chaining a `since` condition to a bare `if` (a move, not an added observance — Zambia). 2026-09-22.
 
 * [x] **Year-boundary substitution** — `materialise/2` gathers a substituted rule's occurrences across the target year and its two neighbours and keeps those whose observed date lands in the target Gregorian year, matching date-holidays' attribution (New Year on a weekend → observed 31 Dec belongs to the prior year). 2026-09-22.
 

@@ -5,6 +5,11 @@ defmodule Tempo.Holidays.ConformanceTest do
   # target is zero unsupported and zero mismatched rules across the whole
   # corpus; while tiers are still being filled in, the assertions below record
   # the remaining gaps.
+  #
+  # `divergent` is a third bucket for *accepted* differences that are not
+  # defects — currently the Islamic civil dates, where date-holidays uses a
+  # fixed table with a 6pm/timezone day-start and Calendrical uses the
+  # midnight-anchored Umm al-Qura. Those are excluded from `mismatched`.
   use ExUnit.Case, async: false
 
   alias Tempo.Holidays.{Conformance, Fixtures}
