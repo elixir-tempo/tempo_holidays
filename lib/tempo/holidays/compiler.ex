@@ -48,6 +48,12 @@ defmodule Tempo.Holidays.Compiler do
     "sunday" => 7
   }
 
+  # Weekday-gate patterns (`on friday, monday`, `not on tuesday, saturday`),
+  # precompiled from the weekday alternation.
+  @weekday_alt "monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekend"
+  @weekday_gate_match ~r/\b(not\s+on|on)\s+((?:#{@weekday_alt})(?:\s*,\s*(?:#{@weekday_alt}))*)/i
+  @weekday_gate_strip ~r/\b(?:not\s+)?on\s+(?:#{@weekday_alt})(?:\s*,\s*(?:#{@weekday_alt}))*/i
+
   @months %{
     "january" => 1,
     "february" => 2,
@@ -77,6 +83,22 @@ defmodule Tempo.Holidays.Compiler do
     "shawwal" => 10,
     "dhu al-qadah" => 11,
     "dhu al-hijjah" => 12
+  }
+
+  # Persian (Solar Hijri) month numbers — fixed 1–12, no leap month.
+  @persian_months %{
+    "farvardin" => 1,
+    "ordibehesht" => 2,
+    "khordad" => 3,
+    "tir" => 4,
+    "mordad" => 5,
+    "shahrivar" => 6,
+    "mehr" => 7,
+    "aban" => 8,
+    "azar" => 9,
+    "dey" => 10,
+    "bahman" => 11,
+    "esfand" => 12
   }
 
   @doc """
@@ -123,26 +145,185 @@ defmodule Tempo.Holidays.Compiler do
       {:islamic, 12, 9, 4}
 
   """
-  @spec compile(String.t()) :: {:ok, Rule.t()} | {:error, {:unsupported, String.t()}}
+  @spec compile(term()) :: {:ok, Rule.t()} | {:error, {:unsupported, term()}}
   def compile(rule) when is_binary(rule) do
-    {base, substitute} = extract_substitution(rule)
+    {without_conditions, conditions} =
+      rule |> strip_time() |> strip_index() |> extract_year_conditions()
 
-    case compile_fixed(base) || compile_weekday(base) || compile_relative_weekday(base) ||
-           compile_islamic(base) || compile_easter(base) do
-      {:ok, compiled} -> {:ok, %{compiled | substitute: substitute, source: rule}}
-      nil -> {:error, {:unsupported, rule}}
+    {base, substitute} = extract_substitution(without_conditions)
+    mode = substitution_mode(without_conditions, substitute)
+
+    case compile_specific_date(base) || compile_fixed(base) || compile_weekday(base) ||
+           compile_nested_weekday(base) || compile_relative_weekday(base) ||
+           compile_calendar(base) || compile_easter(base) do
+      {:ok, compiled} ->
+        {:ok, apply_conditions(compiled, conditions, substitute, mode, rule)}
+
+      nil ->
+        {:error, {:unsupported, rule}}
     end
   end
 
-  # ── fixed: "MM-DD" ──────────────────────────────────────────────────
-  defp compile_fixed(rule) do
-    case Regex.run(~r/^\s*(\d{1,2})-(\d{1,2})\s*$/, rule) do
-      [_, month, day] ->
+  # An entry without a rule string (or any non-binary input) is not a
+  # compilable rule; a library function never raises on caller input.
+  def compile(other), do: {:error, {:unsupported, other}}
+
+  # A specific `YYYY-MM-DD` is a one-off holiday: a fixed date active only in
+  # that year.
+  defp compile_specific_date(rule) do
+    case Regex.run(~r/^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+P\d+D)?\s*$/, rule) do
+      [_, year, month, day] ->
+        active = String.to_integer(year)
+
         {:ok,
          %Rule{
            kind: :fixed,
            month: String.to_integer(month),
            day: String.to_integer(day),
+           from_year: active,
+           to_year: active + 1,
+           source: rule
+         }}
+
+      nil ->
+        nil
+    end
+  end
+
+  # Carry the year conditions onto the compiled rule. A tier that set its own
+  # window (a specific date) keeps it when the rule named no `since`/`until`.
+  defp apply_conditions(compiled, conditions, substitute, mode, rule) do
+    %{
+      compiled
+      | substitute: substitute,
+        substitute_mode: mode,
+        from_year: conditions.from_year || compiled.from_year,
+        to_year: conditions.to_year || compiled.to_year,
+        year_parity: conditions.year_parity,
+        leap: conditions.leap,
+        every_years: conditions.every_years,
+        weekday_gate: conditions.weekday_gate,
+        source: rule
+    }
+  end
+
+  # A `substitutes …` rule *is* the observed day, contributing only when
+  # triggered (`:substitute_only`); "and if …" adds the observed day to the
+  # original (`:add`); a bare "if …" moves the holiday to it (`:shift`). `nil`
+  # when the rule carries no substitution.
+  defp substitution_mode(_rule, nil), do: nil
+
+  defp substitution_mode(rule, _clauses) do
+    cond do
+      Regex.match?(~r/\bsubstitutes\b/i, rule) -> :substitute_only
+      Regex.match?(~r/\band\s+if\b/i, rule) -> :add
+      true -> :shift
+    end
+  end
+
+  # `since <year>` sets the first active year; `prior to <year>` / `until
+  # <year>` set an exclusive last year; `in even|odd years` and `in
+  # leap|non-leap years` add parity and leap-year filters. All are stripped
+  # from the base rule and returned as conditions the materialiser gates on.
+  defp extract_year_conditions(rule) do
+    conditions = %{
+      from_year: extract_year(rule, ~r/\bsince\s+(\d{4})/i),
+      to_year: extract_year(rule, ~r/\b(?:prior\s+to|until)\s+(\d{4})/i),
+      year_parity: extract_parity(rule),
+      leap: extract_leap(rule),
+      every_years: extract_every(rule),
+      weekday_gate: extract_weekday_gate(rule)
+    }
+
+    base =
+      rule
+      |> String.replace(~r/\b(?:and\s+)?since\s+\d{4}/i, "")
+      |> String.replace(~r/\b(?:and\s+)?(?:prior\s+to|until)\s+\d{4}/i, "")
+      |> String.replace(~r/\bin\s+(?:even|odd|non-?leap|leap)\s+years?\b/i, "")
+      |> String.replace(~r/\bevery\s+\d+\s+years?\b/i, "")
+      |> String.replace(@weekday_gate_strip, "")
+      |> String.trim()
+
+    {base, conditions}
+  end
+
+  defp extract_every(rule) do
+    case Regex.run(~r/\bevery\s+(\d+)\s+years?\b/i, rule) do
+      [_, count] -> String.to_integer(count)
+      nil -> nil
+    end
+  end
+
+  # `on <weekday[, …]>` keeps the holiday only on those weekdays (`:only`);
+  # `not on <weekday[, …]>` drops it on them (`:except`).
+  defp extract_weekday_gate(rule) do
+    case Regex.run(@weekday_gate_match, rule) do
+      [_, prefix, days] ->
+        case parse_weekday_set(days) do
+          {:ok, weekdays} -> {gate_mode(prefix), weekdays}
+          :error -> nil
+        end
+
+      nil ->
+        nil
+    end
+  end
+
+  defp gate_mode(prefix), do: if(Regex.match?(~r/not/i, prefix), do: :except, else: :only)
+
+  defp extract_parity(rule) do
+    cond do
+      Regex.match?(~r/\bin\s+even\s+years?\b/i, rule) -> :even
+      Regex.match?(~r/\bin\s+odd\s+years?\b/i, rule) -> :odd
+      true -> nil
+    end
+  end
+
+  defp extract_leap(rule) do
+    cond do
+      Regex.match?(~r/\bin\s+non-?leap\s+years?\b/i, rule) -> :non_leap
+      Regex.match?(~r/\bin\s+leap\s+years?\b/i, rule) -> :leap
+      true -> nil
+    end
+  end
+
+  defp extract_year(rule, pattern) do
+    case Regex.run(pattern, rule) do
+      [_, year] -> String.to_integer(year)
+      nil -> nil
+    end
+  end
+
+  # A time of day does not change which day a holiday falls on, so a time
+  # token (`12:00`) and any time-valued substitution (`if sunday then 00:00`)
+  # are dropped before the date grammar is matched.
+  defp strip_time(rule) do
+    rule
+    |> String.replace(~r/(?:\band\b\s*)?if\s+[a-z, ]+?\s+then\s+\d{1,2}:\d{2}/i, "")
+    |> String.replace(~r/\d{1,2}:\d{2}/, "")
+    |> String.replace(~r/\s+PT\S+/i, "")
+    |> String.trim()
+  end
+
+  # A trailing `#<n>` disambiguates two holidays that share a date; it does not
+  # affect the date, so it is dropped.
+  defp strip_index(rule) do
+    rule |> String.replace(~r/\s*#\d+\s*$/, "") |> String.trim()
+  end
+
+  # ── fixed: "MM-DD", "MM-DD P<n>D" ───────────────────────────────────
+  #
+  # An optional `P<n>D` span (in days) carries into `count`; a bare date is a
+  # single day. A trailing `T` (`P2DT`) is tolerated as a degenerate duration.
+  defp compile_fixed(rule) do
+    case Regex.run(~r/^\s*(\d{1,2})-(\d{1,2})(?:\s+P(\d+)DT?)?\s*$/, rule) do
+      [_, month, day | rest] ->
+        {:ok,
+         %Rule{
+           kind: :fixed,
+           month: String.to_integer(month),
+           day: String.to_integer(day),
+           count: rest |> List.first() |> parse_span(),
            source: rule
          }}
 
@@ -153,7 +334,7 @@ defmodule Tempo.Holidays.Compiler do
 
   # ── weekday-in-month: "2nd Monday in June", "last Monday in May" ─────
   defp compile_weekday(rule) do
-    pattern = ~r/^\s*(\w+)\s+(\w+)\s+in\s+(\w+)\s*$/i
+    pattern = ~r/^\s*(\w+)\s+(\w+)\s+in\s+(\w+)(?:\s+P\d+D)?\s*$/i
 
     with [_, ordinal, weekday, month] <- Regex.run(pattern, rule),
          {:ok, count} <- parse_ordinal(ordinal),
@@ -196,25 +377,52 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
-  # ── relative weekday: "monday before 06-01", "friday after 11-11" ───
+  # ── relative weekday: "monday before 06-01", "1st Friday after 07-10",
+  #    "monday before October" ────────────────────────────────────────
+  #
+  # An optional ordinal (`1st`, `2nd`, …) picks the Nth such weekday from the
+  # anchor (default the 1st, the nearest); the anchor is a fixed `MM-DD` or a
+  # month name (its first day); a trailing `P<n>D` span is ignored, since the
+  # date-set turns on the start day.
   defp compile_relative_weekday(rule) do
-    pattern = ~r/^\s*(\w+)\s+(before|after)\s+(\d{1,2})-(\d{1,2})\s*$/i
+    pattern =
+      ~r/^\s*(?:(\d+)(?:st|nd|rd|th)\s+)?(\w+)\s+(before|after)\s+(\d{1,2}-\d{1,2}|[a-z]+)(?:\s+P\d+D)?\s*$/i
 
-    with [_, weekday, direction, month, day] <- Regex.run(pattern, rule),
-         {:ok, code} <- Map.fetch(@weekdays, String.downcase(weekday)) do
+    with [_, ordinal, weekday, direction, anchor] <- Regex.run(pattern, rule),
+         {:ok, code} <- Map.fetch(@weekdays, String.downcase(weekday)),
+         {:ok, {month, day}} <- relative_anchor(anchor) do
       {:ok,
        %Rule{
          kind: :relative_weekday,
+         count: parse_ordinal_count(ordinal),
          weekday: code,
          direction: relative_direction(direction),
-         month: String.to_integer(month),
-         day: String.to_integer(day),
+         month: month,
+         day: day,
          source: rule
        }}
     else
       _ -> nil
     end
   end
+
+  # A relative-weekday anchor is either a fixed `MM-DD` date or a month name
+  # (anchored on its first day).
+  defp relative_anchor(anchor) do
+    case Regex.run(~r/^(\d{1,2})-(\d{1,2})$/, anchor) do
+      [_, month, day] ->
+        {:ok, {String.to_integer(month), String.to_integer(day)}}
+
+      nil ->
+        case Map.fetch(@months, String.downcase(anchor)) do
+          {:ok, month} -> {:ok, {month, 1}}
+          :error -> :error
+        end
+    end
+  end
+
+  defp parse_ordinal_count(""), do: 1
+  defp parse_ordinal_count(digits), do: String.to_integer(digits)
 
   defp relative_direction(direction) do
     case String.downcase(direction) do
@@ -223,18 +431,47 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
-  # ── Islamic (Hijri): "1 Muharram", "9 Dhu al-Hijjah P4D" ────────────
+  # ── nested weekday: "friday after 4th thursday in November" ──────────
   #
-  # `<day> <Islamic month>`, with an optional `P<n>D` span (in days). The
-  # `count` field carries that span; a bare date is one day.
-  defp compile_islamic(rule) do
+  # An outer weekday relative to an inner weekday-in-month: Black Friday is
+  # "friday after 4th thursday in November", US Election Day is "Tuesday after
+  # 1st Monday in November".
+  defp compile_nested_weekday(rule) do
+    pattern = ~r/^\s*(\w+)\s+(before|after)\s+(\d+)(?:st|nd|rd|th)\s+(\w+)\s+in\s+(\w+)\s*$/i
+
+    with [_, outer, direction, ordinal, inner, month] <- Regex.run(pattern, rule),
+         {:ok, outer_code} <- Map.fetch(@weekdays, String.downcase(outer)),
+         {:ok, inner_code} <- Map.fetch(@weekdays, String.downcase(inner)),
+         {:ok, month_number} <- Map.fetch(@months, String.downcase(month)) do
+      {:ok,
+       %Rule{
+         kind: :nested_weekday,
+         weekday: outer_code,
+         inner_weekday: inner_code,
+         direction: relative_direction(direction),
+         count: String.to_integer(ordinal),
+         month: month_number,
+         source: rule
+       }}
+    else
+      _ -> nil
+    end
+  end
+
+  # ── calendar date: "1 Muharram", "9 Dhu al-Hijjah P4D", "1 Farvardin" ─
+  #
+  # `<day> <calendar month>`, with an optional `P<n>D` span. The month name
+  # picks the calendar (Islamic Umm al-Qura or Persian); the materialiser
+  # projects it onto the Gregorian year through that calendar.
+  defp compile_calendar(rule) do
     pattern = ~r/^\s*(\d{1,2})\s+([a-z][a-z' -]+?)(?:\s+P(\d+)D)?\s*$/i
 
     with [_, day, month_name | rest] <- Regex.run(pattern, rule),
-         {:ok, month} <- Map.fetch(@islamic_months, String.downcase(String.trim(month_name))) do
+         {kind, calendar, month} <- calendar_month(String.downcase(String.trim(month_name))) do
       {:ok,
        %Rule{
-         kind: :islamic,
+         kind: kind,
+         calendar: calendar,
          month: month,
          day: String.to_integer(day),
          count: rest |> List.first() |> parse_span(),
@@ -242,6 +479,21 @@ defmodule Tempo.Holidays.Compiler do
        }}
     else
       _ -> nil
+    end
+  end
+
+  # Resolve a calendar month name to `{kind, calendar_module, month_number}`,
+  # or `nil` when it names no known calendar's month.
+  defp calendar_month(name) do
+    cond do
+      Map.has_key?(@islamic_months, name) ->
+        {:islamic, Calendrical.Islamic.UmmAlQura, @islamic_months[name]}
+
+      Map.has_key?(@persian_months, name) ->
+        {:persian, Calendrical.Persian, @persian_months[name]}
+
+      true ->
+        nil
     end
   end
 
@@ -284,7 +536,7 @@ defmodule Tempo.Holidays.Compiler do
   # Sunday; a comma list (`saturday,sunday`) is taken verbatim. Several
   # clauses may chain — the US rule is `if saturday then previous friday
   # if sunday then next monday`.
-  @substitute_pattern ~r/if\s+([a-z,]+)\s+then\s+(next|previous)\s+([a-z]+)/i
+  @substitute_pattern ~r/if\s+([a-z, ]+?)\s+then\s+(next|previous)\s+([a-z]+)/i
 
   defp extract_substitution(rule) do
     clauses =
@@ -295,6 +547,7 @@ defmodule Tempo.Holidays.Compiler do
     base =
       rule
       |> String.replace(@substitute_pattern, "")
+      |> String.replace(~r/^\s*substitutes\s+/i, "")
       |> String.replace(~r/\s+and\s*$/i, "")
       |> String.trim()
 
@@ -319,7 +572,11 @@ defmodule Tempo.Holidays.Compiler do
         {:ok, [6, 7]}
 
       list ->
-        days = list |> String.split(",") |> Enum.map(&Map.get(@weekdays, &1))
+        days =
+          list
+          |> String.split(",")
+          |> Enum.map(&(&1 |> String.trim() |> then(fn day -> Map.get(@weekdays, day) end)))
+
         if days != [] and Enum.all?(days, &is_integer/1), do: {:ok, days}, else: :error
     end
   end

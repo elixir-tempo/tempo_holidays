@@ -4,7 +4,11 @@
 
 * `Tempo.Holidays.recurrences/1` and `materialise/2` return a territory's holidays — every `:type`, for every territory in the dataset — as Tempo recurrences, projected onto any year and date-sorted. `for_territory/1` takes a CLDR code as an atom or string.
 
-* Rule compiler for date-holidays strings: fixed dates, weekday-in-month (`"2nd Monday in June"`, `"last Monday in May"`), relative weekday (`"monday before 06-01"`), Islamic/Hijri (`"9 Dhu al-Hijjah P4D"`, projected onto a Gregorian year via Calendrical and returned in the Islamic calendar — a lunar date can fall twice in one year, so `materialise/2` returns a list), Easter/orthodox-relative, and an observed-date substitution suffix (`"… if saturday then previous friday if sunday then next monday"`).
+* Rule compiler covering date-holidays' grammar: fixed dates and `P<n>D` spans, weekday-in-month, relative and nested weekdays (Election Day, Black Friday), month-anchor weekdays, Islamic/Hebrew/Persian calendar dates, Easter/orthodox-relative, and specific dates. Islamic dates use Umm al-Qura and are returned in-calendar — a lunar date can fall twice in one Gregorian year, so `materialise/2` returns a list.
+
+* Rule modifiers: observed-date substitution in `and if` (add), `if` (shift) and `substitutes` (observed-only) modes; and `since`/`prior to`, even/odd, leap, `every N years`, and `on`/`not on <weekday>` filters that gate whether a holiday occurs.
+
+* An opt-in conformance test (`mix test --include conformance`) checks every compiled rule's dates against the full date-holidays fixture corpus (9,695 files); ~96% match, with the remainder tracked as the calendars and edge cases still to land.
 
 * Materialisation merges abutting occurrences of the same holiday into one period, so a period split across two entries (to dodge a YAML year boundary) reads as the single span it describes.
 

@@ -53,7 +53,7 @@ defmodule Tempo.Holidays.DateHolidays do
 
       iex> days = %{
       ...>   "12-25" => %{"name" => %{"en" => "Christmas Day"}},
-      ...>   "10-31 18:00" => %{"name" => %{"en" => "Halloween"}}
+      ...>   "chinese 01-0-01" => %{"name" => %{"en" => "Chinese New Year"}}
       ...> }
       iex> holidays = Tempo.Holidays.DateHolidays.compile_days(days)
       iex> Enum.map(holidays, & &1.name)

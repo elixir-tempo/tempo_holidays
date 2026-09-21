@@ -11,6 +11,7 @@ defmodule Tempo.Holidays.MixProject do
       name: "Tempo.Holidays",
       source_url: @source_url,
       elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       # The `:holidays` compiler generates priv/holidays/<CC>.etf from the
       # pinned date-holidays bundle (see Tempo.Holidays.Build). It runs after
@@ -32,6 +33,9 @@ defmodule Tempo.Holidays.MixProject do
   def application do
     [extra_applications: [:logger]]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp description do
     "Public holidays as Tempo intervals — date-holidays rules compiled to " <>

@@ -33,24 +33,37 @@ holidays:
 
 ## Grammar tiers (spec §"Grammar for day rules")
 
-**Handled by `Tempo.Holidays.Compiler` today** — the common cases:
+Coverage is measured by the `:conformance` test against the full fixture
+corpus — see "Conformance" below. ~96% of rules match.
 
-* Fixed date `MM-DD`.
+**Handled by `Tempo.Holidays.Compiler` today:**
+
+* Fixed date `MM-DD`, with `P<n>D` spans, time-of-day (`10-31 18:00`) and `PT…` durations stripped, and specific dates `YYYY-MM-DD`.
 * Weekday-in-month `<ordinal> <weekday> in <Month>` (`first`…`fifth`, `last`).
-* Relative weekday `<weekday> before|after <MM-DD>` (US Memorial `monday before 06-01`).
-* Islamic (Hijri) `<day> <month> [P<n>D]`, returned in the `[u-ca=islamic-civil]` calendar.
-* Easter / orthodox relative.
-* Observed-date substitution `if <weekdays> then (next|previous) <weekday>`, incl. the `and if …` connector and chained clauses.
+* Relative weekday `<weekday> before|after <MM-DD>` or `<Month>` (US Memorial `monday before 06-01`), with an optional ordinal; "after" is inclusive.
+* Nested weekday `<weekday> after <Nth weekday in Month>` (Black Friday, US Election Day).
+* Islamic (Hijri), Hebrew (partial) and Persian `<day> <month> [P<n>D]`, returned in their own calendar. Islamic uses Umm al-Qura.
+* Easter / orthodox relative (normalised to Gregorian).
+* Substitution `if <weekdays> then (next|previous) <weekday>` in three modes — `and if` (add), bare `if` (shift), `substitutes …` (observed-only).
+* Filters: `since`/`prior to <year>`, in even/odd years, in leap/non-leap years, `every N years`, and `on`/`not on <weekday>`.
 
-**Not yet handled** (skipped as `{:error, {:unsupported, rule}}`):
+**Not yet handled** (skipped as `{:error, {:unsupported, rule}}`, or a day off in the calendar edge cases):
 
-* Other calendars: Hebrew, Chinese (lunar & solar), Bengali, Persian — via Calendrical, each returned in its own calendar like the Islamic tier. (Islamic/Hijri is done.)
+* Other calendars: Hebrew leap-month numbering (Adar I/II), Chinese (lunar & solar terms), Bengali, Ethiopian, Coptic, Julian, Vietnamese — blocked on Tempo `[u-ca=…]` support and Calendrical coverage.
 * Equinox / solstice / solar terms — via Astro.
-* `<weekday> before|after <Month>` (start-of-month anchor) and the nested form `<weekday> after <Nth weekday in Month>` (Black Friday, Election Day) — only the `<MM-DD>` anchor is handled so far.
-* Fixed-date-at-start-of-month; time-of-day (`10-31 18:00`) and non-24h durations.
-* Additional-day / "observe **as well as** a substitute" (AU Christmas/Boxing).
-* "Change weekday if date already falls on a holiday" (the cascade / collision).
-* Year filters: `since <year>` (why US Juneteenth is absent — it is a 2021-onward holiday), in/odd/even years, active periods; `disable`/`enable`; `substitutes …` prefix; bridge days; state/region disabling.
+* Tabular Umm al-Qura (our calculated one differs from date-holidays' table by a day some years) and Islamic day-overflow (`30 Safar`).
+* Additional-day / "observe **as well as** a substitute", `disable`/`enable` overrides, and the "if <other date> is a public holiday" cascade.
+* Nested weekday off a *date* anchor (`monday after 3rd sunday after 09-01`).
+
+## Conformance
+
+`Tempo.Holidays.Fixtures` downloads the pinned date-holidays repo tarball and
+exposes its `test/fixtures` (9,695 files, all territories × 2015–2029);
+`Tempo.Holidays.Conformance` compiles and materialises every rule and checks
+its Gregorian dates sit inside the fixture's date-set (date-holidays
+deduplicates across a country's entries, so the check is subset-based, not
+equality). The `:conformance` test asserts zero gaps and is excluded by
+default; run it with `mix test --include conformance`.
 
 ## Build pipeline
 

@@ -1,32 +1,38 @@
 # TODO
 
 Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs
-more than a line here.
+more than a line here. Conformance against the full date-holidays fixture
+corpus (`mix test --include conformance`) drives the remaining tiers; it sits
+at ~96% matched, and the gaps below are what remains.
 
 ## Open
 
-* [ ] **`since <year>` and state/region tiers** — the compiler drops both, so the real data is missing US Juneteenth (a `since 2021` holiday) and AU King's Birthday (carried at state level). The most visible coverage gaps. Analysis in [plans/date-holidays-format.md](plans/date-holidays-format.md).
+* [ ] **State/region tiers** — the build compiles only country-level `days`; sub-territory `days` (`US-AL`, AU state holidays like King's Birthday) are still to come. Analysis in [plans/date-holidays-format.md](plans/date-holidays-format.md).
 
-* [ ] **Additional-day (in-lieu) holidays** — some territories keep a holiday's date on a weekend *and* add an observed weekday, needing per-holiday semantics and collision resolution across the added days.
-
-* [ ] **Compiler tiers beyond the current set** — the other lunar calendars (Hebrew, Chinese, Persian, Bengali via Calendrical, like the Islamic tier), equinox/solstice and solar terms (via Astro / lunisolar calendars), and `disable`/`enable` date qualifiers.
-
-* [ ] **Cross-year range holidays** — school-holiday periods expressed as `:range` rules; the name-aware coalescing that merges their split entries is already in place.
+* [ ] **Inter-holiday, disable/enable, and additional-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"`, `disable`/`enable` overrides (GB's 2022 Jubilee move), and "observe as well as" in-lieu days. Edge cases, each a handful of entries.
 
 * [ ] **Localize integration** — localized holiday names (MF2), and accepting a `LanguageTag` (territory + language in one) wherever a territory code is taken today.
 
+## Blocked
+
+* [ ] **Hebrew / Chinese / Bengali / Ethiopian / Coptic / Julian calendar dates** — need Tempo `[u-ca=…]` support and settled month numbering (Hebrew leap-month Adar I/II shifts Nisan onward). Blocked on Calendrical calendar coverage.
+
+* [ ] **Equinox / solstice / solar terms** — the astronomical tier. Blocked on Astro integration.
+
+* [ ] **Tabular Umm al-Qura** — our *calculated* Umm al-Qura differs from date-holidays' *table* by a day some years (~205 fixture entries), plus day-overflow like `30 Safar` (a 29-day month). Blocked on a tabular Umm al-Qura in Calendrical.
+
 ## Done
 
-* [x] **Real-data pipeline, no seed** — the `:holidays` Mix compiler generates `priv/holidays/<CC>.etf` for every territory from a pinned date-holidays bundle (`3.37.0`), shipped in the package and loaded by `Data.for_territory/1`. Replaces the hand-written AU/US seed. 2026-09-21.
+* [x] **Conformance harness** — `Tempo.Holidays.Fixtures` + `Conformance` run every compiled rule against the full date-holidays fixture corpus (9,695 files) as an opt-in `:conformance` test; ~96% of rules match. 2026-09-21.
 
-* [x] **All holiday types** — every date-holidays `:type` is carried (public through observance), not just public holidays. 2026-09-21.
+* [x] **Grammar tiers** — fixed dates + `P<n>D` spans, weekday-in-month, relative and nested weekdays (Election Day, Black Friday), month-anchor weekdays, specific dates, Persian calendar; plus `on`/`not on <weekday>`, `since`/`prior to`, even/odd, leap and `every N years` filters. 2026-09-21.
 
-* [x] **Islamic (Hijri) tier** — holidays projected onto a Gregorian year via Calendrical's `dates_in_gregorian_year/3` and returned in `[u-ca=islamic-civil]`; `materialise/2` returns a list, so a lunar date that falls twice in a Gregorian year (Eid al-Fitr in 2000) yields both occurrences. 2026-09-21.
+* [x] **Substitution modes** — `and if` adds the observed day, bare `if` moves it, `substitutes …` is the observed day alone; comma-spaced multi-weekday triggers. 2026-09-21.
 
-* [x] **Weekday ordinals and substitution direction** — `"last"`/word ordinals (ISO `-1I`), and `:next`/`:previous` substitution so both the weekend→Monday and Saturday→Friday/Sunday→Monday observances express cleanly. 2026-09-21.
+* [x] **Islamic (Hijri) tier → Umm al-Qura** — projected onto a Gregorian year via Calendrical's `dates_in_gregorian_year/3`, returned in `[u-ca=islamic-umalqura]` (matches date-holidays 95% vs civil's 38%); `materialise/2` returns a list, so a date falling twice in a year yields both. 2026-09-21.
 
-* [x] **Observed-date substitution** — `"… if weekend then next monday"` compiled to `{trigger, direction, target}` clauses, applied after the base date is placed. 2026-09-21.
+* [x] **Real-data pipeline, no seed** — the `:holidays` Mix compiler generates `priv/holidays/<CC>.etf` for every territory from a pinned date-holidays bundle (`3.37.0`), shipped in the package and loaded by `Data.for_territory/1`. 2026-09-21.
+
+* [x] **All holiday types** — every date-holidays `:type` is carried (public through observance). 2026-09-21.
 
 * [x] **Name-aware coalescing** — abutting occurrences of the same holiday merge into one period; different neighbours stay apart. 2026-09-21.
-
-* [x] **Rule compiler** — fixed (`MM-DD`), weekday-in-month (ISO `FL…I…KN`), relative weekday, Easter/orthodox-relative, plus the substitution suffix. 2026-09-21.
