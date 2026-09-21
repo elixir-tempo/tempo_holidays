@@ -50,25 +50,25 @@ holidays:
 * Fixed-date-at-start-of-month; time-of-day (`10-31 18:00`) and non-24h durations.
 * Additional-day / "observe **as well as** a substitute" (AU Christmas/Boxing).
 * "Change weekday if date already falls on a holiday" (the cascade / collision).
-* Year filters: `since <year>`, in/odd/even years, active periods; `disable`/`enable`; `substitutes …` prefix; bridge days; state/region disabling.
+* Year filters: `since <year>` (why US Juneteenth is absent — it is a 2021-onward holiday), in/odd/even years, active periods; `disable`/`enable`; `substitutes …` prefix; bridge days; state/region disabling.
 
-## `mix tempo.holidays.update` design
+## Build pipeline
 
-* **Source** (decided): the compiled `data/holidays.json` bundle from a **pinned** date-holidays version via jsDelivr (`https://cdn.jsdelivr.net/npm/date-holidays@3/data/holidays.json`). It keeps the rule strings as `days` keys — verified — so it parses with stdlib `:json` (Erlang, per the `~> 1.17` floor) and fetches with stdlib `:httpc`: **no new dependency**, matching the ecosystem's stdlib-JSON stance. The per-country YAML path (needing `yaml_elixir`) is rejected on that basis.
-* **Compile**: map each `days` entry `{rule, meta}` to a `%Holiday{name, type, rule}` — name from `meta.name.<lang>` or the `_name` → `names.yaml` lookup, type from `meta.type`. Compile the rule string via `Compiler`; drop unsupported ones (partial support is correct for partial coverage).
-* **Write**: `priv/holidays/<CC>.json` in our own compact shape, bundled in the package and loaded by `Data`.
+* **Source** (decided): the compiled `holidays.json` bundle from an **exactly pinned** date-holidays version via jsDelivr (`date-holidays@3.37.0`). An exact pin — not the `@3` range — makes the build reproducible, so the source need not be vendored in git. It keeps rule strings as `days` keys, so it parses with stdlib `:json` (json_polyfill supplies it on OTP 26) and fetches with `:httpc` via Localize's hardened HTTP client — **no new dependency**. The per-country YAML path (needing `yaml_elixir`) is rejected on that basis.
+* **Generate at build time**: the `:holidays` Mix compiler (`Tempo.Holidays.Build`) runs after the Elixir compiler and, when the pinned data is not already on disk, downloads the bundle and compiles every territory's `days` to `%Holiday{}`, writing `priv/holidays/<CC>.etf`. It is a no-op once built, so warm builds and every consumer build (the etf ships in the package) touch no network.
+* **No seed**: the compiled bundle is the only source; there is no hand-written fallback data.
 
 ## Tasks
 
-* [x] Source decided: jsDelivr `date-holidays@3` `holidays.json` bundle, stdlib `:json` + `:httpc`, no new dep.
+* [x] Source decided: jsDelivr `date-holidays@3.37.0` `holidays.json` bundle (exact pin), stdlib `:json` + `:httpc`, no new dep, no vendored source.
 
-* [x] `Tempo.Holidays.DateHolidays.compile_days/2` — maps a country's `days` entries to `%Holiday{}`, resolving name (inline `name.<lang>` → `_name` → rule) and type, dropping unsupported rules.
+* [x] `Tempo.Holidays.DateHolidays.compile_days/2` — maps a country's `days` entries to `%Holiday{}`, resolving name (inline `name.<lang>` → `_name` → rule) and type, dropping unsupported rules and `false` (disabled) entries.
 
-* [x] `mix tempo.holidays.update`: fetches the bundle via Localize's hardened HTTP client, parses with `:json`, runs each country's `days` through `compile_days/2`, and writes `priv/holidays/<CC>.etf`. `:json` on OTP 26 comes from json_polyfill (a dev/test dep here; consumers add it to run the task). ETF means loading needs no JSON on any release.
+* [x] Build at compile time: the `:holidays` Mix compiler (`Tempo.Holidays.Build`) downloads the pinned bundle and writes `priv/holidays/<CC>.etf` for every territory; `mix tempo.holidays.update` forces a refresh. ETF means loading needs no JSON on any OTP.
 
-* [ ] `Data.for_territory/1` loads `priv/holidays/<CC>.etf` when present, falling back to the inline seed — so the downloaded data is actually used.
+* [x] `Data.for_territory/1` loads `priv/holidays/<CC>.etf` (CLDR code as atom or string); `territories/0` lists them. No seed fallback.
 
-* [ ] States/regions: the task compiles only the country-level `days`; sub-territory `days` (`US-AL`, …) are still to come.
+* [ ] States/regions: the build compiles only the country-level `days`; sub-territory `days` (`US-AL`, …) are still to come — and would restore AU King's Birthday.
 
 * [x] Resolve `_name` references against the bundle's top-level `names` table — days keyed only by `_name` get real, localized names (~50 languages) instead of the reference string.
 

@@ -1,26 +1,32 @@
 defmodule Tempo.Holidays do
   @moduledoc """
-  Public holidays as Tempo recurrences, projectable onto any year.
+  Holidays as Tempo recurrences, projectable onto any year.
 
   A holiday is a *recurrence*, not a date: "Christmas is the 25th of
-  December", "the King's Birthday is the second Monday of June". Each is
-  held as a `t:Tempo.Holidays.Holiday.t/0` — a name and a
+  December", "Thanksgiving is the fourth Thursday of November". Each is
+  held as a `t:Tempo.Holidays.Holiday.t/0` — a name, a `:type`, and a
   `t:Tempo.Holidays.Rule.t/0` — and `materialise/2` projects it onto a
   concrete year to obtain the interval it occupies there.
 
-  Fixed dates and weekday-in-month holidays are native ISO 8601-2 selections
-  (`FL12M25DN`, `FL6M2I1KN`); Easter-relative holidays are computed through
-  Calendrical's ecclesiastical calendar, since Easter has no ISO 8601 form.
+  The data is the [date-holidays](https://github.com/commenthol/date-holidays)
+  dataset for every territory, carrying every `:type` (public holidays through
+  to observances). Fixed dates and weekday-in-month holidays are native ISO
+  8601-2 selections (`FL12M25DN`, `FL6M2I1KN`); Easter-relative holidays are
+  computed through Calendrical's ecclesiastical calendar; Islamic holidays are
+  projected onto the Gregorian year through Calendrical and returned in the
+  Islamic calendar. A lunar holiday can fall twice in one Gregorian year, so
+  `materialise/2` returns a list of occurrences.
 
   ## Example
 
-      territory = :AU
+      territory = :SA
 
       {:ok, holidays}  = Tempo.Holidays.recurrences(territory)
       {:ok, this_year} = Tempo.Holidays.materialise(territory, ~o"2026")
 
-  > *"The recurrences are Australia's public holidays. Materialised onto
-  > 2026, each one lands on the day it falls that year."*
+  > *"The recurrences are Saudi Arabia's holidays. Materialised onto 2026,
+  > each one lands on the day it falls that year — Eid al-Fitr and Eid
+  > al-Adha in the Islamic calendar."*
 
   """
 

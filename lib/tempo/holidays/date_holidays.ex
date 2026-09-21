@@ -60,12 +60,18 @@ defmodule Tempo.Holidays.DateHolidays do
       ["Christmas Day"]
 
   """
-  @spec compile_days(map(), keyword()) :: [Holiday.t()]
-  def compile_days(days, options \\ []) when is_map(days) do
+  @spec compile_days(term(), keyword()) :: [Holiday.t()]
+  def compile_days(days, options \\ [])
+
+  def compile_days(days, options) when is_map(days) do
     language = Keyword.get(options, :language, "en")
     names = Keyword.get(options, :names, %{})
     Enum.flat_map(days, fn {rule, meta} -> compile_day(rule, meta, language, names) end)
   end
+
+  # Downloaded data is external input: a `days` that is not a map yields no
+  # holidays rather than a crash.
+  def compile_days(_days, _options), do: []
 
   @doc """
   Compile a single `{rule, metadata}` entry into a holiday.
@@ -87,7 +93,9 @@ defmodule Tempo.Holidays.DateHolidays do
   * `[t:Tempo.Holidays.Holiday.t/0]` — a one-element list on a supported
     rule, so it splices cleanly into `Enum.flat_map/2`.
 
-  * `[]` when the rule's grammar is not yet supported.
+  * `[]` when the rule's grammar is not yet supported, when the entry is
+    disabled (`meta` is `false`, date-holidays' way of removing an inherited
+    holiday), or when the entry is otherwise malformed.
 
   ### Examples
 
@@ -101,9 +109,14 @@ defmodule Tempo.Holidays.DateHolidays do
       iex> holiday.name
       "Nouvel An"
 
+      iex> Tempo.Holidays.DateHolidays.compile_day("1st monday in May", false, "en")
+      []
+
   """
-  @spec compile_day(String.t(), map(), String.t(), map()) :: [Holiday.t()]
-  def compile_day(rule, meta, language, names \\ %{}) when is_binary(rule) and is_map(meta) do
+  @spec compile_day(term(), term(), String.t(), map()) :: [Holiday.t()]
+  def compile_day(rule, meta, language, names \\ %{})
+
+  def compile_day(rule, meta, language, names) when is_binary(rule) and is_map(meta) do
     case Compiler.compile(rule) do
       {:ok, compiled} ->
         [%Holiday{name: name(meta, language, names, rule), type: type(meta), rule: compiled}]
@@ -112,6 +125,10 @@ defmodule Tempo.Holidays.DateHolidays do
         []
     end
   end
+
+  # `<rule>: false` disables an inherited holiday, and downloaded data may be
+  # malformed; neither yields a holiday.
+  def compile_day(_rule, _meta, _language, _names), do: []
 
   # Prefer the requested language on an inline name, then the `_name`
   # reference resolved against the bundle's shared names table (by language,

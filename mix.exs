@@ -12,6 +12,10 @@ defmodule Tempo.Holidays.MixProject do
       source_url: @source_url,
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
+      # The `:holidays` compiler generates priv/holidays/<CC>.etf from the
+      # pinned date-holidays bundle (see Tempo.Holidays.Build). It runs after
+      # the Elixir compiler and is a no-op once the data is present.
+      compilers: Mix.compilers() ++ [:holidays],
       deps: deps(),
       description: description(),
       package: package(),
@@ -68,7 +72,12 @@ defmodule Tempo.Holidays.MixProject do
       main: "readme",
       source_ref: "v#{@version}",
       formatters: ["html", "markdown"],
-      extras: ["README.md", "CHANGELOG.md"]
+      extras: ["README.md", "CHANGELOG.md"],
+      groups_for_modules: [
+        Holidays: [Tempo.Holidays.Data, Tempo.Holidays.Holiday, Tempo.Holidays.Rule],
+        "date-holidays": [Tempo.Holidays.Compiler, Tempo.Holidays.DateHolidays],
+        Internals: [Tempo.Holidays.Build]
+      ]
     ]
   end
 

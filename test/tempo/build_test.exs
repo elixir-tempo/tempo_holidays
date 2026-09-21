@@ -1,7 +1,7 @@
-defmodule Mix.Tasks.Tempo.Holidays.UpdateTest do
+defmodule Tempo.Holidays.BuildTest do
   use ExUnit.Case, async: true
 
-  alias Mix.Tasks.Tempo.Holidays.Update
+  alias Tempo.Holidays.Build
 
   describe "holidays_from_bundle/3" do
     setup do
@@ -13,7 +13,9 @@ defmodule Mix.Tasks.Tempo.Holidays.UpdateTest do
               "12-25" => %{"name" => %{"en" => "Christmas Day"}},
               "4th thursday in November" => %{"name" => %{"en" => "Thanksgiving Day"}},
               # unsupported grammar (time-of-day) — dropped
-              "10-31 18:00" => %{"name" => %{"en" => "Halloween"}}
+              "10-31 18:00" => %{"name" => %{"en" => "Halloween"}},
+              # date-holidays disables an inherited holiday with `false` — dropped
+              "1st monday in May" => false
             }
           }
         }
@@ -22,10 +24,12 @@ defmodule Mix.Tasks.Tempo.Holidays.UpdateTest do
       %{bundle: bundle}
     end
 
-    test "compiles a territory's supported holidays", %{bundle: bundle} do
+    test "compiles a territory's supported holidays, skipping unsupported and disabled", %{
+      bundle: bundle
+    } do
       names =
         bundle
-        |> Update.holidays_from_bundle("US", "en")
+        |> Build.holidays_from_bundle("US", "en")
         |> Enum.map(& &1.name)
         |> Enum.sort()
 
@@ -33,7 +37,7 @@ defmodule Mix.Tasks.Tempo.Holidays.UpdateTest do
     end
 
     test "a territory the bundle does not carry yields none", %{bundle: bundle} do
-      assert Update.holidays_from_bundle(bundle, "ZZ", "en") == []
+      assert Build.holidays_from_bundle(bundle, "ZZ", "en") == []
     end
   end
 end
