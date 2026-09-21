@@ -39,5 +39,29 @@ defmodule Tempo.Holidays.BuildTest do
     test "a territory the bundle does not carry yields none", %{bundle: bundle} do
       assert Build.holidays_from_bundle(bundle, "ZZ", "en") == []
     end
+
+    test "a territory inherits another's holidays via `_days`, overriding by rule", %{
+      bundle: bundle
+    } do
+      # `IX` inherits `US`, adds its own `07-04`, and removes the inherited
+      # Thanksgiving with `false` — as Jersey inherits Great Britain.
+      bundle =
+        put_in(bundle, ["holidays", "IX"], %{
+          "_days" => ["US"],
+          "days" => %{
+            "07-04" => %{"name" => %{"en" => "Founders' Day"}},
+            "4th thursday in November" => false
+          }
+        })
+
+      names =
+        bundle
+        |> Build.holidays_from_bundle("IX", "en")
+        |> Enum.map(& &1.name)
+        |> Enum.sort()
+
+      # Inherited Christmas kept, Thanksgiving removed, own Founders' Day added.
+      assert names == ["Christmas Day", "Founders' Day"]
+    end
   end
 end

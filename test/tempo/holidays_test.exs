@@ -432,6 +432,31 @@ defmodule Tempo.HolidaysTest do
       assert Tempo.Interval.from(interval) == ~o"2025Y9M11D"
     end
 
+    test "an Nth weekday in month overflows into the next month when the month is short" do
+      # October 2027 has only four Mondays, so the "5th monday in October"
+      # (an NZ-MBH anniversary) overflows to 1 November.
+      {:ok, rule} = Compiler.compile("5th monday in October")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2027")
+      assert Tempo.Interval.from(interval) == ~o"2027Y11M1D"
+
+      # A "last" weekday cannot overflow — it simply does not occur past its month.
+      {:ok, last} = Compiler.compile("last monday in May")
+      assert {:ok, [may]} = Rule.materialise(last, ~o"2026")
+      assert Tempo.Interval.from(may) == ~o"2026Y5M25D"
+    end
+
+    test "a date-precise `prior to` gates by the occurrence date, not just the year" do
+      # Norfolk Island's holiday moved on 2022-09-09; the prior-to window keeps
+      # the June occurrence in 2022 (before the cutoff) but not in 2023.
+      {:ok, rule} = Compiler.compile("Monday after 2nd saturday in June prior to 2022-09-09")
+
+      assert rule.active == [{nil, ~D[2022-09-09]}]
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2022")
+      assert Tempo.Interval.from(interval) == ~o"2022Y6M13D"
+      assert {:ok, []} = Rule.materialise(rule, ~o"2023")
+    end
+
     test "the 'and' chaining a since-condition to a bare if is a shift, not an add" do
       # `since 2022 and if sunday …` chains the year condition to a bare `if`
       # (move), unlike the additive `and if`. 28 April 2024 is a Sunday.

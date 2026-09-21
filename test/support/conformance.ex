@@ -45,18 +45,21 @@ defmodule Tempo.Holidays.Conformance do
   end
 
   defp gate_index(territory) do
-    {code, division} = split_territory(territory)
+    {code, division, subdivision} = split_territory(territory)
 
-    case Data.for_territory(code, division) do
+    case Data.for_territory(code, division, subdivision) do
       {:ok, holidays} -> Enum.group_by(holidays, & &1.rule.source, & &1.rule)
       {:error, _absent} -> %{}
     end
   end
 
+  # A fixture territory is `<country>[-<state>[-<region>]]`, e.g. `US-CA` or
+  # `BR-SP-SP`.
   defp split_territory(territory) do
-    case String.split(territory, "-", parts: 2) do
-      [code] -> {code, nil}
-      [code, division] -> {code, division}
+    case String.split(territory, "-", parts: 3) do
+      [code] -> {code, nil, nil}
+      [code, division] -> {code, division, nil}
+      [code, division, subdivision] -> {code, division, subdivision}
     end
   end
 

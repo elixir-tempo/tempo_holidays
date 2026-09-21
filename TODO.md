@@ -7,7 +7,7 @@ at over 99% matched, and the gaps below are what remains.
 
 ## Open
 
-* [ ] **Inter-holiday / bridge-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"`, `<rule> if is holiday then next <weekday>`, and "observe as well as" in-lieu days; needs a country-level second pass over the other holidays. A handful of entries.
+* [ ] **Inter-holiday / bridge-day rules** — the last conformance gap: 5 distinct rules across ~8 fixture entries. Two forms, both defined in `date-holidays-parser`'s `PostRule` (`bridge` / `ruleIfHoliday`): (a) `09-22 if 09-21 and 09-23 is public holiday` — a date is a holiday only if the referenced dates are holidays of the type; (b) `<rule> if is (type)? holiday then (count)? (next|previous) <weekday|day> (omit …)?` (Switzerland-GL, Norfolk) — if the computed date coincides with a holiday of the type, apply the move. Both need a **country-level second pass** over the other holidays — in `Tempo.Holidays.materialise` for the public API, and (to be measured) in the per-rule conformance harness too. Low ROI, well understood; awaiting a go-ahead.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
 
@@ -20,6 +20,8 @@ at over 99% matched, and the gaps below are what remains.
 * [ ] **Islamic residual (~19 mismatches)** — three sub-cases: (a) day-**overflow** (`30 Safar` in a 29-day month) — date-holidays rolls it into the next month (`first_day_of_month + (day-1)`), which Calendrical's `dates_in_gregorian_year` rejects; (b) off-by-one **type A** (`3 Jumada 1446`) — date-holidays matches Calendrical's **astronomical** UmmAlQura (`.Astronomical.first_day_of_month`), not the tabular default this lib uses; (c) off-by-one **type B** (`12 Rabi 1437`) — both Calendrical variants say 12-23, date-holidays says 12-24, a table disagreement. (a) and (b) need a Calendrical-side path (astronomical `dates_in_gregorian_year` with overflow rollover); analysis carries the reproducers. Also the lunar-twice-in-a-Gregorian-year attribution differs.
 
 ## Done
+
+* [x] **Territory inheritance (`_days`)** — a territory inheriting another's holidays (JE/GG/IM ← GB, the French overseas ← FR, 22 in all) now carries the full inherited set plus its own, own entries overriding by rule and `false` removing an inherited one (`Build.resolve_days/2`, mirroring `Data._assign`). Also fixed the conformance harness's 3-part territory split (`BR-SP-SP`) and the Nth-weekday-in-month overflow (`5th monday in October` → 1 Nov) and date-precise `since`/`prior to YYYY-MM-DD` gating (Norfolk). 2026-09-22.
 
 * [x] **Per-clause substitution + enable-as-move** — studied `date-holidays-parser`'s `Rule.dateIfThen` and `PostRule.disable`: each `if`/`and if`/`substitutes` clause carries its own mode with a *persistent* modifier (a leading `and` makes it and every later clause additive), and the first clause a date triggers fires and locks it. Fixed the mixed shift/add rules (Tonga) and the `substitutes … and if …` case (Japan). `disable`+`enable` is now a move — the enable is added only when a disable matches a computed date (fixes St Vincent's Carnival, whose disable date didn't match). 2026-09-22.
 

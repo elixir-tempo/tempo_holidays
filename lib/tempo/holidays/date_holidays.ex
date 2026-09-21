@@ -177,11 +177,17 @@ defmodule Tempo.Holidays.DateHolidays do
   defp with_gates(rule, meta) do
     %{
       rule
-      | active: active_ranges(meta),
+      | active: merge_active(rule.active, active_ranges(meta)),
         disable: iso_dates(Map.get(meta, "disable")),
         enable: iso_dates(Map.get(meta, "enable"))
     }
   end
+
+  # The compiler may already have set an `active` window from a date-precise
+  # `since`/`prior to`; keep it, and add the metadata windows when present.
+  defp merge_active(nil, meta), do: meta
+  defp merge_active(rule_active, nil), do: rule_active
+  defp merge_active(rule_active, meta), do: rule_active ++ meta
 
   # `active` is a list of `%{"from" => bound, "to" => bound}` windows, each
   # bound an integer year (meaning its January 1st) or an ISO date, half-open.

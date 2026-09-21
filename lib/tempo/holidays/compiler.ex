@@ -258,6 +258,7 @@ defmodule Tempo.Holidays.Compiler do
     %{
       compiled
       | substitute: substitute,
+        active: conditions.active,
         from_year: conditions.from_year || compiled.from_year,
         to_year: conditions.to_year || compiled.to_year,
         year_parity: conditions.year_parity,
@@ -274,8 +275,9 @@ defmodule Tempo.Holidays.Compiler do
   # from the base rule and returned as conditions the materialiser gates on.
   defp extract_year_conditions(rule) do
     conditions = %{
-      from_year: extract_year(rule, ~r/\bsince\s+(\d{4})/i),
-      to_year: extract_year(rule, ~r/\b(?:prior\s+to|until)\s+(\d{4})/i),
+      from_year: extract_year(rule, ~r/\bsince\s+(\d{4})(?!-)/i),
+      to_year: extract_year(rule, ~r/\b(?:prior\s+to|until)\s+(\d{4})(?!-)/i),
+      active: date_precise_window(rule),
       year_parity: extract_parity(rule),
       leap: extract_leap(rule),
       every_years: extract_every(rule),
@@ -341,6 +343,30 @@ defmodule Tempo.Holidays.Compiler do
     case Regex.run(pattern, rule) do
       [_, year] -> String.to_integer(year)
       nil -> nil
+    end
+  end
+
+  # A date-precise `since YYYY-MM-DD` / `prior to YYYY-MM-DD` gates by the
+  # occurrence's date, not just its year (Norfolk Island's holiday moved on
+  # 2022-09-09), so it becomes a half-open `active` window `[from, to)` that the
+  # materialiser applies to the computed date. `nil` when neither is date-precise.
+  defp date_precise_window(rule) do
+    from = extract_date(rule, ~r/\bsince\s+(\d{4})-(\d{2})-(\d{2})/i)
+    to = extract_date(rule, ~r/\b(?:prior\s+to|until)\s+(\d{4})-(\d{2})-(\d{2})/i)
+
+    if is_nil(from) and is_nil(to), do: nil, else: [{from, to}]
+  end
+
+  defp extract_date(rule, pattern) do
+    case Regex.run(pattern, rule) do
+      [_, year, month, day] ->
+        case Date.new(String.to_integer(year), String.to_integer(month), String.to_integer(day)) do
+          {:ok, date} -> date
+          {:error, _reason} -> nil
+        end
+
+      nil ->
+        nil
     end
   end
 

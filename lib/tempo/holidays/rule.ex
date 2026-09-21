@@ -362,7 +362,10 @@ defmodule Tempo.Holidays.Rule do
   defp materialise_base(%__MODULE__{kind: :weekday} = rule, %Tempo{} = year) do
     with {:ok, recurrence} <- Tempo.from_iso8601(weekday_iso(rule)),
          {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
-      wrap_one(first_interval(set))
+      case first_interval(set) do
+        {:ok, interval} -> {:ok, [interval]}
+        {:error, :no_occurrence} -> overflow_weekday(rule, year)
+      end
     end
   end
 
@@ -769,6 +772,25 @@ defmodule Tempo.Holidays.Rule do
   # one-element list `materialise/2` returns, propagating any error.
   defp wrap_one({:ok, %Interval{} = interval}), do: {:ok, [interval]}
   defp wrap_one({:error, _} = error), do: error
+
+  # date-holidays counts the Nth weekday from the first of the month, so a
+  # "5th monday in October" in a month with only four Mondays overflows into
+  # the next month (the anniversary NZ-MBH observes as 1 November). A negative
+  # count (`last`) cannot overflow, so it simply does not occur.
+  defp overflow_weekday(%__MODULE__{count: count} = rule, year)
+       when is_integer(count) and count > 0 do
+    with {:ok, anchor} <- Tempo.from_iso8601("#{Tempo.year(year)}-#{month_day(rule.month, 1)}") do
+      to_first = relative_shift(:after, Tempo.day_of_week(anchor, :monday), rule.weekday, 1)
+
+      anchor
+      |> Tempo.shift(day: to_first + (count - 1) * 7)
+      |> Tempo.to_interval()
+      |> first_interval()
+      |> wrap_one()
+    end
+  end
+
+  defp overflow_weekday(_rule, _year), do: {:ok, []}
 
   # Map an `{:ok, _} | {:error, _}` function over `items`, collecting the
   # values in order into `{:ok, list}`, or returning the first error.

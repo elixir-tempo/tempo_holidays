@@ -92,8 +92,8 @@ defmodule Tempo.Holidays.Build do
   """
   @spec holidays_from_bundle(map(), String.t(), String.t()) :: [Holiday.t()]
   def holidays_from_bundle(bundle, code, language) do
-    case get_in(bundle, ["holidays", code, "days"]) do
-      days when is_map(days) ->
+    case resolve_days(bundle, code) do
+      days when map_size(days) > 0 ->
         DateHolidays.compile_days(days, language: language, names: Map.get(bundle, "names", %{}))
 
       _absent ->
@@ -112,7 +112,7 @@ defmodule Tempo.Holidays.Build do
   # disables the country's holiday with the same key.
   defp write_territory(directory, bundle, code, language) do
     names = Map.get(bundle, "names", %{})
-    country = compile_days(get_in(bundle, ["holidays", code, "days"]), names, language)
+    country = compile_days(resolve_days(bundle, code), names, language)
 
     states =
       ["holidays", code, "states"]
@@ -146,6 +146,25 @@ defmodule Tempo.Holidays.Build do
 
   defp compile_days(days, names, language) do
     days |> as_days() |> DateHolidays.compile_days(language: language, names: names)
+  end
+
+  # date-holidays lets a territory inherit another's holidays via `_days` (JE
+  # inherits GB, the French overseas territories inherit FR — 22 in all). The
+  # `_days` value is a path into the holidays tree; the referenced `days` are
+  # the base, the territory's own `days` override by rule key, and a `false`
+  # value removes an inherited rule (mirrors `date-holidays-parser`'s
+  # `Data._assign`).
+  defp resolve_days(bundle, code) do
+    inherited =
+      case get_in(bundle, ["holidays", code, "_days"]) do
+        nil -> %{}
+        reference -> as_days(get_in(bundle, ["holidays"] ++ List.wrap(reference) ++ ["days"]))
+      end
+
+    inherited
+    |> Map.merge(as_days(get_in(bundle, ["holidays", code, "days"])))
+    |> Enum.reject(fn {_rule, meta} -> meta == false end)
+    |> Map.new()
   end
 
   defp empty_state?(%{holidays: [], keys: [], regions: regions}), do: regions == %{}
