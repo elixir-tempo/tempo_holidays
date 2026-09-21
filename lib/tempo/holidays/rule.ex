@@ -21,7 +21,7 @@ defmodule Tempo.Holidays.Rule do
 
   alias Tempo.Interval
 
-  @type kind :: :fixed | :weekday | :relative_weekday | :easter | :orthodox
+  @type kind :: :fixed | :weekday | :relative_weekday | :islamic | :easter | :orthodox
 
   @typedoc """
   An observed-date substitution: `{trigger_weekdays, direction, target_weekday}`
@@ -109,6 +109,22 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
+  # An Islamic holiday is calculated — and returned — in the Islamic
+  # calendar, per Tempo's calendar-awareness: `year` names the *Hijri* year,
+  # and the result is an `[u-ca=islamic-civil]` interval, not a Gregorian
+  # conversion. A `count` greater than one spans that many days (the `P<n>D`
+  # form, e.g. the four days of Eid al-Fitr).
+  defp materialise_base(
+         %__MODULE__{kind: :islamic, month: month, day: day, count: count},
+         %Tempo{} = year
+       ) do
+    with {:ok, base} <-
+           Tempo.from_iso8601("#{Tempo.year(year)}Y#{month}M#{day}D[u-ca=islamic-civil]"),
+         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
+      {:ok, span_days(interval, base, count)}
+    end
+  end
+
   defp materialise_base(%__MODULE__{kind: kind, offset: offset}, %Tempo{} = year)
        when kind in [:easter, :orthodox] do
     easter_date(kind, Tempo.year(year))
@@ -117,6 +133,11 @@ defmodule Tempo.Holidays.Rule do
     |> Tempo.to_interval()
     |> first_interval()
   end
+
+  # A one-day interval already spans a single day; a longer holiday moves
+  # the exclusive upper bound forward by `days`, staying in the calendar.
+  defp span_days(interval, _base, days) when days in [nil, 1], do: interval
+  defp span_days(interval, base, days), do: %{interval | to: Tempo.shift(base, day: days)}
 
   # ── observed-date substitution ──────────────────────────────────────
 

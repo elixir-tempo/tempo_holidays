@@ -15,6 +15,9 @@ defmodule Tempo.Holidays.Compiler do
     weekday strictly before or after a fixed date (`"monday before 06-01"`
     is US Memorial Day).
 
+  * **Islamic (Hijri)** — `"<day> <Islamic month>"` with an optional `P<n>D`
+    span (`"9 Dhu al-Hijjah P4D"`). Materialised in the Islamic calendar.
+
   * **Easter-relative** — `"easter"` / `"orthodox"` with an optional signed
     day offset (e.g. `"easter -2"` for Good Friday).
 
@@ -60,6 +63,22 @@ defmodule Tempo.Holidays.Compiler do
     "december" => 12
   }
 
+  # Islamic (Hijri) month numbers, spelled as date-holidays writes them.
+  @islamic_months %{
+    "muharram" => 1,
+    "safar" => 2,
+    "rabi al-awwal" => 3,
+    "rabi al-thani" => 4,
+    "jumada al-awwal" => 5,
+    "jumada al-thani" => 6,
+    "rajab" => 7,
+    "shaban" => 8,
+    "ramadan" => 9,
+    "shawwal" => 10,
+    "dhu al-qadah" => 11,
+    "dhu al-hijjah" => 12
+  }
+
   @doc """
   Compile a date-holidays rule string into a `t:Tempo.Holidays.Rule.t/0`.
 
@@ -99,13 +118,17 @@ defmodule Tempo.Holidays.Compiler do
       iex> {rule.kind, rule.weekday, rule.direction, rule.month, rule.day}
       {:relative_weekday, 1, :before, 6, 1}
 
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("9 Dhu al-Hijjah P4D")
+      iex> {rule.kind, rule.month, rule.day, rule.count}
+      {:islamic, 12, 9, 4}
+
   """
   @spec compile(String.t()) :: {:ok, Rule.t()} | {:error, {:unsupported, String.t()}}
   def compile(rule) when is_binary(rule) do
     {base, substitute} = extract_substitution(rule)
 
     case compile_fixed(base) || compile_weekday(base) || compile_relative_weekday(base) ||
-           compile_easter(base) do
+           compile_islamic(base) || compile_easter(base) do
       {:ok, compiled} -> {:ok, %{compiled | substitute: substitute, source: rule}}
       nil -> {:error, {:unsupported, rule}}
     end
@@ -199,6 +222,32 @@ defmodule Tempo.Holidays.Compiler do
       "after" -> :after
     end
   end
+
+  # ── Islamic (Hijri): "1 Muharram", "9 Dhu al-Hijjah P4D" ────────────
+  #
+  # `<day> <Islamic month>`, with an optional `P<n>D` span (in days). The
+  # `count` field carries that span; a bare date is one day.
+  defp compile_islamic(rule) do
+    pattern = ~r/^\s*(\d{1,2})\s+([a-z][a-z' -]+?)(?:\s+P(\d+)D)?\s*$/i
+
+    with [_, day, month_name | rest] <- Regex.run(pattern, rule),
+         {:ok, month} <- Map.fetch(@islamic_months, String.downcase(String.trim(month_name))) do
+      {:ok,
+       %Rule{
+         kind: :islamic,
+         month: month,
+         day: String.to_integer(day),
+         count: rest |> List.first() |> parse_span(),
+         source: rule
+       }}
+    else
+      _ -> nil
+    end
+  end
+
+  defp parse_span(nil), do: 1
+  defp parse_span(""), do: 1
+  defp parse_span(days), do: String.to_integer(days)
 
   # ── easter-relative: "easter", "easter -2", "orthodox 1" ────────────
   defp compile_easter(rule) do

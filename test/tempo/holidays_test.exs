@@ -202,4 +202,23 @@ defmodule Tempo.HolidaysTest do
       assert Tempo.Interval.from(interval) == ~o"2026Y11M13D"
     end
   end
+
+  describe "Islamic (Hijri) holidays" do
+    test "materialise in the Islamic calendar, not Gregorian" do
+      # Islamic New Year — 1 Muharram of the Hijri year 1447.
+      {:ok, rule} = Compiler.compile("1 Muharram")
+
+      assert {:ok, interval} = Rule.materialise(rule, ~o"1447")
+      assert Tempo.Interval.from(interval) == ~o"1447Y1M1D[u-ca=islamic-civil]"
+    end
+
+    test "a P<n>D span covers that many days, crossing months in-calendar" do
+      # Eid al-Fitr — "30 Ramadan P4D" runs from 30 Ramadan into Shawwal.
+      {:ok, rule} = Compiler.compile("30 Ramadan P4D")
+
+      assert {:ok, interval} = Rule.materialise(rule, ~o"1447")
+      assert Tempo.Interval.from(interval) == ~o"1447Y9M30D[u-ca=islamic-civil]"
+      assert Tempo.Interval.to(interval) == ~o"1447Y10M4D[u-ca=islamic-civil]"
+    end
+  end
 end

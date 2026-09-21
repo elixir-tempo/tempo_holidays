@@ -38,12 +38,13 @@ holidays:
 * Fixed date `MM-DD`.
 * Weekday-in-month `<ordinal> <weekday> in <Month>` (`first`…`fifth`, `last`).
 * Relative weekday `<weekday> before|after <MM-DD>` (US Memorial `monday before 06-01`).
+* Islamic (Hijri) `<day> <month> [P<n>D]`, returned in the `[u-ca=islamic-civil]` calendar.
 * Easter / orthodox relative.
 * Observed-date substitution `if <weekdays> then (next|previous) <weekday>`, incl. the `and if …` connector and chained clauses.
 
 **Not yet handled** (skipped as `{:error, {:unsupported, rule}}`):
 
-* Lunar/other calendars: Hijra, Hebrew, Chinese (lunar & solar), Bengali, Persian — via Calendrical.
+* Other calendars: Hebrew, Chinese (lunar & solar), Bengali, Persian — via Calendrical, each returned in its own calendar like the Islamic tier. (Islamic/Hijri is done.)
 * Equinox / solstice / solar terms — via Astro.
 * `<weekday> before|after <Month>` (start-of-month anchor) and the nested form `<weekday> after <Nth weekday in Month>` (Black Friday, Election Day) — only the `<MM-DD>` anchor is handled so far.
 * Fixed-date-at-start-of-month; time-of-day (`10-31 18:00`) and non-24h durations.
