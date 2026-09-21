@@ -147,6 +147,72 @@ defmodule Tempo.Holidays.Rule do
   """
   @spec materialise(t(), Tempo.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   def materialise(%__MODULE__{} = rule, %Tempo{} = year) do
+    case boundary_years(rule, Tempo.year(year)) do
+      [_only] -> materialise_in_year(rule, year)
+      years -> materialise_across_boundary(rule, year, years)
+    end
+  end
+
+  # The common case: no substitution can cross the year boundary, so every
+  # occurrence stays in `year` and no re-projection or filtering is needed.
+  defp materialise_in_year(rule, year) do
+    with {:ok, occurrences} <- occurrences_for_year(rule, year) do
+      append_enabled(occurrences, rule.enable, year)
+    end
+  end
+
+  # The boundary case: materialise the target year and its neighbours, then
+  # keep only the occurrences whose observed date lands in the target year.
+  defp materialise_across_boundary(rule, year, years) do
+    target = Tempo.year(year)
+
+    with {:ok, groups} <- reduce_ok(years, &occurrences_for(rule, &1)) do
+      groups
+      |> List.flatten()
+      |> Enum.filter(&in_gregorian_year?(&1, target))
+      |> append_enabled(rule.enable, year)
+    end
+  end
+
+  # A substitution can push an observed date across the Gregorian year boundary
+  # — New Year on a Saturday observed the previous Friday, 31 December — and
+  # date-holidays attributes each observed date to the year it falls in. So a
+  # substituted rule is materialised across the target year and its two
+  # neighbours and then filtered to the target; an unsubstituted rule, whose
+  # base always lands in its own year, needs only the target year.
+  defp boundary_years(%__MODULE__{substitute: substitute}, target)
+       when substitute in [nil, []],
+       do: [target]
+
+  defp boundary_years(rule, target) do
+    if boundary_capable?(rule), do: [target - 1, target, target + 1], else: [target]
+  end
+
+  # A substitution shifts a date by at most a week, so it can only cross a
+  # Gregorian year boundary when the holiday itself falls within a week of 1
+  # January or 31 December. A fixed or weekday rule whose month is February
+  # through November never can; Easter is always spring; everything else
+  # (January/December, and calendars whose Gregorian date drifts year to year)
+  # is treated conservatively as boundary-capable.
+  defp boundary_capable?(%__MODULE__{kind: kind}) when kind in [:easter, :orthodox], do: false
+
+  defp boundary_capable?(%__MODULE__{kind: kind, month: month})
+       when kind in [:fixed, :weekday, :nested_weekday, :relative_weekday] and is_integer(month),
+       do: month in [1, 12]
+
+  defp boundary_capable?(_rule), do: true
+
+  # A neighbouring year, built from its integer, for the boundary case.
+  defp occurrences_for(rule, year_int) do
+    with {:ok, year} <- Tempo.from_iso8601(Integer.to_string(year_int)) do
+      occurrences_for_year(rule, year)
+    end
+  end
+
+  # Every gate but `enable` (which names absolute dates) applies within the year
+  # being materialised, so the year conditions, active windows, disable list,
+  # weekday gate and substitution are all evaluated per year.
+  defp occurrences_for_year(rule, year) do
     if active_in_year?(rule, Tempo.year(year)) do
       with {:ok, base} <- materialise_base(rule, year) do
         base
@@ -154,10 +220,16 @@ defmodule Tempo.Holidays.Rule do
         |> reject_disabled(rule.disable)
         |> gate_by_weekday(rule.weekday_gate)
         |> substitute_all(rule.substitute, rule.substitute_mode)
-        |> append_enabled(rule.enable, year)
       end
     else
       {:ok, []}
+    end
+  end
+
+  defp in_gregorian_year?(interval, target) do
+    case occurrence_days(interval) do
+      {:ok, days} -> Date.from_gregorian_days(days).year == target
+      :error -> false
     end
   end
 
@@ -215,10 +287,9 @@ defmodule Tempo.Holidays.Rule do
 
   # `enable` adds explicit observed dates — the target of a disable/enable move
   # — materialised as single days, keeping only those in the requested year.
-  defp append_enabled({:error, _} = error, _enable, _year), do: error
-  defp append_enabled({:ok, intervals}, nil, _year), do: {:ok, intervals}
+  defp append_enabled(intervals, nil, _year), do: {:ok, intervals}
 
-  defp append_enabled({:ok, intervals}, enabled, year) do
+  defp append_enabled(intervals, enabled, year) do
     target = Tempo.year(year)
 
     with {:ok, added} <-
@@ -484,7 +555,7 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp named_zone_date(%DateTime{} = utc, timezone) do
-    case DateTime.shift_zone(utc, timezone) do
+    case DateTime.shift_zone(utc, timezone, Tz.TimeZoneDatabase) do
       {:ok, local} -> {:ok, DateTime.to_date(local)}
       {:error, _reason} = error -> error
     end

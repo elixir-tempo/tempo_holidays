@@ -94,6 +94,10 @@ defmodule Tempo.Holidays.MixProject do
       # hex calendrical as a child. Becomes {:calendrical, "~> 1.4"} before publish.
       {:calendrical, path: "../../localize/calendrical", override: true},
       {:astro, "~> 2.5"},
+      # Equinox/solstice holidays computed for a named IANA timezone (Chile's
+      # solstice `in America/Santiago`) need a time-zone database; numeric
+      # offsets and GMT do not. Tz is the one Astro and Calendrical already use.
+      {:tz, "~> 0.28"},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
       {:localize, "~> 1.3"},

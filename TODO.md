@@ -7,11 +7,7 @@ at ~96% matched, and the gaps below are what remains.
 
 ## Open
 
-* [ ] **Year-boundary substitution** — when a holiday's observed date crosses the Gregorian year boundary (New Year on a weekend → observed 31 Dec of the *prior* year), date-holidays attributes it to the year the observed date falls in. `materialise/2` should yield occurrences whose observed date lands in the requested year. The bulk of the current non-calendar mismatches (~216 across a 9-country subset).
-
 * [ ] **Inter-holiday / bridge-day rules** — `"09-22 if 09-21 and 09-23 is public holiday"`, `<rule> if is holiday then next <weekday>`, and "observe as well as" in-lieu days; needs a country-level second pass over the other holidays. A handful of entries.
-
-* [ ] **IANA-zone equinox/solstice** — only Chile's `june solstice in America/Santiago`. Numeric offsets and GMT work with no dependency; a named zone needs a host time-zone database (`Tz` is only an *optional* transitive dep). Decision: add `{:tz, …}` as a direct dep, or leave the one rule unsupported.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
 
@@ -24,6 +20,10 @@ at ~96% matched, and the gaps below are what remains.
 * [ ] **Tabular Umm al-Qura** — our *calculated* Umm al-Qura differs from date-holidays' *table* by a day some years, plus day-overflow like `30 Safar` (a 29-day month). Many are corrected in-data by the `disable`/`enable` gates now handled; the residual is blocked on a tabular Umm al-Qura in Calendrical.
 
 ## Done
+
+* [x] **Year-boundary substitution** — `materialise/2` gathers a substituted rule's occurrences across the target year and its two neighbours and keeps those whose observed date lands in the target Gregorian year, matching date-holidays' attribution (New Year on a weekend → observed 31 Dec belongs to the prior year). 2026-09-22.
+
+* [x] **IANA-zone equinox/solstice** — added `{:tz, "~> 0.28"}` as a direct dependency and pass `Tz.TimeZoneDatabase` to `DateTime.shift_zone/3`, so Chile's `june solstice in America/Santiago` resolves; numeric offsets and GMT still need no tz data. 2026-09-22.
 
 * [x] **Equinox / solstice tier** — `<march|september> equinox` / `<june|december> solstice` via `Astro.equinox/2`,`Astro.solstice/2`, with an optional `<n> days before/after` and `in <timezone>`; the civil date is taken in that timezone (Japan's Vernal/Autumnal Equinox Days in `+09:00`), GMT when none. Fixed a latent `strip_time` bug that ate the `HH:MM` of a `+HH:MM` offset. Named IANA zones skip cleanly without a host tz database (the remaining astronomical gap, below). 2026-09-22.
 

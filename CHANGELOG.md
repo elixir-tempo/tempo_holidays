@@ -8,7 +8,7 @@
 
 * Rule compiler covering date-holidays' grammar: fixed dates and `P<n>D` spans, weekday-in-month, relative and nested weekdays (Election Day, Black Friday), month-anchor weekdays, Islamic/Hebrew/Persian calendar dates, `julian MM-DD` fixed dates (Orthodox/Coptic/Ethiopian Christmas, converted to Gregorian), Chinese and Korean lunisolar dates and Chinese solar terms (Qingming), equinox/solstice dates (Japan's Equinox Days, timezone-aware), Easter/orthodox-relative, and specific dates. Islamic dates use Umm al-Qura and are returned in-calendar — a lunar date can fall twice in one Gregorian year, so `materialise/2` returns a list.
 
-* Rule modifiers: observed-date substitution in `and if` (add), `if` (shift) and `substitutes` (observed-only) modes; and `since`/`prior to`, even/odd, leap, `every N years`, and `on`/`not on <weekday>` filters that gate whether a holiday occurs.
+* Rule modifiers: observed-date substitution in `and if` (add), `if` (shift) and `substitutes` (observed-only) modes; and `since`/`prior to`, even/odd, leap, `every N years`, and `on`/`not on <weekday>` filters that gate whether a holiday occurs. An observed date that crosses the Gregorian year boundary (New Year on a weekend observed 31 December) is attributed to the year it falls in.
 
 * Occurrence-level metadata gates from date-holidays: `active` windows (half-open `[from, to)`), `disable`d dates and `enable`d dates — a `disable`+`enable` pair moves an occurrence, as with the UK 2022 Spring bank holiday to the Platinum Jubilee Thursday.
 

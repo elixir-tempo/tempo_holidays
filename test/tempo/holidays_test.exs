@@ -396,6 +396,33 @@ defmodule Tempo.HolidaysTest do
       assert rule.kind == :equinox
       assert rule.timezone == "+09:00"
     end
+
+    test "a named IANA timezone resolves the civil date via the tz database" do
+      # Chile's June solstice, observed in Santiago (UTC−4 in June).
+      {:ok, rule} = Compiler.compile("june solstice in America/Santiago")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"2025Y6M20D"
+    end
+  end
+
+  describe "year-boundary substitution" do
+    test "an observed date crossing the year boundary is attributed to its own year" do
+      # US New Year: 1 Jan observed the previous Friday when it is a Saturday.
+      {:ok, rule} =
+        Compiler.compile("01-01 and if saturday then previous friday if sunday then next monday")
+
+      # 1 Jan 2028 is a Saturday; its observed 31 Dec 2027 belongs to 2027.
+      {:ok, ivs_2027} = Rule.materialise(rule, ~o"2027")
+
+      assert ivs_2027 |> Enum.map(&Tempo.Interval.from/1) |> MapSet.new() ==
+               MapSet.new([~o"2027Y1M1D", ~o"2027Y12M31D"])
+
+      # 2028 keeps only its own 1 January — the 31 Dec 2027 observance is not
+      # attributed here.
+      {:ok, ivs_2028} = Rule.materialise(rule, ~o"2028")
+      assert Enum.map(ivs_2028, &Tempo.Interval.from/1) == [~o"2028Y1M1D"]
+    end
   end
 
   describe "locale and state resolution" do
