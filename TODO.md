@@ -7,6 +7,8 @@ at over 99% matched, and the gaps below are what remains.
 
 ## Open
 
+* [ ] **Holidays as a Tempo grammar** — the core objective: express a holiday as a Tempo interval-set value so it composes with other Tempo values (`free_time ∩ holidays`). Categorisation by rule family and a phased path in [plans/holiday-grammar.md](plans/holiday-grammar.md).
+
 * [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: territory-local anchoring (derive a territory's zone/location from the locale) as a follow-up to the current canonical/explicit anchors.
@@ -21,7 +23,7 @@ at over 99% matched, and the gaps below are what remains.
 
 * [x] **Day-start projection (`:day_start`)** — `materialise/3` projects a sunset-starting-calendar holiday (Islamic, Hebrew) onto the Gregorian timeline as a datetime interval that begins the evening before: `:evening` (18:00 proxy) or `:sunset` (true, via Astro), at the calendar's canonical reference (Mecca/Jerusalem) or an explicit zone-id / `{lng, lat}` location (`tz_world`-resolved, optional dep). `:midnight` (default) keeps the in-calendar day. New `Tempo.Holidays.DayStart`. 2026-09-22.
 
-* [x] **Islamic day-count rollover** — the `:islamic` tier anchors on `first_day_of_month + (day-1)`, so a day beyond the month's length (`30 Ramadan` in a 29-day Ramadan → Eid, `30 Safar` → 1 Rabi) rolls into the next month and is labelled with its true in-calendar date instead of being dropped. The ~18 remaining off-by-one cases (date-holidays' embedded Hijri table vs Calendrical's Umm al-Qura) stay accepted `divergent` — Calendrical is authoritative. 2026-09-22.
+* [x] **Islamic day-count rollover** — the `:islamic` tier anchors on `first_day_of_month + (day-1)`, so a day beyond the month's length (`30 Ramadan` in a 29-day Ramadan → Eid, `30 Safar` → 1 Rabi) rolls into the next month and is labelled with its true in-calendar date instead of being dropped. With date-holidays' own `disable`/`enable` table corrections (which we apply), only **2** genuine off-by-one cases remain, accepted `divergent` — Calendrical authoritative. 2026-09-22.
 
 * [x] **Vietnamese lunisolar** — `vietnamese <month>-<leap>-<day>` via `Calendrical.Vietnamese` (UTC+7 meridian, `[u-ca=chinese]` type). A lunisolar date is attributed to the Gregorian year it falls in (fixes Ông Táo, the 12th month), and a `<n> day[s] before/after <base> [P<n>D]` prefix carries Tết's eve. VN: 405/405 conform. 2026-09-22. [plans/vietnamese-calendar.md](plans/vietnamese-calendar.md)
 

@@ -733,6 +733,7 @@ defmodule Tempo.Holidays.Compiler do
         {:ok,
          %Rule{
            kind: :solar_term,
+           calendar: Calendrical.Chinese,
            count: String.to_integer(term),
            day: String.to_integer(day),
            source: rule

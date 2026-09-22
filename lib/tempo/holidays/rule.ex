@@ -700,26 +700,19 @@ defmodule Tempo.Holidays.Rule do
     |> reduce_ok(&converted_interval(offset_date(&1, rule.offset), calendar, rule.count))
   end
 
-  # A Chinese solar term — `chinese <term>-<day> solarterm`. The term index maps
-  # to an ecliptic longitude (term 1 = 立春 at 315°, then every 15°), and the day
-  # the sun reaches it, in China Standard Time, is the term's date; `<day>` is a
-  # 1-based offset into the term. Solar, so returned as a Gregorian civil date.
-  defp materialise_base(%__MODULE__{kind: :solar_term, count: term, day: day}, %Tempo{} = year) do
-    longitude = rem(300 + term * 15, 360)
-    start = Calendrical.Gregorian.date_to_iso_days(Tempo.year(year), 1, 1)
-
-    moment =
-      Calendrical.Lunisolar.solar_longitude_on_or_after(
-        longitude,
-        start,
-        &Calendrical.Chinese.location/1
-      )
-
-    {term_year, term_month, term_day} =
-      Calendrical.Gregorian.date_from_iso_days(trunc(moment))
-
-    with {:ok, base} <- Tempo.from_iso8601("#{term_year}Y#{term_month}M#{term_day}D") do
-      base
+  # A Chinese solar term — `chinese <term>-<day> solarterm`. `Calendrical`
+  # resolves the 1-based term index to the Gregorian day the sun reaches its
+  # ecliptic longitude, observed at the calendar's meridian (`calendar.location/1`);
+  # nothing calendrical is computed here. `<day>` is a 1-based offset into the
+  # term. Solar, so a Gregorian civil date.
+  defp materialise_base(
+         %__MODULE__{kind: :solar_term, calendar: calendar, count: term, day: day},
+         %Tempo{} = year
+       ) do
+    with {:ok, date} <-
+           Calendrical.Lunisolar.solar_term(term, Tempo.year(year), &calendar.location(&1)) do
+      date
+      |> Tempo.from_elixir()
       |> Tempo.shift(day: day - 1)
       |> Tempo.to_interval()
       |> first_interval()
@@ -762,14 +755,8 @@ defmodule Tempo.Holidays.Rule do
 
   defp materialise_base(%__MODULE__{kind: kind, offset: offset, count: count}, %Tempo{} = year)
        when kind in [:easter, :orthodox] do
-    base =
-      easter_date(kind, Tempo.year(year))
-      |> Tempo.from_elixir()
-      |> Tempo.shift(day: offset || 0)
-
-    with {:ok, interval} <- base |> Tempo.to_interval() |> first_interval() do
-      {:ok, [span_days(interval, base, count)]}
-    end
+    event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
+    computed_event_holiday(event, offset, count, year)
   end
 
   # A fixed date in a `[u-ca=tag]` calendar, projected onto the Gregorian `year`
@@ -810,6 +797,21 @@ defmodule Tempo.Holidays.Rule do
       |> Enum.map(fn interval -> Tempo.shift(Interval.from(interval), day: offset) end)
       |> Enum.filter(fn start -> gregorian_year(start) == target end)
       |> Enum.uniq()
+      |> reduce_ok(&day_interval(&1, count))
+    end
+  end
+
+  # A holiday fixed by a computed event (`(easter)E`, `(orthodox-easter)E`) plus
+  # a day `offset`. The whole calendar computation is delegated to `Tempo.Event`
+  # (and Calendrical/Astro beneath it): the event recurrence bounded to the year
+  # resolves the event's date, `Tempo.shift` applies the offset, and `count`
+  # extends the span. Nothing here computes a date.
+  defp computed_event_holiday(event, offset, count, %Tempo{} = year) do
+    with {:ok, recurrence} <- Tempo.from_iso8601("R/../P1Y/FL(#{event})EN"),
+         {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
+      set
+      |> Tempo.IntervalSet.to_list()
+      |> Enum.map(fn interval -> Tempo.shift(Interval.from(interval), day: offset || 0) end)
       |> reduce_ok(&day_interval(&1, count))
     end
   end
@@ -1015,26 +1017,6 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp inclusive_step(delta), do: Integer.mod(delta, 7)
-
-  # Orthodox Easter comes back in the Julian calendar; the holiday is asked for
-  # a Gregorian year, so both anchors are normalised to Gregorian before the
-  # offset and any weekday substitution are applied.
-  defp easter_date(:easter, year) do
-    year |> Calendrical.Ecclesiastical.easter_sunday() |> to_gregorian()
-  end
-
-  defp easter_date(:orthodox, year) do
-    year |> Calendrical.Ecclesiastical.orthodox_easter_sunday() |> to_gregorian()
-  end
-
-  defp to_gregorian(%Date{calendar: Calendrical.Gregorian} = date), do: date
-
-  defp to_gregorian(%Date{} = date) do
-    case Date.convert(date, Calendrical.Gregorian) do
-      {:ok, gregorian} -> gregorian
-      {:error, _reason} -> date
-    end
-  end
 
   # `select/2` and `to_interval/2` return an interval set; a single value
   # materialises straight to an interval. Normalise both to the first
