@@ -88,7 +88,34 @@ defmodule Tempo.Holidays.Rule do
           active: [{Date.t() | nil, Date.t() | nil}] | nil,
           disable: [Date.t()] | nil,
           enable: [Date.t()] | nil,
+          conditional: conditional() | nil,
           source: String.t() | nil
+        }
+
+  @typedoc """
+  An inter-holiday condition that turns a rule's occurrence on or off, or moves
+  it, depending on the *other* holidays of the year — so it is resolved in a
+  second pass with the year's holiday set. `:bridge` keeps the occurrence only
+  when every `:on` date (`{month, day}`) is itself a holiday of `:type`
+  (`"09-22 if 09-21 and 09-23 is public holiday"`); `:if_holiday` moves the
+  occurrence by `:move` when it coincides with a holiday of `:type`
+  (`"… if is observance holiday then next Thursday"`). `:type` defaults to
+  `:public`.
+  """
+  @type conditional ::
+          %{kind: :bridge, type: atom(), on: [{pos_integer(), pos_integer()}]}
+          | %{kind: :if_holiday, type: atom(), move: move()}
+
+  @typedoc """
+  A relative move applied to a date: `count` steps in `direction` to the next
+  `target` — a weekday `1..7`, or `:day` (a plain day step that skips the `omit`
+  weekdays).
+  """
+  @type move :: %{
+          count: pos_integer(),
+          direction: :next | :after | :before | :previous,
+          target: 1..7 | :day,
+          omit: [1..7]
         }
 
   @enforce_keys [:kind]
@@ -114,6 +141,7 @@ defmodule Tempo.Holidays.Rule do
     :active,
     :disable,
     :enable,
+    :conditional,
     :source
   ]
 
@@ -153,6 +181,165 @@ defmodule Tempo.Holidays.Rule do
     with {:ok, occurrences} <- gather_occurrences(rule, year) do
       move_disabled(occurrences, rule, year)
     end
+  end
+
+  @doc """
+  Whether a rule carries an inter-holiday `t:conditional/0`.
+
+  A conditional rule (a *bridge* day, or an `if is … holiday then …` move)
+  depends on the *other* holidays of the year, so it cannot be materialised in
+  isolation — `materialise/2` yields its base occurrences and the second pass
+  (`resolve_conditional/4`) turns them on, off or moves them.
+
+  ### Arguments
+
+  * `rule` is a `t:t/0`.
+
+  ### Returns
+
+  * `true` when the rule has a conditional, `false` otherwise.
+
+  ### Examples
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
+      iex> Tempo.Holidays.Rule.conditional?(rule)
+      false
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
+      iex> Tempo.Holidays.Rule.conditional?(rule)
+      true
+
+  """
+  @spec conditional?(t()) :: boolean()
+  def conditional?(%__MODULE__{conditional: nil}), do: false
+  def conditional?(%__MODULE__{}), do: true
+
+  @doc """
+  Resolve a conditional rule's base occurrences against the year's holidays.
+
+  The second pass of materialisation. `present?` answers whether a holiday of a
+  given `t:Tempo.Holidays.Holiday.type/0` falls on a Gregorian day count in the
+  year — the caller builds it from the year's other holidays. A `:bridge` keeps
+  its occurrences only when every named date is present; an `:if_holiday` moves
+  each occurrence that coincides with a present holiday, and leaves the rest.
+
+  ### Arguments
+
+  * `rule` is a conditional `t:t/0` (see `conditional?/1`).
+
+  * `occurrences` are the rule's base occurrences from `materialise/2`.
+
+  * `year` is the year-resolution `t:Tempo.t/0` being projected.
+
+  * `present?` is a `(gregorian_days, type) -> boolean()` function.
+
+  ### Returns
+
+  * `{:ok, [t:Tempo.Interval.t/0]}` — the resolved occurrences, possibly empty
+    (a bridge whose conditions are not met) or moved (an if-holiday coincidence).
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
+      iex> {:ok, base} = Tempo.Holidays.Rule.materialise(rule, ~o"2026")
+      iex> Tempo.Holidays.Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> false end)
+      {:ok, []}
+
+  """
+  @spec resolve_conditional(t(), [Interval.t()], Tempo.t(), (integer(), atom() -> boolean())) ::
+          {:ok, [Interval.t()]} | {:error, term()}
+  def resolve_conditional(
+        %__MODULE__{conditional: %{kind: :bridge} = conditional},
+        occurrences,
+        year,
+        present?
+      ) do
+    if bridge_satisfied?(conditional, year, present?), do: {:ok, occurrences}, else: {:ok, []}
+  end
+
+  def resolve_conditional(
+        %__MODULE__{conditional: %{kind: :if_holiday} = conditional},
+        occurrences,
+        _year,
+        present?
+      ) do
+    reduce_ok(occurrences, &move_if_holiday(&1, conditional, present?))
+  end
+
+  # A bridge keeps its day only when every named date is itself a holiday of the
+  # conditional's type that year (`PostRule.bridge`).
+  defp bridge_satisfied?(%{on: on, type: type}, year, present?) do
+    target = Tempo.year(year)
+
+    Enum.all?(on, fn {month, day} ->
+      case Date.new(target, month, day) do
+        {:ok, date} -> present?.(Date.to_gregorian_days(date), type)
+        {:error, _} -> false
+      end
+    end)
+  end
+
+  # An if-holiday moves an occurrence that coincides with a holiday of the type,
+  # and leaves one that does not (`PostRule.ruleIfHoliday`).
+  defp move_if_holiday(interval, %{type: type, move: move}, present?) do
+    case occurrence_days(interval) do
+      {:ok, days} ->
+        if present?.(days, type),
+          do: days |> Date.from_gregorian_days() |> apply_move(move) |> enabled_interval(),
+          else: {:ok, interval}
+
+      :error ->
+        {:ok, interval}
+    end
+  end
+
+  # date-holidays' `dateDir`: step `count` in `direction` to the `target`
+  # weekday (or a plain `:day`, skipping `omit` weekdays). The arithmetic is in
+  # JS weekday indices (Sunday 0 … Saturday 6) to mirror the reference exactly.
+  defp apply_move(%Date{} = date, %{
+         count: count,
+         direction: direction,
+         target: target,
+         omit: omit
+       }) do
+    weekday = js_weekday(date)
+    Date.add(date, move_offset(target, direction, count, weekday, Enum.map(omit, &js_index/1)))
+  end
+
+  defp js_weekday(%Date{} = date), do: js_index(Date.day_of_week(date))
+
+  # ISO Monday 1 … Sunday 7 → JS Sunday 0 … Saturday 6.
+  defp js_index(iso_weekday), do: rem(iso_weekday, 7)
+
+  defp move_offset(:day, direction, count, weekday, omit) do
+    {from, delta} = if backward?(direction), do: {-count, -1}, else: {count, +1}
+    skip_omit(from, delta, weekday, omit, 0)
+  end
+
+  defp move_offset(target, direction, count, weekday, _omit) when is_integer(target) do
+    rule_weekday = js_index(target)
+    base = count - 1
+
+    if backward?(direction) do
+      steps = if weekday == rule_weekday, do: base + 1, else: base
+      -(Integer.mod(7 + weekday - rule_weekday, 7) + steps * 7)
+    else
+      steps = if direction == :next and weekday == rule_weekday, do: base + 1, else: base
+      Integer.mod(7 - weekday + rule_weekday, 7) + steps * 7
+    end
+  end
+
+  defp backward?(direction), do: direction in [:before, :previous]
+
+  # A `:day` move skips over any `omit` weekday, up to a week, mirroring the
+  # reference's bounded `while`.
+  defp skip_omit(offset, _delta, _weekday, _omit, tries) when tries >= 7, do: offset
+
+  defp skip_omit(offset, delta, weekday, omit, tries) do
+    if Integer.mod(offset + weekday, 7) in omit,
+      do: skip_omit(offset + delta, delta, weekday, omit, tries + 1),
+      else: offset
   end
 
   # Gather the occurrences before the `disable`/`enable` post-step. The common
@@ -308,10 +495,36 @@ defmodule Tempo.Holidays.Rule do
     date |> Tempo.from_elixir() |> Tempo.to_interval() |> first_interval()
   end
 
-  # An occurrence's date as a proleptic-Gregorian day count, so a value in any
-  # calendar (an Islamic or Hebrew holiday) compares with the Gregorian
-  # `active`/`disable` dates. `:error` when the value will not convert.
-  defp occurrence_days(interval) do
+  @doc """
+  An occurrence's start as a proleptic-Gregorian day count.
+
+  A value in any calendar (an Islamic or Hebrew holiday) reduces to a single
+  integer, so occurrences compare against each other and against the Gregorian
+  `active`/`disable`/condition dates regardless of the calendar they are held
+  in. Used to build the year's holiday-day set for the conditional second pass
+  (`resolve_conditional/4`).
+
+  ### Arguments
+
+  * `interval` is one occurrence, a `t:Tempo.Interval.t/0`.
+
+  ### Returns
+
+  * `{:ok, integer()}` — the start date as a Gregorian day count.
+
+  * `:error` when the value will not convert to a Gregorian date.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
+      iex> {:ok, [interval]} = Tempo.Holidays.Rule.materialise(rule, ~o"2026")
+      iex> Tempo.Holidays.Rule.occurrence_days(interval)
+      {:ok, 740340}
+
+  """
+  @spec occurrence_days(Interval.t()) :: {:ok, integer()} | :error
+  def occurrence_days(interval) do
     with tempo <- Interval.from(interval),
          {:ok, date} <- Tempo.to_date(tempo),
          {:ok, iso} <- Date.convert(date, Calendar.ISO) do
@@ -443,7 +656,7 @@ defmodule Tempo.Holidays.Rule do
          %__MODULE__{kind: kind, calendar: calendar, month: month, day: day, count: count},
          %Tempo{} = year
        )
-       when kind in [:islamic, :hebrew, :persian] do
+       when kind in [:hebrew, :persian] do
     tag = calendar_tag(calendar)
 
     Tempo.year(year)
@@ -451,21 +664,57 @@ defmodule Tempo.Holidays.Rule do
     |> reduce_ok(&calendar_interval(&1, tag, count))
   end
 
-  # A lunisolar date — Chinese (`chinese …`) or Korean (`korean …`). date-holidays
-  # writes `<month>-<leap>-<day>` in *traditional* month numbering, which drifts
-  # from the calendar's ordinal months in a year carrying an intercalary month,
-  # so Calendrical resolves the traditional month to a Gregorian date; that is
-  # converted back into the source calendar (ordinal months) and returned
-  # in-calendar (`[u-ca=chinese]`, `[u-ca=dangi]`).
+  # Islamic (Hijri) dates carry an extra wrinkle: date-holidays encodes some
+  # holidays as a day *beyond* the month's length — Saudi Eid al-Fitr as
+  # `30 Ramadan P4D`, Iran's end-of-Safar observance as `30 Safar` — leaning on
+  # the sunset-convention rollover its table implementation gives (the spec's
+  # 18:00 day-start): it anchors on the always-valid first of the month and adds
+  # `day - 1` days, so a 30th in a 29-day month spills into the next month. The
+  # spec documents neither the rollover nor `day` beyond the month length, so we
+  # reproduce it *here*, in the holidays layer, to stay faithful to date-holidays'
+  # published dates rather than dropping the holiday. For an in-range day it is
+  # identical to resolving the date directly, so nothing that already matched
+  # moves; the Hijri year whose anchored day lands in the Gregorian year is kept,
+  # a lunar date still able to fall in it twice.
+  defp materialise_base(
+         %__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day, count: count},
+         %Tempo{} = year
+       ) do
+    target = Tempo.year(year)
+
+    calendar
+    |> islamic_month_starts(target, month)
+    |> Enum.map(&Date.add(&1, day - 1))
+    |> Enum.filter(&(&1.year == target))
+    |> Enum.uniq()
+    |> reduce_ok(&converted_interval(&1, calendar, count))
+  end
+
+  # A lunisolar date — Chinese (`chinese …`), Korean (`korean …`) or Vietnamese
+  # (`vietnamese …`). date-holidays writes `<month>-<leap>-<day>` in *traditional*
+  # month numbering, which drifts from the calendar's ordinal months in a year
+  # carrying an intercalary month, so Calendrical resolves the traditional month
+  # to a Gregorian date; that is converted back into the source calendar (ordinal
+  # months) and returned in-calendar (`[u-ca=chinese]`, `[u-ca=dangi]`).
+  #
+  # date-holidays attributes a lunar date to the Gregorian year it *falls in*, so
+  # a late lunar month (Ông Táo, the 12th month) belongs to the Gregorian year
+  # after its lunar new year. The candidate is therefore taken from each
+  # neighbouring lunar year and filtered to the target Gregorian year — the same
+  # convention `dates_in_gregorian_year/3` gives the Islamic and Hebrew tiers.
   defp materialise_base(
          %__MODULE__{kind: :lunisolar, calendar: calendar} = rule,
          %Tempo{} = year
        ) do
+    target = Tempo.year(year)
     lunar_month = if rule.leap_month, do: {rule.month, :leap}, else: rule.month
 
-    Tempo.year(year)
-    |> calendar.gregorian_date_for_lunar(lunar_month, rule.day)
-    |> lunisolar_interval(calendar, rule.count)
+    rule
+    |> lunisolar_anchor_years(target)
+    |> Enum.map(&calendar.gregorian_date_for_lunar(&1, lunar_month, rule.day))
+    |> Enum.filter(&(&1.year == target))
+    |> Enum.uniq()
+    |> reduce_ok(&converted_interval(offset_date(&1, rule.offset), calendar, rule.count))
   end
 
   # A Chinese solar term — `chinese <term>-<day> solarterm`. The term index maps
@@ -554,10 +803,49 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # One lunisolar occurrence: `gregorian_date_for_lunar/3` gives the Gregorian
-  # date, which is converted into the source calendar (ordinal months) and
-  # returned in-calendar, spanning `count` days.
-  defp lunisolar_interval(%Date{} = gregorian, calendar, count) do
+  # A non-leap rule's integer month is valid in every lunar year, so its
+  # candidate is taken from the previous, current and next lunar year and
+  # filtered by Gregorian year. A leap-month rule names a month that exists only
+  # in specific years, so it stays anchored to the target year to avoid asking a
+  # neighbour for a month it does not have.
+  defp lunisolar_anchor_years(%__MODULE__{leap_month: true}, target), do: [target]
+  defp lunisolar_anchor_years(%__MODULE__{}, target), do: [target - 1, target, target + 1]
+
+  # The Gregorian first-of-month dates for every Hijri year whose given month
+  # could place an occurrence in the target Gregorian year — the two or three
+  # Hijri years spanning it, so a lunar date that falls in it twice is still
+  # found. Anchoring on the always-valid first day lets a day beyond the month's
+  # length count forward into the next month (see the `:islamic` clause).
+  defp islamic_month_starts(calendar, target, month) do
+    with {:ok, first_civil} <- Date.new(target, 1, 1),
+         {:ok, last_civil} <- Date.new(target, 12, 31),
+         {:ok, low} <- Date.convert(first_civil, calendar),
+         {:ok, high} <- Date.convert(last_civil, calendar) do
+      Enum.flat_map((low.year - 1)..(high.year + 1), &month_start(calendar, &1, month))
+    else
+      _ -> []
+    end
+  end
+
+  defp month_start(calendar, hijri_year, month) do
+    case calendar.first_day_of_month(hijri_year, month) do
+      {:ok, %Date{} = date} -> [date]
+      _ -> []
+    end
+  end
+
+  # A `<n> day[s] before/after` prefix (Vietnam's Tết eve) shifts the computed
+  # Gregorian date; no offset leaves it untouched.
+  defp offset_date(%Date{} = date, nil), do: date
+  defp offset_date(%Date{} = date, offset), do: Date.add(date, offset)
+
+  # A Gregorian occurrence converted into the source calendar (ordinal months)
+  # and returned in-calendar, spanning `count` days. Shared by the lunisolar
+  # tiers (whose `gregorian_date_for_lunar/3` yields a Gregorian date) and the
+  # Islamic tier (whose anchored first-of-month-plus-offset does too); the
+  # rolled-over Islamic day converts to its true in-calendar value (a `30 Safar`
+  # in a 29-day Safar becomes `1 Rabi al-awwal`).
+  defp converted_interval(%Date{} = gregorian, calendar, count) do
     tag = calendar_tag(calendar)
 
     with {:ok, in_calendar} <- Date.convert(gregorian, calendar),
@@ -566,7 +854,7 @@ defmodule Tempo.Holidays.Rule do
              "#{in_calendar.year}Y#{in_calendar.month}M#{in_calendar.day}D[u-ca=#{tag}]"
            ),
          {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
-      {:ok, [span_days(interval, base, count)]}
+      {:ok, span_days(interval, base, count)}
     end
   end
 

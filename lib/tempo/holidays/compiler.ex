@@ -23,11 +23,12 @@ defmodule Tempo.Holidays.Compiler do
     Christmas), a fixed date in the Julian calendar, converted to Gregorian.
 
   * **Lunisolar** — Chinese `"chinese <month>-<leap>-<day>"` (`"chinese
-    01-0-01"` is Chinese New Year) and Korean `"korean <month>-<leap>-<day>"`
-    (`"korean 01-0-01"` is Seollal), returned in that calendar; plus the Chinese
-    solar term `"chinese <term>-<day> solarterm"` (`"chinese 5-01 solarterm"` is
-    Qingming), the day the sun reaches the term's longitude in China Standard
-    Time.
+    01-0-01"` is Chinese New Year), Korean `"korean <month>-<leap>-<day>"`
+    (`"korean 01-0-01"` is Seollal) and Vietnamese `"vietnamese
+    <month>-<leap>-<day>"` (`"vietnamese 1-0-1"` is Tết), returned in that
+    calendar; plus the Chinese solar term `"chinese <term>-<day> solarterm"`
+    (`"chinese 5-01 solarterm"` is Qingming), the day the sun reaches the term's
+    longitude in China Standard Time.
 
   * **Equinox / solstice** — `"march equinox in +09:00"` (Japan's Vernal
     Equinox Day), `"december solstice"`, with an optional `"<n> days
@@ -83,6 +84,16 @@ defmodule Tempo.Holidays.Compiler do
     "october" => 10,
     "november" => 11,
     "december" => 12
+  }
+
+  # date-holidays' holiday-type vocabulary (`_type` in the grammar), the type a
+  # bridge / if-holiday condition matches against. Absent means `:public`.
+  @types %{
+    "public" => :public,
+    "bank" => :bank,
+    "school" => :school,
+    "observance" => :observance,
+    "optional" => :optional
   }
 
   # Islamic (Hijri) month numbers, spelled as date-holidays writes them.
@@ -195,11 +206,12 @@ defmodule Tempo.Holidays.Compiler do
     {without_conditions, conditions} =
       rule |> strip_time() |> strip_index() |> extract_year_conditions()
 
-    {base, substitute} = extract_substitution(without_conditions)
+    {without_if_holiday, conditional} = extract_if_holiday(without_conditions)
+    {base, substitute} = extract_substitution(without_if_holiday)
 
     case compile_base(base) do
       {:ok, compiled} ->
-        {:ok, apply_conditions(compiled, conditions, substitute, rule)}
+        {:ok, apply_conditions(compiled, conditions, substitute, conditional, rule)}
 
       nil ->
         {:error, {:unsupported, rule}}
@@ -214,6 +226,7 @@ defmodule Tempo.Holidays.Compiler do
   # (conditions and substitution already stripped) wins, else `nil`.
   defp compile_base(base) do
     [
+      &compile_bridge/1,
       &compile_specific_date/1,
       &compile_fixed/1,
       &compile_weekday/1,
@@ -222,6 +235,7 @@ defmodule Tempo.Holidays.Compiler do
       &compile_relative_weekday/1,
       &compile_julian/1,
       &compile_lunisolar/1,
+      &compile_day_offset/1,
       &compile_chinese_solar/1,
       &compile_solar_event/1,
       &compile_calendar/1,
@@ -252,9 +266,61 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
+  # A *bridge* day (`09-22 if 09-21 and 09-23 is public holiday`): a fixed date
+  # kept only when every named date is itself a holiday of the type that year —
+  # date-holidays' `PostRule.bridge`. The condition dates are carried as
+  # `{month, day}` pairs on a `:bridge` conditional, resolved in the second pass
+  # against the year's holiday set.
+  @bridge_pattern ~r/^\s*(?:0*\d{1,4}-)?0?(?<month>\d{1,2})-0?(?<day>\d{1,2})\s+if\s+(?<on>.+?)\s+is\s+(?:(?<type>public|bank|school|observance|optional)\s+)?holiday\s*$/i
+
+  defp compile_bridge(rule) do
+    case Regex.named_captures(@bridge_pattern, rule) do
+      %{"month" => month, "day" => day, "on" => on, "type" => type} ->
+        compile_bridge(rule, month, day, on, type)
+
+      nil ->
+        nil
+    end
+  end
+
+  defp compile_bridge(rule, month, day, on, type) do
+    case parse_on_dates(on) do
+      [] ->
+        nil
+
+      dates ->
+        {:ok,
+         %Rule{
+           kind: :fixed,
+           month: String.to_integer(month),
+           day: String.to_integer(day),
+           conditional: %{kind: :bridge, type: holiday_type(type), on: dates},
+           source: rule
+         }}
+    end
+  end
+
+  # The `if <date> and <date> …` condition dates of a bridge, each `MM-DD` (an
+  # optional year is ignored — the conditions are checked within the same year).
+  defp parse_on_dates(string) do
+    string
+    |> String.split(~r/\s+and\s+/i)
+    |> Enum.map(&parse_on_date/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp parse_on_date(string) do
+    case Regex.run(~r/(?:0*\d{1,4}-)?0?(\d{1,2})-0?(\d{1,2})/, String.trim(string)) do
+      [_, month, day] -> {String.to_integer(month), String.to_integer(day)}
+      _ -> nil
+    end
+  end
+
   # Carry the year conditions onto the compiled rule. A tier that set its own
-  # window (a specific date) keeps it when the rule named no `since`/`until`.
-  defp apply_conditions(compiled, conditions, substitute, rule) do
+  # window (a specific date) keeps it when the rule named no `since`/`until`;
+  # an `if is … holiday then …` conditional stripped ahead of the base takes
+  # precedence over a `:bridge` conditional a tier (`compile_bridge/1`) set.
+  defp apply_conditions(compiled, conditions, substitute, conditional, rule) do
     %{
       compiled
       | substitute: substitute,
@@ -265,6 +331,7 @@ defmodule Tempo.Holidays.Compiler do
         leap: conditions.leap,
         every_years: conditions.every_years,
         weekday_gate: conditions.weekday_gate,
+        conditional: conditional || compiled.conditional,
         source: rule
     }
   end
@@ -588,9 +655,15 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
-  # date-holidays writes its two lunisolar calendars — Chinese (`chinese …`) and
-  # Korean (`korean …`) — with the same shape, so they share a compiler tier.
-  @lunisolar_calendars %{"chinese" => Calendrical.Chinese, "korean" => Calendrical.Korean}
+  # date-holidays writes its lunisolar calendars — Chinese (`chinese …`), Korean
+  # (`korean …`) and Vietnamese (`vietnamese …`) — with the same shape, so they
+  # share a compiler tier. Vietnamese is the Chinese system at the UTC+7 meridian
+  # (`Calendrical.Vietnamese`), so Tết can land a day off Chinese New Year.
+  @lunisolar_calendars %{
+    "chinese" => Calendrical.Chinese,
+    "korean" => Calendrical.Korean,
+    "vietnamese" => Calendrical.Vietnamese
+  }
 
   # ── lunisolar: "chinese|korean <month>-<leap>-<day>" ────────────────
   #
@@ -601,7 +674,7 @@ defmodule Tempo.Holidays.Compiler do
   # not accepted.
   defp compile_lunisolar(rule) do
     case Regex.run(
-           ~r/^\s*(chinese|korean)\s+(\d{1,2})-([01])-(\d{1,2})(?:\s+P(\d+)D)?\s*$/i,
+           ~r/^\s*(chinese|korean|vietnamese)\s+(\d{1,2})-([01])-(\d{1,2})(?:\s+P(\d+)D)?\s*$/i,
            rule
          ) do
       [_, system, month, leap, day | rest] ->
@@ -620,6 +693,33 @@ defmodule Tempo.Holidays.Compiler do
         nil
     end
   end
+
+  # ── day-offset before/after a lunisolar date ────────────────────────
+  #
+  # `<n> day[s] (before|after) <lunisolar rule> [P<n>D]` — Vietnam's Tết eve
+  # (`1 day before vietnamese 1-0-1 P5D`) starts the day before Tết and runs
+  # five days. The offset shifts the computed Gregorian date; the span carries
+  # into `count`. Only a lunisolar base takes an offset (no other rule uses this
+  # form), so a non-lunisolar base falls through to the other tiers.
+  defp compile_day_offset(rule) do
+    case Regex.run(~r/^\s*(\d+)\s+days?\s+(before|after)\s+(.+?)(?:\s+P(\d+)D)?\s*$/i, rule) do
+      [_, count, direction, base | rest] ->
+        offset = offset_sign(String.downcase(direction)) * String.to_integer(count)
+        wrap_day_offset(compile_base(base), offset, List.first(rest), rule)
+
+      nil ->
+        nil
+    end
+  end
+
+  defp offset_sign("before"), do: -1
+  defp offset_sign("after"), do: 1
+
+  defp wrap_day_offset({:ok, %Rule{kind: :lunisolar} = compiled}, offset, span, rule) do
+    {:ok, %{compiled | offset: offset, count: parse_span(span), source: rule}}
+  end
+
+  defp wrap_day_offset(_compiled, _offset, _span, _rule), do: nil
 
   # ── chinese solar term: "chinese <term>-<day> solarterm" ────────────
   #
@@ -809,8 +909,66 @@ defmodule Tempo.Holidays.Compiler do
     end
   end
 
+  # `if is <type>? holiday then <count>? <direction> <weekday|day> omit <days>?`
+  # — date-holidays' `ruleIfHoliday`: when the base date coincides with another
+  # holiday of the type, move it (`dateDir`). The move is stripped from the base
+  # and carried as an `:if_holiday` conditional resolved in the second pass.
+  @weekday_alt_days "#{@weekday_alt}|day"
+  @if_holiday_pattern ~r/\bif\s+is\s+(?:(public|bank|school|observance|optional)\s+)?holiday\s+then\s+(?:(\d+)(?:st|nd|rd|th)?\s+)?(before|after|next|previous|in)\s+(#{@weekday_alt_days})s?(?:\s+omit\s+((?:#{@weekday_alt_days})(?:\s*,\s*(?:#{@weekday_alt_days}))*))?/i
+
+  defp extract_if_holiday(rule) do
+    case Regex.run(@if_holiday_pattern, rule) do
+      [match, type, count, direction, weekday | rest] ->
+        conditional = %{
+          kind: :if_holiday,
+          type: holiday_type(type),
+          move: %{
+            count: parse_count(count),
+            direction: move_direction(String.downcase(direction)),
+            target: move_target(String.downcase(weekday)),
+            omit: parse_omit(List.first(rest))
+          }
+        }
+
+        {rule |> String.replace(match, "") |> String.trim(), conditional}
+
+      nil ->
+        {rule, nil}
+    end
+  end
+
+  defp parse_count(""), do: 1
+  defp parse_count(count), do: String.to_integer(count)
+
+  defp move_target("day"), do: :day
+  defp move_target(weekday), do: Map.fetch!(@weekdays, weekday)
+
+  # An `omit` list of weekdays, taken verbatim as the days a `:day`-target move
+  # steps over; a missing list is none.
+  defp parse_omit(nil), do: []
+  defp parse_omit(""), do: []
+
+  defp parse_omit(days) do
+    days
+    |> String.split(",")
+    |> Enum.map(&(&1 |> String.trim() |> then(fn day -> Map.get(@weekdays, day) end)))
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp holiday_type(type) when type in [nil, ""], do: :public
+  defp holiday_type(type), do: Map.get(@types, String.downcase(type), :public)
+
   defp direction_atom("next"), do: :next
   defp direction_atom("previous"), do: :previous
+
+  # A move's direction spans the full `_direction` vocabulary; only `next`
+  # applies the "already on the target weekday" step, so the four are kept
+  # distinct (see `Tempo.Holidays.Rule` `dateDir`).
+  defp move_direction("next"), do: :next
+  defp move_direction("after"), do: :after
+  defp move_direction("before"), do: :before
+  defp move_direction("in"), do: :after
+  defp move_direction("previous"), do: :previous
 
   defp parse_weekday_set(triggers) do
     case String.downcase(triggers) do

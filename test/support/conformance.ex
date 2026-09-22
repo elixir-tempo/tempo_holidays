@@ -73,6 +73,7 @@ defmodule Tempo.Holidays.Conformance do
 
     base = %{
       all_dates: all_dates,
+      holidays: holidays,
       year_tempo: year_tempo,
       territory: territory,
       year: year,
@@ -90,13 +91,49 @@ defmodule Tempo.Holidays.Conformance do
 
   defp check_rule(rule, expected, base, acc) do
     acc = %{acc | rules: acc.rules + 1}
-    context = Map.merge(base, %{rule: rule, expected: expected})
+    context = Map.merge(base, %{rule: rule, expected: expected, present: present_fun(base, rule)})
 
     case Compiler.compile(rule) do
       {:ok, compiled} -> check_materialised(attach_gates(compiled, context.gates), context, acc)
       {:error, _} -> bump(acc, :unsupported, feature(rule))
     end
   end
+
+  # A `(gregorian_days, type) -> boolean()` for the conditional second pass,
+  # built from date-holidays' own output: the fixture's other entries, of the
+  # right type, on that day. The rule under test is excluded by identity —
+  # exactly as `PostRule` skips the rule it is resolving — so an if-holiday day
+  # never coincides with itself.
+  defp present_fun(%{holidays: holidays}, current_rule) do
+    date_types =
+      holidays
+      |> Enum.reject(&(&1.rule == current_rule))
+      |> Enum.reduce(MapSet.new(), fn holiday, set ->
+        case fixture_days(holiday.date) do
+          nil -> set
+          days -> MapSet.put(set, {days, fixture_type(holiday.type)})
+        end
+      end)
+
+    fn days, type -> MapSet.member?(date_types, {days, type}) end
+  end
+
+  defp fixture_days(date) do
+    case Date.from_iso8601(date) do
+      {:ok, date} -> Date.to_gregorian_days(date)
+      {:error, _} -> nil
+    end
+  end
+
+  @fixture_types %{
+    "public" => :public,
+    "bank" => :bank,
+    "school" => :school,
+    "observance" => :observance,
+    "optional" => :optional
+  }
+
+  defp fixture_type(type), do: Map.get(@fixture_types, type, :public)
 
   # Copy the built rule's occurrence-level gates onto the freshly compiled
   # rule; a source the built data does not carry leaves the rule ungated,
@@ -114,7 +151,7 @@ defmodule Tempo.Holidays.Conformance do
   defp check_materialised(compiled, context, acc) do
     case Rule.materialise(compiled, context.year_tempo) do
       {:ok, intervals} ->
-        ours = intervals |> Enum.map(&gregorian/1) |> MapSet.new()
+        ours = compiled |> resolve_if_conditional(intervals, context) |> to_date_set()
 
         if MapSet.subset?(context.expected, ours) and MapSet.subset?(ours, context.all_dates) do
           %{acc | matched: acc.matched + 1}
@@ -126,6 +163,22 @@ defmodule Tempo.Holidays.Conformance do
         record(acc, context, %{error: :materialise})
     end
   end
+
+  # A bridge / if-holiday rule's base occurrences are resolved against the
+  # year's holidays (`context.present`) in the second pass, mirroring
+  # `Tempo.Holidays.materialise/2`; every other rule stands as materialised.
+  defp resolve_if_conditional(compiled, intervals, context) do
+    if Rule.conditional?(compiled) do
+      case Rule.resolve_conditional(compiled, intervals, context.year_tempo, context.present) do
+        {:ok, resolved} -> resolved
+        {:error, _} -> intervals
+      end
+    else
+      intervals
+    end
+  end
+
+  defp to_date_set(intervals), do: intervals |> Enum.map(&gregorian/1) |> MapSet.new()
 
   defp record(acc, context, detail) do
     feature = feature(context.rule)

@@ -7,19 +7,25 @@ at over 99% matched, and the gaps below are what remains.
 
 ## Open
 
-* [ ] **Inter-holiday / bridge-day rules** — the last conformance gap: 5 distinct rules across ~8 fixture entries. Two forms, both defined in `date-holidays-parser`'s `PostRule` (`bridge` / `ruleIfHoliday`): (a) `09-22 if 09-21 and 09-23 is public holiday` — a date is a holiday only if the referenced dates are holidays of the type; (b) `<rule> if is (type)? holiday then (count)? (next|previous) <weekday|day> (omit …)?` (Switzerland-GL, Norfolk) — if the computed date coincides with a holiday of the type, apply the move. Both need a **country-level second pass** over the other holidays — in `Tempo.Holidays.materialise` for the public API, and (to be measured) in the per-rule conformance harness too. Low ROI, well understood; awaiting a go-ahead.
+* [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
+
+* [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: territory-local anchoring (derive a territory's zone/location from the locale) as a follow-up to the current canonical/explicit anchors.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
 
 ## Blocked
 
-* [ ] **Vietnamese (`vietnamese <month>-<leap>-<day>`) lunisolar dates** — Vietnamese lunar (Tet et al., ~10 rules) is Chinese-lunisolar at the UTC+7 meridian; there is no `Calendrical.Vietnamese`. The machinery exists (`Calendrical.Lunisolar.gregorian_date_for_lunar/5` takes a location), so this is an upstream addition to Calendrical, not a Tempo helper (rule 9). Analysis in [plans/vietnamese-calendar.md](plans/vietnamese-calendar.md).
-
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream.
 
-* [ ] **Islamic residual (~19 mismatches)** — three sub-cases: (a) day-**overflow** (`30 Safar` in a 29-day month) — date-holidays rolls it into the next month (`first_day_of_month + (day-1)`), which Calendrical's `dates_in_gregorian_year` rejects; (b) off-by-one **type A** (`3 Jumada 1446`) — date-holidays matches Calendrical's **astronomical** UmmAlQura (`.Astronomical.first_day_of_month`), not the tabular default this lib uses; (c) off-by-one **type B** (`12 Rabi 1437`) — both Calendrical variants say 12-23, date-holidays says 12-24, a table disagreement. (a) and (b) need a Calendrical-side path (astronomical `dates_in_gregorian_year` with overflow rollover); analysis carries the reproducers. Also the lunar-twice-in-a-Gregorian-year attribution differs.
-
 ## Done
+
+* [x] **Day-start projection (`:day_start`)** — `materialise/3` projects a sunset-starting-calendar holiday (Islamic, Hebrew) onto the Gregorian timeline as a datetime interval that begins the evening before: `:evening` (18:00 proxy) or `:sunset` (true, via Astro), at the calendar's canonical reference (Mecca/Jerusalem) or an explicit zone-id / `{lng, lat}` location (`tz_world`-resolved, optional dep). `:midnight` (default) keeps the in-calendar day. New `Tempo.Holidays.DayStart`. 2026-09-22.
+
+* [x] **Islamic day-count rollover** — the `:islamic` tier anchors on `first_day_of_month + (day-1)`, so a day beyond the month's length (`30 Ramadan` in a 29-day Ramadan → Eid, `30 Safar` → 1 Rabi) rolls into the next month and is labelled with its true in-calendar date instead of being dropped. The ~18 remaining off-by-one cases (date-holidays' embedded Hijri table vs Calendrical's Umm al-Qura) stay accepted `divergent` — Calendrical is authoritative. 2026-09-22.
+
+* [x] **Vietnamese lunisolar** — `vietnamese <month>-<leap>-<day>` via `Calendrical.Vietnamese` (UTC+7 meridian, `[u-ca=chinese]` type). A lunisolar date is attributed to the Gregorian year it falls in (fixes Ông Táo, the 12th month), and a `<n> day[s] before/after <base> [P<n>D]` prefix carries Tết's eve. VN: 405/405 conform. 2026-09-22. [plans/vietnamese-calendar.md](plans/vietnamese-calendar.md)
+
+* [x] **Inter-holiday / bridge-day rules** — the two `date-holidays-parser` `PostRule` forms, resolved in a country-level second pass: a *bridge* (`09-22 if 09-21 and 09-23 is public holiday`, Japan's Citizens' Holiday — kept only when the flanking dates are holidays of the type) and an `if is <type>? holiday then <count>? <dir> <weekday|day> omit …` move (CH-GL, NF, NZ-OTA — the `dateDir` offset mirrored in JS weekday indices). `Rule.conditional?/1` + `resolve_conditional/4`; `Holidays.materialise/2` and the conformance harness both tally the year's `{gregorian_days, type}` set (self excluded) and resolve against it. CH/JP/NF/NZ: 0 mismatches (11,570/11,570). 2026-09-22.
 
 * [x] **Territory inheritance (`_days`)** — a territory inheriting another's holidays (JE/GG/IM ← GB, the French overseas ← FR, 22 in all) now carries the full inherited set plus its own, own entries overriding by rule and `false` removing an inherited one (`Build.resolve_days/2`, mirroring `Data._assign`). Also fixed the conformance harness's 3-part territory split (`BR-SP-SP`) and the Nth-weekday-in-month overflow (`5th monday in October` → 1 Nov) and date-precise `since`/`prior to YYYY-MM-DD` gating (Norfolk). 2026-09-22.
 

@@ -76,9 +76,20 @@ defmodule Tempo.Holidays.MixProject do
       main: "readme",
       source_ref: "v#{@version}",
       formatters: ["html", "markdown"],
-      extras: ["README.md", "CHANGELOG.md"],
+      extras: [
+        "README.md",
+        "guides/user-guide.md",
+        "guides/conformance.md",
+        "CHANGELOG.md"
+      ],
       groups_for_modules: [
-        Holidays: [Tempo.Holidays.Data, Tempo.Holidays.Holiday, Tempo.Holidays.Rule],
+        Holidays: [
+          Tempo.Holidays.Data,
+          Tempo.Holidays.DayStart,
+          Tempo.Holidays.Holiday,
+          Tempo.Holidays.Locale,
+          Tempo.Holidays.Rule
+        ],
         "date-holidays": [Tempo.Holidays.Compiler, Tempo.Holidays.DateHolidays],
         Internals: [Tempo.Holidays.Build]
       ]
@@ -93,11 +104,16 @@ defmodule Tempo.Holidays.MixProject do
       # unreleased as of 1.3.0. `override` because ex_tempo/localize pull the
       # hex calendrical as a child. Becomes {:calendrical, "~> 1.4"} before publish.
       {:calendrical, path: "../../localize/calendrical", override: true},
-      {:astro, "~> 2.5"},
+      {:astro, "~> 2.6"},
       # Equinox/solstice holidays computed for a named IANA timezone (Chile's
       # solstice `in America/Santiago`) need a time-zone database; numeric
       # offsets and GMT do not. Tz is the one Astro and Calendrical already use.
       {:tz, "~> 0.28"},
+      # Optional: resolves a `{lng, lat}` location to an IANA zone for the
+      # `day_start: :evening` projection. A zone id needs no resolver, and
+      # `:sunset` returns a UTC instant, so tz_world is only pulled in when a
+      # caller projects an evening day-start from a location.
+      {:tz_world, "~> 2.3", optional: true},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
       {:localize, "~> 1.3"},

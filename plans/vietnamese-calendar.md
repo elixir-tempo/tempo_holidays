@@ -1,6 +1,6 @@
 # Vietnamese lunisolar calendar
 
-**Status:** planning, 2026-09-22
+**Status:** implemented (v0.1.0), 2026-09-22
 
 date-holidays expresses Vietnamese holidays (Tết Nguyên Đán and the rest, ~10
 distinct rules for `VN`) with a `vietnamese <month>-<leap>-<day>` rule in the

@@ -13,10 +13,36 @@ defmodule Tempo.HolidaysTest do
     for {holiday, interval} <- holidays, holiday.name == name, do: Tempo.Interval.from(interval)
   end
 
+  # The single interval a one-holiday list materialises to that year, under a
+  # `day_start` projection.
+  defp single_interval(holidays, year, day_start) do
+    {:ok, [{_holiday, interval}]} = Holidays.materialise(holidays, year, day_start: day_start)
+    interval
+  end
+
+  defp holiday_list(rule_string, name) do
+    {:ok, rule} = Compiler.compile(rule_string)
+    [%Holiday{name: name, type: :public, rule: rule}]
+  end
+
+  # The Gregorian ISO dates a rule materialises to that year — useful for a
+  # calendar (Vietnamese) whose in-calendar value carries a shared CLDR tag.
+  defp gregorian_dates(rule_string, year) do
+    {:ok, rule} = Compiler.compile(rule_string)
+    {:ok, intervals} = Rule.materialise(rule, year)
+
+    Enum.map(intervals, fn interval ->
+      {:ok, date} = Tempo.to_date(Tempo.Interval.from(interval))
+      {:ok, iso} = Date.convert(date, Calendar.ISO)
+      Date.to_iso8601(iso)
+    end)
+  end
+
   doctest Tempo.Holidays
   doctest Tempo.Holidays.Data
   doctest Tempo.Holidays.Compiler
   doctest Tempo.Holidays.Rule
+  doctest Tempo.Holidays.DayStart
 
   describe "recurrences/1" do
     test "returns the AU holidays as recurrences" do
@@ -508,10 +534,236 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
+  describe "day_start projection (a day is just a day until projected)" do
+    test "the default :midnight leaves the in-calendar day untouched" do
+      eid = holiday_list("1 Shawwal", "Eid al-Fitr")
+      interval = single_interval(eid, ~o"2025", :midnight)
+
+      assert Tempo.Interval.from(interval) == ~o"1446Y10M1D[u-ca=islamic-umalqura]"
+      # identical to passing no option at all
+      {:ok, [{_holiday, plain}]} = Holidays.materialise(eid, ~o"2025")
+      assert plain == interval
+    end
+
+    test "a zone-anchored evening begins at 18:00 the evening before" do
+      # 1 Shawwal 1446 is 30 March 2025; its evening begins 18:00 the 29th.
+      interval =
+        single_interval(
+          holiday_list("1 Shawwal", "Eid al-Fitr"),
+          ~o"2025",
+          {:evening, "Asia/Riyadh"}
+        )
+
+      # An exact structural comparison — no configured zone database needed to
+      # read the named-zone value back.
+      {:ok, expected} =
+        DateTime.new(~D[2025-03-29], ~T[18:00:00], "Asia/Riyadh", Tz.TimeZoneDatabase)
+
+      assert Tempo.Interval.from(interval) == Tempo.from_elixir(expected)
+    end
+
+    test "a canonical sunset projects to a datetime interval, sunset to sunset" do
+      interval = single_interval(holiday_list("1 Shawwal", "Eid al-Fitr"), ~o"2025", :sunset)
+
+      assert {:ok, from} = Tempo.to_elixir(Tempo.Interval.from(interval))
+      assert {:ok, to} = Tempo.to_elixir(Tempo.Interval.to(interval))
+      # sunset the evening before 1 Shawwal, through sunset the evening before 2 Shawwal
+      assert DateTime.to_date(from) == ~D[2025-03-29]
+      assert DateTime.to_date(to) == ~D[2025-03-30]
+      assert from.time_zone == "Etc/UTC"
+    end
+
+    test "a location-anchored sunset resolves from coordinates alone (no tz_world)" do
+      interval =
+        single_interval(
+          holiday_list("1 Shawwal", "Eid al-Fitr"),
+          ~o"2025",
+          {:sunset, {101.6869, 3.139}}
+        )
+
+      assert %Tempo.Interval{} = interval
+      assert {:ok, from} = Tempo.to_elixir(Tempo.Interval.from(interval))
+      assert DateTime.to_date(from) == ~D[2025-03-29]
+    end
+
+    test "an evening from a location falls back to the day when tz_world is unavailable" do
+      # No tz_world backend runs in the suite, so the location's zone cannot be
+      # resolved and the occurrence stays the in-calendar day rather than crashing.
+      interval =
+        single_interval(
+          holiday_list("1 Shawwal", "Eid al-Fitr"),
+          ~o"2025",
+          {:evening, {101.6869, 3.139}}
+        )
+
+      assert Tempo.Interval.from(interval) == ~o"1446Y10M1D[u-ca=islamic-umalqura]"
+    end
+
+    test "a Gregorian-calendar holiday is untouched by day_start" do
+      # Christmas is a civil-calendar day; sunset projection applies only to the
+      # sunset-starting calendars (Islamic, Hebrew).
+      interval = single_interval(holiday_list("12-25", "Christmas"), ~o"2025", :sunset)
+
+      assert Tempo.Interval.from(interval) == ~o"2025Y12M25D"
+    end
+  end
+
+  describe "Islamic day-count rollover (date-holidays encoding)" do
+    test "a 30th day in a 29-day month rolls into the next month, labelled truly" do
+      # date-holidays encodes Saudi Eid al-Fitr as "30 Ramadan P4D". When Ramadan
+      # has 29 days (1436), the 30th day counting from its start is 1 Shawwal —
+      # Eid itself — so the occurrence is labelled 1 Shawwal, not a fictional
+      # "30 Ramadan", and it is no longer dropped.
+      {:ok, rule} = Compiler.compile("30 Ramadan P4D")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2015")
+      assert Tempo.Interval.from(interval) == ~o"1436Y10M1D[u-ca=islamic-umalqura]"
+      assert gregorian_dates("30 Ramadan P4D", ~o"2015") == ["2015-07-17"]
+    end
+
+    test "30 Safar in a 29-day Safar rolls to 1 Rabi al-awwal" do
+      # Iran encodes an end-of-Safar observance as "30 Safar"; Safar 1437 has 29
+      # days, so it rolls to 1 Rabi al-awwal.
+      {:ok, rule} = Compiler.compile("30 Safar")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2015")
+      assert Tempo.Interval.from(interval) == ~o"1437Y3M1D[u-ca=islamic-umalqura]"
+      assert gregorian_dates("30 Safar", ~o"2015") == ["2015-12-12"]
+    end
+
+    test "a valid day is unaffected — 1 Muharram is unchanged" do
+      # The rollover path only moves out-of-range days; a valid day resolves
+      # exactly as the direct in-calendar mapping did.
+      {:ok, rule} = Compiler.compile("1 Muharram")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(interval) == ~o"1447Y1M1D[u-ca=islamic-umalqura]"
+    end
+  end
+
+  describe "Vietnamese lunisolar holidays" do
+    test "Tết is the first day of the first lunar month" do
+      # Vietnamese New Year 2025 is 29 January (a day before Chinese New Year's
+      # 29th too, but the meridian can split them in other years).
+      assert gregorian_dates("vietnamese 1-0-1", ~o"2025") == ["2025-01-29"]
+    end
+
+    test "a 12th-month holiday falls in the Gregorian year it lands in" do
+      # Ông Táo (Kitchen Guardians, the 23rd of the 12th lunar month) belongs to
+      # the Gregorian year it falls in — 22 January 2025, before Tết — not the
+      # 12th month of the lunar year that begins in 2025.
+      assert gregorian_dates("vietnamese 12-0-23", ~o"2025") == ["2025-01-22"]
+
+      # Re-projects: a year later it is 10 February 2026.
+      assert gregorian_dates("vietnamese 12-0-23", ~o"2026") == ["2026-02-10"]
+    end
+
+    test "a day-offset span starts before its anchor (Tết eve)" do
+      # "1 day before vietnamese 1-0-1 P5D" is Tết eve, five days from the 28th.
+      {:ok, rule} = Compiler.compile("1 day before vietnamese 1-0-1 P5D")
+
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert gregorian_dates("1 day before vietnamese 1-0-1 P5D", ~o"2025") == ["2025-01-28"]
+
+      # The span runs five days — 28 January through 2 February (exclusive).
+      {:ok, to} = Tempo.to_date(Tempo.Interval.to(interval))
+      {:ok, to_iso} = Date.convert(to, Calendar.ISO)
+      assert Date.to_iso8601(to_iso) == "2025-02-02"
+    end
+  end
+
+  describe "inter-holiday conditionals (bridge / if-holiday)" do
+    test "a bridge compiles to a :bridge conditional carrying its condition dates" do
+      {:ok, rule} = Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
+
+      assert rule.kind == :fixed
+      assert {rule.month, rule.day} == {9, 22}
+      assert rule.conditional == %{kind: :bridge, type: :public, on: [{9, 21}, {9, 23}]}
+      assert Rule.conditional?(rule)
+    end
+
+    test "a bridge is kept only when every condition date is a holiday of the type" do
+      {:ok, rule} = Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
+      {:ok, base} = Rule.materialise(rule, ~o"2026")
+
+      # Both flanks present — the day stays.
+      assert {:ok, [kept]} =
+               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> true end)
+
+      assert Tempo.Interval.from(kept) == ~o"2026Y9M22D"
+
+      # A missing flank — the day is dropped.
+      assert {:ok, []} =
+               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> false end)
+    end
+
+    test "Japan's Citizens' Holiday bridges 22 September only when 21 and 23 are holidays" do
+      # 2026: Respect-for-the-Aged Day (the 21st, 3rd Monday) and the Autumnal
+      # Equinox (the 23rd) flank the 22nd, so the Citizens' Holiday falls between
+      # them — date-holidays' bridge.
+      {:ok, holidays_2026} = Holidays.materialise(:JP, ~o"2026")
+      assert ~o"2026Y9M22D" in dates_of(holidays_2026, "Citizens' Holiday")
+
+      # 2025: Respect-for-the-Aged Day is the 15th, so the 22nd is not flanked
+      # and the bridge does not occur.
+      {:ok, holidays_2025} = Holidays.materialise(:JP, ~o"2025")
+      assert dates_of(holidays_2025, "Citizens' Holiday") == []
+    end
+
+    test "an if-holiday move is extracted alongside earlier substitution clauses" do
+      {:ok, rule} =
+        Compiler.compile(
+          "03-23 if Tuesday,Wednesday,Thursday then previous Monday if Friday,Saturday,Sunday then next Monday if is public holiday then next Monday"
+        )
+
+      # The two weekday-substitution clauses and the if-holiday move are each
+      # extracted independently — the base is the bare fixed date.
+      assert {rule.kind, rule.month, rule.day} == {:fixed, 3, 23}
+
+      assert rule.substitute == [
+               {[2, 3, 4], :previous, 1, :shift},
+               {[5, 6, 7], :next, 1, :shift}
+             ]
+
+      assert rule.conditional ==
+               %{
+                 kind: :if_holiday,
+                 type: :public,
+                 move: %{count: 1, direction: :next, target: 1, omit: []}
+               }
+    end
+
+    test "an if-holiday occurrence moves when it coincides and stays when it does not" do
+      # A fixed 15 June (a Monday in 2026) with a "next monday" if-holiday move.
+      {:ok, rule} = Compiler.compile("06-15 if is public holiday then next monday")
+      {:ok, base} = Rule.materialise(rule, ~o"2026")
+      assert Tempo.Interval.from(hd(base)) == ~o"2026Y6M15D"
+
+      # Coincides with another public holiday — a Monday moving to "next monday"
+      # steps a whole week, to the 22nd.
+      assert {:ok, [moved]} =
+               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> true end)
+
+      assert Tempo.Interval.from(moved) == ~o"2026Y6M22D"
+
+      # No coincidence — the date is unchanged.
+      assert {:ok, [same]} =
+               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> false end)
+
+      assert Tempo.Interval.from(same) == ~o"2026Y6M15D"
+    end
+
+    test "a plain rule carries no conditional" do
+      {:ok, plain} = Compiler.compile("12-25")
+      refute Rule.conditional?(plain)
+      assert plain.conditional == nil
+    end
+  end
+
   describe "locale and state resolution" do
     test "a locale with a subdivision loads the state's holidays" do
       {:ok, national} = Holidays.recurrences(:US)
-      {:ok, california} = Holidays.recurrences("en-US-u-sd-usca")
+      {:ok, california} = Holidays.recurrences(locale: "en-US-u-sd-usca")
 
       refute "Presidents' Day" in Enum.map(national, & &1.name)
       assert "Presidents' Day" in Enum.map(california, & &1.name)

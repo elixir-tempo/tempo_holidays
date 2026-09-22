@@ -30,23 +30,33 @@ defmodule Tempo.Holidays do
 
   """
 
-  alias Tempo.Holidays.{Data, Holiday, Locale, Rule}
+  alias Tempo.Holidays.{Data, DayStart, Holiday, Locale, Rule}
+
+  @typedoc """
+  A holiday request's target: a positional CLDR territory code (atom or string,
+  always a territory — never a language), a `t:Localize.LanguageTag.t/0`, or a
+  keyword list carrying a `:territory` or `:locale` option.
+  """
+  @type target :: atom() | String.t() | Localize.LanguageTag.t() | keyword()
 
   @doc """
-  Return the holiday recurrences for a locale.
+  Return the holiday recurrences for a territory.
 
   ### Arguments
 
-  * `locale` names the target — a CLDR territory code (`:AU`, `"AU"`), a BCP 47
-    locale identifier (`"en-AU"`, `"en-US-u-sd-usca"`, or the same as an atom),
-    or a `t:Localize.LanguageTag.t/0`. A locale is validated and its territory,
-    state (division) and region (subdivision) are derived; see
-    `Tempo.Holidays.Locale`.
+  * `target` names the territory — a positional CLDR territory code (`:AU`,
+    `"AU"`, always a territory, never a language) or a `t:Localize.LanguageTag.t/0`.
+    Omit it and pass the target by option instead. See `Tempo.Holidays.Locale`.
 
   ### Options
 
-  * `:territory`, `:division`, `:subdivision` — override the level derived from
-    the locale.
+  * `:territory` — an explicit CLDR territory code, validated (`territory: :SA`
+    is Saudi Arabia).
+
+  * `:locale` — a BCP 47 locale identifier or `t:Localize.LanguageTag.t/0` whose
+    territory is derived (`locale: "en-US-u-sd-usca"` selects California).
+
+  * `:division`, `:subdivision` — override the state / region level.
 
   ### Returns
 
@@ -54,7 +64,7 @@ defmodule Tempo.Holidays do
     level with data, falling back to the country.
 
   * `{:error, {:unknown_territory, territory}}` or `{:error, {:invalid_locale,
-    locale}}`.
+    target}}`.
 
   ### Examples
 
@@ -63,33 +73,59 @@ defmodule Tempo.Holidays do
       ["New Year's Day", "Australia Day"]
 
   """
-  @spec recurrences(Localize.LanguageTag.t() | atom() | String.t(), keyword()) ::
-          {:ok, [Holiday.t()]} | {:error, {atom(), term()}}
-  def recurrences(locale, options \\ []) do
-    with {:ok, resolved} <- Locale.resolve(locale, options) do
+  @spec recurrences(target(), keyword()) :: {:ok, [Holiday.t()]} | {:error, {atom(), term()}}
+  def recurrences(target \\ [], options \\ [])
+
+  def recurrences(options, extra) when is_list(options) do
+    resolve_holidays(nil, Keyword.merge(options, extra))
+  end
+
+  def recurrences(target, options) do
+    resolve_holidays(target, options)
+  end
+
+  defp resolve_holidays(target, options) do
+    with {:ok, resolved} <- Locale.resolve(target, options) do
       Data.for_territory(resolved.territory, resolved.division, resolved.subdivision)
     end
   end
 
   @doc """
-  Project a locale's holidays onto `year`, date-sorted.
+  Project a territory's holidays onto `year`, date-sorted.
+
+  Called as `materialise(target, year, options)` with a positional territory or
+  holiday list (as for `recurrences/2`), or as `materialise(year, options)` with
+  the target given by a `:territory` or `:locale` option.
 
   ### Arguments
 
-  * `locale` names the target as for `recurrences/2`, or a list of
+  * `target` names the territory as for `recurrences/2`, or is a list of
     `t:Tempo.Holidays.Holiday.t/0` to project directly.
 
   * `year` is a year-resolution `t:Tempo.t/0` such as `~o"2026"`.
 
   ### Options
 
-  * `:territory`, `:division`, `:subdivision` — override the level derived from
-    the locale (ignored when a holiday list is given).
+  * `:territory` / `:locale` — the target, as for `recurrences/2`.
+
+  * `:division`, `:subdivision` — override the state / region level (ignored when
+    a holiday list is given).
+
+  * `:day_start` — how a sunset-starting-calendar holiday (Islamic, Hebrew) is
+    projected onto the Gregorian timeline. `:midnight` (the default) returns the
+    in-calendar day. `:evening` / `:sunset` return the datetime interval that
+    begins the evening before — the 18:00 proxy, or true sunset — at the
+    calendar's canonical reference (Mecca, Jerusalem); a `{:evening | :sunset,
+    anchor}` pair takes it at an explicit IANA zone id or `{longitude, latitude}`
+    location instead. See `t:Tempo.Holidays.DayStart.t/0`. Non-sunset holidays are
+    unaffected.
 
   ### Returns
 
   * `{:ok, [{t:Tempo.Holidays.Holiday.t/0, t:Tempo.Interval.t/0}]}` — each
-    holiday paired with the interval it occupies that year, earliest first.
+    holiday paired with the interval it occupies that year, earliest first. Under
+    a non-midnight `:day_start`, a sunset-starting holiday's interval is a
+    Gregorian datetime interval rather than an in-calendar day.
 
   * `{:error, {:unknown_territory, territory}}` or `{:error, {:invalid_locale,
     locale}}`.
@@ -103,37 +139,125 @@ defmodule Tempo.Holidays do
       {"New Year's Day", ~o"2026Y1M1D"}
 
   """
-  @spec materialise(
-          Localize.LanguageTag.t() | atom() | String.t() | [Holiday.t()],
-          Tempo.t(),
-          keyword()
-        ) :: {:ok, [{Holiday.t(), Tempo.Interval.t()}]} | {:error, {atom(), term()}}
-  def materialise(locale_or_holidays, year, options \\ [])
+  @spec materialise(target() | [Holiday.t()] | Tempo.t(), Tempo.t() | keyword(), keyword()) ::
+          {:ok, [{Holiday.t(), Tempo.Interval.t()}]} | {:error, {atom(), term()}}
+  def materialise(target, year_or_options, options \\ [])
 
-  def materialise(holidays, %Tempo{} = year, _options) when is_list(holidays) do
-    {:ok, materialise_all(holidays, year)}
+  def materialise(%Tempo{} = year, options, extra) when is_list(options) do
+    materialise_target(nil, year, Keyword.merge(options, extra))
   end
 
-  def materialise(locale, %Tempo{} = year, options) do
-    with {:ok, holidays} <- recurrences(locale, options) do
-      {:ok, materialise_all(holidays, year)}
+  def materialise(holidays, %Tempo{} = year, options) when is_list(holidays) do
+    {:ok, materialise_all(holidays, year, day_start(options))}
+  end
+
+  def materialise(target, %Tempo{} = year, options) do
+    materialise_target(target, year, options)
+  end
+
+  defp materialise_target(target, year, options) do
+    with {:ok, holidays} <- resolve_holidays(target, options) do
+      {:ok, materialise_all(holidays, year, day_start(options))}
     end
   end
+
+  defp day_start(options), do: Keyword.get(options, :day_start, :midnight)
 
   # A holiday whose rule cannot land in this year is dropped rather than
   # failing the whole set — the same partial-support contract the compiler
   # keeps.
-  defp materialise_all(holidays, year) do
-    holidays
-    |> Enum.flat_map(&materialise_one(&1, year))
+  #
+  # Materialisation is two passes, because a *conditional* holiday (a bridge
+  # day, or an `if is … holiday then …` move) depends on the *other* holidays of
+  # the year. The first pass materialises every holiday's base occurrences and
+  # tallies the year's holiday days by type; the second resolves each
+  # conditional against that tally (`Tempo.Holidays.Rule.resolve_conditional/4`).
+  defp materialise_all(holidays, year, day_start) do
+    base = Enum.map(holidays, fn holiday -> {holiday, base_occurrences(holiday, year)} end)
+    counts = occurrence_counts(base)
+
+    base
+    |> Enum.flat_map(&resolve_occurrences(&1, year, counts))
     |> coalesce_by_name()
+    |> project_day_start(day_start)
     |> Enum.sort_by(fn {_holiday, interval} -> Tempo.Interval.from(interval) end, Tempo)
   end
 
-  defp materialise_one(%Holiday{rule: rule} = holiday, year) do
+  # A day is just a day until it is projected onto the Gregorian timeline. With a
+  # non-midnight `day_start`, each sunset-starting-calendar occurrence (Islamic,
+  # Hebrew) is projected to the datetime interval that begins when its day begins;
+  # every other holiday, and `:midnight`, is left as the civil day it already is.
+  defp project_day_start(pairs, :midnight), do: pairs
+
+  defp project_day_start(pairs, day_start) do
+    Enum.map(pairs, fn {holiday, interval} ->
+      {holiday, project_occurrence(holiday, interval, day_start)}
+    end)
+  end
+
+  defp project_occurrence(
+         %Holiday{rule: %Rule{kind: kind, calendar: calendar}},
+         interval,
+         day_start
+       )
+       when kind in [:islamic, :hebrew] do
+    case DayStart.project(interval, calendar, day_start) do
+      {:ok, projected} -> projected
+      {:error, _} -> interval
+    end
+  end
+
+  defp project_occurrence(_holiday, interval, _day_start), do: interval
+
+  defp base_occurrences(%Holiday{rule: rule}, year) do
     case Rule.materialise(rule, year) do
-      {:ok, intervals} -> Enum.map(intervals, &{holiday, &1})
+      {:ok, intervals} -> intervals
       {:error, _} -> []
+    end
+  end
+
+  # The year's holiday days as a `{gregorian_days, type} => count` tally, over
+  # every holiday's base occurrences.
+  defp occurrence_counts(base) do
+    Enum.reduce(base, %{}, fn {holiday, occurrences}, counts ->
+      tally(counts, occurrences, holiday.type)
+    end)
+  end
+
+  defp tally(counts, occurrences, type) do
+    Enum.reduce(occurrences, counts, &tally_one(&2, &1, type))
+  end
+
+  defp tally_one(counts, interval, type) do
+    case Rule.occurrence_days(interval) do
+      {:ok, days} -> Map.update(counts, {days, type}, 1, &(&1 + 1))
+      :error -> counts
+    end
+  end
+
+  defp resolve_occurrences({%Holiday{rule: rule} = holiday, occurrences}, year, counts) do
+    if Rule.conditional?(rule) do
+      present? = present_excluding(holiday, occurrences, counts)
+
+      case Rule.resolve_conditional(rule, occurrences, year, present?) do
+        {:ok, intervals} -> Enum.map(intervals, &{holiday, &1})
+        {:error, _} -> []
+      end
+    else
+      Enum.map(occurrences, &{holiday, &1})
+    end
+  end
+
+  # A `(gregorian_days, type) -> boolean()` for the second pass: does *another*
+  # holiday of `type` fall on `days`? A holiday never satisfies its own
+  # condition, so its own occurrences are discounted from the tally — mirroring
+  # date-holidays skipping the rule under test.
+  defp present_excluding(%Holiday{type: own_type}, occurrences, counts) do
+    own = tally(%{}, occurrences, own_type)
+
+    fn days, type ->
+      mine = if type == own_type, do: Map.get(own, {days, own_type}, 0), else: 0
+      Map.get(counts, {days, type}, 0) - mine > 0
     end
   end
 
