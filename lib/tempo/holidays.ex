@@ -11,7 +11,7 @@ defmodule Tempo.Holidays do
   The data is the [date-holidays](https://github.com/commenthol/date-holidays)
   dataset for every territory, carrying every `:type` (public holidays through
   to observances). Fixed dates and weekday-in-month holidays are native ISO
-  8601-2 selections (`FL12M25DN`, `FL6M2I1KN`); Easter-relative holidays are
+  8601-2 selections (`FL12M25DN`, `FL6M1K2IN`); Easter-relative holidays are
   computed through Calendrical's ecclesiastical calendar; Islamic holidays are
   projected onto the Gregorian year through Calendrical and returned in the
   Islamic calendar. A lunar holiday can fall twice in one Gregorian year, so

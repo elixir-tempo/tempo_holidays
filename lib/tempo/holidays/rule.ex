@@ -12,11 +12,11 @@ defmodule Tempo.Holidays.Rule do
   a weekday-in-month, such as US Election Day) are Tempo-native date selections
   and arithmetic; `:easter` / `:orthodox` are computed through Calendrical's
   ecclesiastical calendar, since Easter is not expressible as an ISO 8601
-  recurrence; and `:islamic`, `:hebrew` and `:persian` are materialised in
-  their own calendar (Islamic via Umm al-Qura), returned as an
-  `[u-ca=…]`-tagged value rather than converted to Gregorian. `:julian` is a
-  fixed date in the Julian calendar (Orthodox Christmas and the like); it has
-  no CLDR calendar tag, so it is converted to Gregorian.
+  recurrence; and `:islamic`, `:hebrew`, `:persian` and `:julian` (Orthodox
+  Christmas and the like) are each materialised in their own calendar as a
+  yearly recurrence bounded to the year — Islamic via Umm al-Qura, Julian via
+  Calendrical's non-CLDR Julian calendar — returned as an `[u-ca=…]`-tagged
+  value.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -606,7 +606,7 @@ defmodule Tempo.Holidays.Rule do
          %__MODULE__{kind: :nested_weekday, weekday: outer, inner_weekday: inner} = rule,
          %Tempo{} = year
        ) do
-    inner_iso = "R/../P1Y/FL#{rule.month}M#{rule.count}I#{inner}KN"
+    inner_iso = "R/../P1Y/FL#{rule.month}M#{inner}K#{rule.count}IN"
 
     with {:ok, recurrence} <- Tempo.from_iso8601(inner_iso),
          {:ok, set} <- Tempo.to_interval(recurrence, bound: year),
@@ -646,48 +646,31 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # A non-Gregorian-calendar holiday (Islamic, Hebrew, Persian) is calculated
-  # and returned in its own calendar, per Tempo's calendar-awareness — not
-  # converted to Gregorian. `year` is the *Gregorian* year, and `Calendrical`'s
-  # `dates_in_gregorian_year/3` finds which occurrences of the calendar date
-  # fall in it — zero, one, or (for a lunar date, as Eid al-Fitr in 2000) two.
-  # A `count` greater than one spans that many days (the `P<n>D` form).
+  # A Hebrew or Persian fixed date, returned in its own calendar (`year` is the
+  # *Gregorian* year). The yearly recurrence bounded to the year finds which
+  # occurrences of the calendar date fall in it — zero, one, or (for a lunar
+  # date, as Eid al-Fitr in 2000) two — declaratively, Tempo resolving the
+  # calendar arithmetic. A `count` greater than one spans that many days.
   defp materialise_base(
          %__MODULE__{kind: kind, calendar: calendar, month: month, day: day, count: count},
          %Tempo{} = year
        )
        when kind in [:hebrew, :persian] do
-    tag = calendar_tag(calendar)
-
-    Tempo.year(year)
-    |> calendar.dates_in_gregorian_year(month, day)
-    |> reduce_ok(&calendar_interval(&1, tag, count))
+    calendar_date_holiday(calendar_tag(calendar), month, day, count, year)
   end
 
-  # Islamic (Hijri) dates carry an extra wrinkle: date-holidays encodes some
-  # holidays as a day *beyond* the month's length — Saudi Eid al-Fitr as
-  # `30 Ramadan P4D`, Iran's end-of-Safar observance as `30 Safar` — leaning on
-  # the sunset-convention rollover its table implementation gives (the spec's
-  # 18:00 day-start): it anchors on the always-valid first of the month and adds
-  # `day - 1` days, so a 30th in a 29-day month spills into the next month. The
-  # spec documents neither the rollover nor `day` beyond the month length, so we
-  # reproduce it *here*, in the holidays layer, to stay faithful to date-holidays'
-  # published dates rather than dropping the holiday. For an in-range day it is
-  # identical to resolving the date directly, so nothing that already matched
-  # moves; the Hijri year whose anchored day lands in the Gregorian year is kept,
-  # a lunar date still able to fall in it twice.
+  # date-holidays encodes some Islamic holidays as a day *beyond* the month's
+  # length — Saudi Eid al-Fitr as `30 Ramadan P4D`, Iran's end-of-Safar
+  # observance as `30 Safar` — leaning on the sunset-convention rollover its
+  # table gives (the spec's 18:00 day-start). Declared as the always-valid 1st
+  # of the month plus a `day - 1` day offset, `Tempo.shift` reproduces the
+  # rollover in-calendar (a 30th of a 29-day month becomes the next month's 1st)
+  # without ever forming an out-of-range date.
   defp materialise_base(
          %__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day, count: count},
          %Tempo{} = year
        ) do
-    target = Tempo.year(year)
-
-    calendar
-    |> islamic_month_starts(target, month)
-    |> Enum.map(&Date.add(&1, day - 1))
-    |> Enum.filter(&(&1.year == target))
-    |> Enum.uniq()
-    |> reduce_ok(&converted_interval(&1, calendar, count))
+    offset_calendar_holiday(calendar_tag(calendar), month, day - 1, count, year)
   end
 
   # A lunisolar date — Chinese (`chinese …`), Korean (`korean …`) or Vietnamese
@@ -766,17 +749,15 @@ defmodule Tempo.Holidays.Rule do
   end
 
   # A Julian fixed date (Orthodox Christmas et al.). date-holidays writes these
-  # as `julian MM-DD`; the Julian calendar has no CLDR `u-ca` tag, so each
-  # occurrence is converted to Gregorian rather than returned in-calendar. A
-  # single Gregorian year can hold zero, one or two, as with any calendar whose
-  # year drifts against the Gregorian one.
+  # as `julian MM-DD`. `julian` is a non-CLDR calendar Calendrical resolves, so
+  # the occurrence is returned in-calendar (`[u-ca=julian]`) like every other
+  # calendar tier, and the yearly recurrence bounded to the Gregorian year does
+  # the projection declaratively.
   defp materialise_base(
          %__MODULE__{kind: :julian, month: month, day: day, count: count},
          %Tempo{} = year
        ) do
-    Tempo.year(year)
-    |> Calendrical.Julian.dates_in_gregorian_year(month, day)
-    |> reduce_ok(&julian_interval(&1, count))
+    calendar_date_holiday("julian", month, day, count, year)
   end
 
   defp materialise_base(%__MODULE__{kind: kind, offset: offset, count: count}, %Tempo{} = year)
@@ -791,15 +772,62 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # One occurrence (a `t:Date.t/0` in the target calendar) becomes an interval
-  # tagged with that calendar, spanning `count` days for a multi-day holiday.
-  # The date's own calendar year is used, so the value stays in calendar rather
-  # than being converted to Gregorian.
-  defp calendar_interval(%Date{} = date, tag, count) do
-    with {:ok, base} <-
-           Tempo.from_iso8601("#{date.year}Y#{date.month}M#{date.day}D[u-ca=#{tag}]"),
-         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
-      {:ok, span_days(interval, base, count)}
+  # A fixed date in a `[u-ca=tag]` calendar, projected onto the Gregorian `year`
+  # declaratively: the yearly recurrence `R/../P1Y/FL<month>M<day>DN[u-ca=tag]`
+  # bounded to the year yields every occurrence that falls in it — zero, one,
+  # or (for a calendar whose year drifts against the Gregorian one) two — each
+  # returned in its own calendar. `count` greater than one extends the span to
+  # that many days. Tempo resolves the calendar arithmetic, so nothing here
+  # computes a date.
+  defp calendar_date_holiday(tag, month, day, count, %Tempo{} = year) do
+    with {:ok, recurrence} <-
+           Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{tag}]"),
+         {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
+      intervals =
+        set
+        |> Tempo.IntervalSet.to_list()
+        |> Enum.map(fn interval -> span_days(interval, Interval.from(interval), count) end)
+
+      {:ok, intervals}
+    end
+  end
+
+  # A calendar date declared as the 1st of its month plus a day `offset`. The
+  # 1st always exists, so `Tempo.shift/2` can reach the intended day — and roll
+  # a day beyond the month's length into the next month — without ever forming
+  # an out-of-range date. The 1st is materialised across the neighbouring years
+  # too, because the offset can carry the day across the Gregorian boundary; an
+  # occurrence is kept when its own Gregorian projection lands in `year`, a lunar
+  # date still able to fall in it twice. `count` extends the span.
+  defp offset_calendar_holiday(tag, month, offset, count, %Tempo{} = year) do
+    target = Tempo.year(year)
+
+    with {:ok, window} <- Tempo.from_iso8601("#{target - 1}Y/#{target + 1}Y"),
+         {:ok, recurrence} <- Tempo.from_iso8601("R/../P1Y/FL#{month}M1DN[u-ca=#{tag}]"),
+         {:ok, set} <- Tempo.to_interval(recurrence, bound: window) do
+      set
+      |> Tempo.IntervalSet.to_list()
+      |> Enum.map(fn interval -> Tempo.shift(Interval.from(interval), day: offset) end)
+      |> Enum.filter(fn start -> gregorian_year(start) == target end)
+      |> Enum.uniq()
+      |> reduce_ok(&day_interval(&1, count))
+    end
+  end
+
+  # One day-resolution value becomes its interval, spanning `count` days.
+  defp day_interval(%Tempo{} = start, count) do
+    with {:ok, interval} <- first_interval(Tempo.to_interval(start)) do
+      {:ok, span_days(interval, start, count)}
+    end
+  end
+
+  # The Gregorian year a value falls in, whatever calendar it is stated in.
+  defp gregorian_year(%Tempo{} = value) do
+    with {:ok, date} <- Tempo.to_date(value),
+         {:ok, gregorian} <- Date.convert(date, Calendrical.Gregorian) do
+      gregorian.year
+    else
+      _other -> nil
     end
   end
 
@@ -810,29 +838,6 @@ defmodule Tempo.Holidays.Rule do
   # neighbour for a month it does not have.
   defp lunisolar_anchor_years(%__MODULE__{leap_month: true}, target), do: [target]
   defp lunisolar_anchor_years(%__MODULE__{}, target), do: [target - 1, target, target + 1]
-
-  # The Gregorian first-of-month dates for every Hijri year whose given month
-  # could place an occurrence in the target Gregorian year — the two or three
-  # Hijri years spanning it, so a lunar date that falls in it twice is still
-  # found. Anchoring on the always-valid first day lets a day beyond the month's
-  # length count forward into the next month (see the `:islamic` clause).
-  defp islamic_month_starts(calendar, target, month) do
-    with {:ok, first_civil} <- Date.new(target, 1, 1),
-         {:ok, last_civil} <- Date.new(target, 12, 31),
-         {:ok, low} <- Date.convert(first_civil, calendar),
-         {:ok, high} <- Date.convert(last_civil, calendar) do
-      Enum.flat_map((low.year - 1)..(high.year + 1), &month_start(calendar, &1, month))
-    else
-      _ -> []
-    end
-  end
-
-  defp month_start(calendar, hijri_year, month) do
-    case calendar.first_day_of_month(hijri_year, month) do
-      {:ok, %Date{} = date} -> [date]
-      _ -> []
-    end
-  end
 
   # A `<n> day[s] before/after` prefix (Vietnam's Tết eve) shifts the computed
   # Gregorian date; no offset leaves it untouched.
@@ -901,17 +906,6 @@ defmodule Tempo.Holidays.Rule do
   defp to_minutes(nil), do: 0
   defp to_minutes(""), do: 0
   defp to_minutes(minutes), do: String.to_integer(minutes)
-
-  # One Julian occurrence, converted to Gregorian and spanning `count` days.
-  # `Tempo.from_elixir/1` needs a Gregorian date, so the Julian date is
-  # converted first; this also sidesteps Calendrical's Julian `day_of_week`.
-  defp julian_interval(%Date{} = julian_date, count) do
-    with {:ok, gregorian} <- Date.convert(julian_date, Calendrical.Gregorian),
-         base <- Tempo.from_elixir(gregorian),
-         {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
-      {:ok, span_days(interval, base, count)}
-    end
-  end
 
   # The BCP 47 `u-ca` calendar tag for a Calendrical module — its CLDR type
   # with underscores as hyphens (`:islamic_umalqura` → "islamic-umalqura").
@@ -997,7 +991,7 @@ defmodule Tempo.Holidays.Rule do
   # against the target year by `Tempo.to_interval/2`. No `:anchor` is
   # needed; the bound year supplies it.
   defp weekday_iso(%__MODULE__{month: month, count: count, weekday: weekday}) do
-    "R/../P1Y/FL#{month}M#{count}I#{weekday}KN"
+    "R/../P1Y/FL#{month}M#{weekday}K#{count}IN"
   end
 
   # The signed day offset from an anchor date (whose weekday is

@@ -330,20 +330,24 @@ defmodule Tempo.HolidaysTest do
   end
 
   describe "Julian calendar holidays" do
-    test "a Julian fixed date is converted to Gregorian" do
-      # Orthodox Christmas — julian 12-25 — is 7 January Gregorian this century.
+    test "a Julian fixed date is returned in the Julian calendar" do
+      # Orthodox Christmas — julian 12-25 — the Julian date whose Gregorian
+      # projection (7 January this century) falls in the requested year.
       {:ok, rule} = Compiler.compile("julian 12-25")
 
       assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
-      assert Tempo.Interval.from(interval) == ~o"2025Y1M7D"
+      assert Tempo.Interval.from(interval) == ~o"2024Y12M25D[u-ca=julian]"
+
+      assert {:ok, ~o"2025Y1M7D"} =
+               Tempo.to_calendar(Tempo.Interval.from(interval), Calendrical.Gregorian)
     end
 
-    test "a P<n>D span covers that many Gregorian days" do
+    test "a P<n>D span covers that many days" do
       {:ok, rule} = Compiler.compile("julian 12-25 P2D")
 
       assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
-      assert Tempo.Interval.from(interval) == ~o"2025Y1M7D"
-      assert Tempo.Interval.to(interval) == ~o"2025Y1M9D"
+      assert Tempo.Interval.from(interval) == ~o"2024Y12M25D[u-ca=julian]"
+      assert Tempo.Interval.to(interval) == ~o"2024Y12M27D[u-ca=julian]"
     end
   end
 

@@ -53,8 +53,8 @@ defmodule Tempo.Holidays.Compiler do
 
   alias Tempo.Holidays.Rule
 
-  # ISO 8601 weekday numbers (Monday = 1 … Sunday = 7), as the `I<n>K`
-  # instance selector expects: `FL6M2I1KN` is "the 2nd Monday of June".
+  # ISO 8601 weekday numbers (Monday = 1 … Sunday = 7), as the `<n>K<i>I`
+  # weekday-then-position selector expects: `FL6M1K2IN` is "the 2nd Monday of June".
   @weekdays %{
     "monday" => 1,
     "tuesday" => 2,
