@@ -14,6 +14,7 @@ defmodule Tempo.Holidays.Conformance do
           rules: non_neg_integer(),
           matched: non_neg_integer(),
           unsupported: %{atom() => non_neg_integer()},
+          known_unsupported: %{atom() => non_neg_integer()},
           mismatched: %{atom() => non_neg_integer()},
           divergent: %{atom() => non_neg_integer()},
           samples: [map()]
@@ -29,8 +30,17 @@ defmodule Tempo.Holidays.Conformance do
     |> Enum.reduce(initial(), &check_fixture(&1, &2, gate_indices, sample_limit))
   end
 
-  defp initial,
-    do: %{rules: 0, matched: 0, unsupported: %{}, mismatched: %{}, divergent: %{}, samples: []}
+  defp initial do
+    %{
+      rules: 0,
+      matched: 0,
+      unsupported: %{},
+      known_unsupported: %{},
+      mismatched: %{},
+      divergent: %{},
+      samples: []
+    }
+  end
 
   # date-holidays' `active`/`disable`/`enable` metadata lives on the source
   # `days`, not in the fixture output, so re-compiling a bare rule string
@@ -95,8 +105,27 @@ defmodule Tempo.Holidays.Conformance do
 
     case Compiler.compile(rule) do
       {:ok, compiled} -> check_materialised(attach_gates(compiled, context.gates), context, acc)
-      {:error, _} -> bump(acc, :unsupported, feature(rule))
+      {:error, _} -> record_unsupported(acc, rule)
     end
+  end
+
+  # A rule that does not compile is a defect unless it is an accepted known gap
+  # (`accepted_unsupported?/1`), which is tracked in its own bucket — the way
+  # `divergent` sits apart from `mismatched`.
+  defp record_unsupported(acc, rule) do
+    bucket = if accepted_unsupported?(rule), do: :known_unsupported, else: :unsupported
+    bump(acc, bucket, feature(rule))
+  end
+
+  # Rules we knowingly do not compile yet, excluded from the `unsupported` gate.
+  # `bengali-revised` needs a Bengali calendar in Calendrical before a
+  # `tempo_holidays` tier can exist; the other two are a rare compound Easter
+  # offset and an expired doubly-nested US rule, tracked as deferred follow-ups.
+  # All are gaps, not defects.
+  defp accepted_unsupported?(rule) do
+    String.starts_with?(rule, "bengali") or
+      rule =~ ~r/^Thursday before easter/i or
+      rule =~ ~r/^friday before 1st monday before 06-01/i
   end
 
   # A `(gregorian_days, type) -> boolean()` for the conditional second pass,
@@ -261,15 +290,17 @@ defmodule Tempo.Holidays.Conformance do
   @spec summary(stats()) :: String.t()
   def summary(stats) do
     unsupported = stats.unsupported |> Map.values() |> Enum.sum()
+    known_unsupported = stats.known_unsupported |> Map.values() |> Enum.sum()
     mismatched = stats.mismatched |> Map.values() |> Enum.sum()
     divergent = stats.divergent |> Map.values() |> Enum.sum()
 
     """
-    rules checked: #{stats.rules}
-    matched:       #{stats.matched}
-    unsupported:   #{unsupported}  #{inspect(sorted(stats.unsupported))}
-    mismatched:    #{mismatched}  #{inspect(sorted(stats.mismatched))}
-    divergent:     #{divergent}  #{inspect(sorted(stats.divergent))}  (accepted reference differences)
+    rules checked:     #{stats.rules}
+    matched:           #{stats.matched}
+    unsupported:       #{unsupported}  #{inspect(sorted(stats.unsupported))}
+    known unsupported: #{known_unsupported}  #{inspect(sorted(stats.known_unsupported))}  (accepted gaps: Bengali calendar, two rare shapes)
+    mismatched:        #{mismatched}  #{inspect(sorted(stats.mismatched))}
+    divergent:         #{divergent}  #{inspect(sorted(stats.divergent))}  (accepted reference differences)
     """
   end
 

@@ -2,8 +2,10 @@
 
 Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs
 more than a line here. Conformance against the full date-holidays fixture
-corpus (`mix test --include conformance`) drives the remaining tiers; it sits
-at over 99% matched, and the gaps below are what remains.
+corpus (`mix test --include conformance`) drives the tiers: every rule that
+compiles computes correct dates (zero mismatched), with a small set of accepted
+`known_unsupported` gaps (the Bengali calendar and two rare shapes, below) and
+the Islamic civil-date `divergent` differences.
 
 ## Open
 
@@ -17,9 +19,17 @@ at over 99% matched, and the gaps below are what remains.
 
 ## Blocked
 
-* [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream.
+* [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
+
+## Deferred
+
+* [ ] **`Thursday before easter -46`** — a weekday relative to a computed Easter *offset* (not to Easter itself); one rule, no compiler tier for it. Accepted `known_unsupported`. Would revive if a second such rule appears.
+
+* [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Taiwan Chinese New Year makeup days** — the substitution target is now weekday-bounded, so date-holidays' malformed chained TW rule (`…then next Saturdayif Wednesday…`, a missing space) parses instead of derailing; the 7-way lieu-day chain compiles and computes the correct observed dates. 2026-09-23.
 
 * [x] **Day-start projection (`:day_start`)** — `materialise/3` projects a sunset-starting-calendar holiday (Islamic, Hebrew) onto the Gregorian timeline as a datetime interval that begins the evening before: `:evening` (18:00 proxy) or `:sunset` (true, via Astro), at the calendar's canonical reference (Mecca/Jerusalem) or an explicit zone-id / `{lng, lat}` location (`tz_world`-resolved, optional dep). `:midnight` (default) keeps the in-calendar day. New `Tempo.Holidays.DayStart`. 2026-09-22.
 
