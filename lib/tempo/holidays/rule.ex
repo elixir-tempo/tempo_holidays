@@ -238,7 +238,22 @@ defmodule Tempo.Holidays.Rule do
     Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
   end
 
+  def recurrence(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
+      when kind in [:equinox, :solstice] and offset in [nil, 0] and
+             timezone in [nil, "GMT", "UTC"] do
+    case solar_event_name(kind, month) do
+      nil -> :needs_window
+      event -> Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
+    end
+  end
+
   def recurrence(%__MODULE__{}), do: :needs_window
+
+  defp solar_event_name(:equinox, 3), do: "march-equinox"
+  defp solar_event_name(:equinox, 9), do: "september-equinox"
+  defp solar_event_name(:solstice, 6), do: "june-solstice"
+  defp solar_event_name(:solstice, 12), do: "december-solstice"
+  defp solar_event_name(_kind, _month), do: nil
 
   @doc """
   Whether a rule carries an inter-holiday `t:conditional/0`.
