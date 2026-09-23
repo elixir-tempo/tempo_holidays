@@ -189,9 +189,12 @@ defmodule Tempo.Holidays.Rule do
 
   Where a holiday is a plain recurrence — a fixed date, an nth weekday, a
   calendar date, a computed event — this is the rule as an unbounded recurrence
-  that projects onto any window. Rules that cannot stand alone as a recurrence —
-  a bridge or `if`-holiday move (which depends on the year's other holidays), or
-  the lunisolar traditional-month query (which resolves per year) — return
+  that projects onto any window. A `since`/`until` year range folds into the
+  recurrence's `{…}` domain — `to_year` is exclusive (the half-open `[from, to)`
+  convention), so the domain runs to `to_year - 1`, with a `^`-excluded year for
+  each disabled date. Rules that cannot stand alone as a recurrence — a bridge or
+  `if`-holiday move (which depends on the year's other holidays), or the
+  lunisolar traditional-month query (which resolves per year) — return
   `:needs_window`, so the caller materialises them concretely against a bound.
 
   ### Arguments
@@ -213,47 +216,111 @@ defmodule Tempo.Holidays.Rule do
       iex> Tempo.to_iso8601(recurrence)
       "R/../P1Y/FL12M25DN"
 
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25 since 2020 until 2025")
+      iex> {:ok, recurrence} = Tempo.Holidays.Rule.recurrence(rule)
+      iex> Tempo.to_iso8601(recurrence)
+      "R/{2020Y..2024Y}/P1Y/FL12M25DN"
+
   """
   @spec recurrence(t()) :: {:ok, Tempo.Interval.t()} | :needs_window | {:error, term()}
-  def recurrence(%__MODULE__{kind: :fixed, month: month, day: day}) do
+  def recurrence(%__MODULE__{} = rule) do
+    with {:ok, base} <- base_recurrence(rule) do
+      apply_year_domain(base, rule)
+    end
+  end
+
+  # The base recurrence for the rule's kind, before any year-domain gate is
+  # applied. A kind that cannot stand alone as a recurrence returns
+  # `:needs_window`.
+  defp base_recurrence(%__MODULE__{kind: :fixed, month: month, day: day}) do
     Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN")
   end
 
-  def recurrence(%__MODULE__{kind: :weekday} = rule) do
+  defp base_recurrence(%__MODULE__{kind: :weekday} = rule) do
     Tempo.from_iso8601(weekday_iso(rule))
   end
 
-  def recurrence(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
-      when kind in [:hebrew, :persian] do
+  defp base_recurrence(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
+       when kind in [:hebrew, :persian] do
     Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
   end
 
-  def recurrence(%__MODULE__{kind: :julian, month: month, day: day}) do
+  defp base_recurrence(%__MODULE__{kind: :julian, month: month, day: day}) do
     Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=julian]")
   end
 
-  def recurrence(%__MODULE__{kind: kind, offset: offset})
-      when kind in [:easter, :orthodox] and offset in [nil, 0] do
+  defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
+       when kind in [:easter, :orthodox] and offset in [nil, 0] do
     event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
     Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
   end
 
-  def recurrence(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
-      when kind in [:equinox, :solstice] and offset in [nil, 0] and
-             timezone in [nil, "GMT", "UTC"] do
+  defp base_recurrence(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
+       when kind in [:equinox, :solstice] and offset in [nil, 0] and
+              timezone in [nil, "GMT", "UTC"] do
     case solar_event_name(kind, month) do
       nil -> :needs_window
       event -> Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
     end
   end
 
-  def recurrence(%__MODULE__{}), do: :needs_window
+  defp base_recurrence(%__MODULE__{}), do: :needs_window
 
   defp solar_event_name(:equinox, 3), do: "march-equinox"
   defp solar_event_name(:equinox, 9), do: "september-equinox"
   defp solar_event_name(:solstice, 6), do: "june-solstice"
   defp solar_event_name(:solstice, 12), do: "december-solstice"
   defp solar_event_name(_kind, _month), do: nil
+
+  # Fold a `since`/`until` year range (and any disabled years) into the base
+  # recurrence's `{…}` domain by rewriting its leading open `..` domain. A rule
+  # carrying a gate the year domain cannot express keeps the ungated base
+  # recurrence.
+  defp apply_year_domain(base, rule) do
+    case year_domain(rule) do
+      :none ->
+        {:ok, base}
+
+      {:ok, domain} ->
+        base
+        |> Tempo.to_iso8601()
+        |> String.replace("R/../", "R/#{domain}/", global: false)
+        |> Tempo.from_iso8601()
+    end
+  end
+
+  # `to_year` is exclusive, so the inclusive domain runs to `to_year - 1`. Only a
+  # closed range yields a self-bounding domain; an open-ended `since`/`until`
+  # cannot bound itself, so it stays the ungated base recurrence.
+  defp year_domain(%__MODULE__{from_year: from, to_year: to} = rule)
+       when is_integer(from) and is_integer(to) do
+    if domain_blocking_gate?(rule) do
+      :none
+    else
+      {:ok, "{#{from}Y..#{to - 1}Y#{disable_exclusions(rule)}}"}
+    end
+  end
+
+  defp year_domain(_rule), do: :none
+
+  # Gates the year domain cannot also carry, so a rule bearing one keeps its
+  # ungated base recurrence rather than a domain that silently drops the gate.
+  # A `substitute` is orthogonal (it shifts the observed day, not the year), so
+  # it does not block.
+  defp domain_blocking_gate?(%__MODULE__{} = rule) do
+    rule.active not in [nil, []] or rule.enable not in [nil, []] or
+      not is_nil(rule.year_parity) or not is_nil(rule.leap) or
+      not is_nil(rule.every_years) or not is_nil(rule.weekday_gate)
+  end
+
+  # A `^year` exclusion for each disabled date (a pure removal — a disable paired
+  # with an `enable` is a move, which `domain_blocking_gate?/1` keeps out of the
+  # domain).
+  defp disable_exclusions(%__MODULE__{disable: disable}) when is_list(disable) do
+    Enum.map_join(disable, fn %Date{year: year} -> ",^#{year}Y" end)
+  end
+
+  defp disable_exclusions(_rule), do: ""
 
   @doc """
   Whether a rule carries an inter-holiday `t:conditional/0`.
