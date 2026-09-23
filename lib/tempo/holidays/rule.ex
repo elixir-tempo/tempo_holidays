@@ -11,12 +11,19 @@ defmodule Tempo.Holidays.Rule do
   `:weekday`, `:relative_weekday` and `:nested_weekday` (a weekday relative to
   a weekday-in-month, such as US Election Day) are Tempo-native date selections
   and arithmetic; `:easter` / `:orthodox` are computed through Calendrical's
-  ecclesiastical calendar, since Easter is not expressible as an ISO 8601
-  recurrence; and `:islamic`, `:hebrew`, `:persian` and `:julian` (Orthodox
-  Christmas and the like) are each materialised in their own calendar as a
-  yearly recurrence bounded to the year — Islamic via Umm al-Qura, Julian via
-  Calendrical's non-CLDR Julian calendar — returned as an `[u-ca=…]`-tagged
-  value.
+  ecclesiastical calendar, since Easter has no fixed-date RRULE and is instead
+  a `(easter)E` computed event; and `:islamic`, `:hebrew`, `:persian` and
+  `:julian` (Orthodox Christmas and the like) are each materialised in their
+  own calendar as a yearly recurrence bounded to the year — Islamic via Umm
+  al-Qura, Julian via Calendrical's non-CLDR Julian calendar — returned as an
+  `[u-ca=…]`-tagged value.
+
+  `recurrence/1` re-expresses most kinds as a standalone, re-materialisable
+  `%Tempo.Interval{}` recurrence: a calendar date under `[u-ca=…]`, a moveable
+  feast as a §12.10 window off `(easter)E`, a relative or nested weekday as a
+  window off its anchor date. The kinds that stay `:needs_window` are the
+  lunisolar traditional-month query, an Islamic day-rollover or multi-day span,
+  a timezone-specific equinox, and the inter-holiday bridge / `if`-holiday.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -240,6 +247,39 @@ defmodule Tempo.Holidays.Rule do
     Tempo.from_iso8601(weekday_iso(rule))
   end
 
+  # A weekday relative to a fixed date — "Monday before 06-01", "Friday after
+  # 06-19". An ISO 8601-2 §12.10 window off the anchor date picks the count-th
+  # target weekday in the direction; taking the window off the real date lets
+  # Tempo resolve the month boundary and leap years, so the recurrence stays
+  # year-independent.
+  defp base_recurrence(%__MODULE__{
+         kind: :relative_weekday,
+         month: month,
+         day: day,
+         weekday: target,
+         direction: direction,
+         count: count
+       }) do
+    window = relative_weekday_window(direction, count || 1, target)
+    Tempo.from_iso8601("R/../P1Y/FLLL#{month}M#{day}DN/#{window}N")
+  end
+
+  # A weekday relative to an nth weekday-in-month — "Friday after the 4th
+  # Thursday in November" (Black Friday), "Tuesday after the 1st Monday in
+  # November" (US Election Day). The inner nth weekday is the anchor; a §12.10
+  # window off it picks the outer weekday.
+  defp base_recurrence(%__MODULE__{
+         kind: :nested_weekday,
+         month: month,
+         inner_weekday: inner,
+         weekday: outer,
+         direction: direction,
+         count: count
+       }) do
+    window = relative_weekday_window(direction, 1, outer)
+    Tempo.from_iso8601("R/../P1Y/FLLL#{month}M#{inner}K#{count}IN/#{window}N")
+  end
+
   defp base_recurrence(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
        when kind in [:hebrew, :persian] do
     Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
@@ -249,10 +289,37 @@ defmodule Tempo.Holidays.Rule do
     Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=julian]")
   end
 
+  # An Islamic fixed date is a `[u-ca=islamic-*]` selection, like the Hebrew and
+  # Persian ones. Guarded to a valid, single-day date: date-holidays' `30 Ramadan`
+  # style day-beyond-the-month (a sunset-convention rollover) and multi-day spans
+  # need the concrete `materialise/2` handling, so they stay `:needs_window`.
+  defp base_recurrence(%__MODULE__{
+         kind: :islamic,
+         calendar: calendar,
+         month: month,
+         day: day,
+         count: count
+       })
+       when day <= 29 and count in [nil, 1] do
+    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
+  end
+
   defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
        when kind in [:easter, :orthodox] and offset in [nil, 0] do
     event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
     Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
+  end
+
+  # A moveable feast a fixed offset from Easter (Ash Wednesday −46, Ascension
+  # +39, …). Easter is a Sunday, so `easter + offset` lands on a derivable
+  # weekday, expressed as an ISO 8601-2 §12.10 window off `(easter)E` picking
+  # that weekday. A multi-day span (`count > 1`) needs the concrete span, so it
+  # stays `:needs_window`.
+  defp base_recurrence(%__MODULE__{kind: kind, offset: offset, count: count})
+       when kind in [:easter, :orthodox] and is_integer(offset) and offset != 0 and
+              count in [nil, 1] do
+    event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
+    Tempo.from_iso8601("R/../P1Y/FLLL(#{event})EN/#{easter_offset_window(offset)}N")
   end
 
   defp base_recurrence(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
@@ -271,6 +338,26 @@ defmodule Tempo.Holidays.Rule do
   defp solar_event_name(:solstice, 6), do: "june-solstice"
   defp solar_event_name(:solstice, 12), do: "december-solstice"
   defp solar_event_name(_kind, _month), do: nil
+
+  # The §12.10 window that picks `easter + offset` off `(easter)E`: a forward
+  # window taking the last occurrence of the target weekday for a positive
+  # offset, a backward window taking the first for a negative one. Easter is a
+  # Sunday (ISO weekday 7), so the weekday is `mod(6 + offset, 7) + 1`.
+  defp easter_offset_window(offset) when offset > 0 do
+    "P#{offset + 1}DN#{easter_offset_weekday(offset)}K-1I"
+  end
+
+  defp easter_offset_window(offset) do
+    "-P#{-offset + 1}DN#{easter_offset_weekday(offset)}K1I"
+  end
+
+  defp easter_offset_weekday(offset), do: Integer.mod(6 + offset, 7) + 1
+
+  # The §12.10 window that picks the count-th `target` weekday relative to an
+  # anchor date: a backward window taking the earliest for "before", a forward
+  # window taking the latest for "after" (which is on-or-after the anchor).
+  defp relative_weekday_window(:before, count, target), do: "-P#{7 * count}DN#{target}K1I"
+  defp relative_weekday_window(:after, count, target), do: "P#{7 * count}DN#{target}K-1I"
 
   # Fold a `since`/`until` year range (and any disabled years) into the base
   # recurrence's `{…}` domain by rewriting its leading open `..` domain. A rule
