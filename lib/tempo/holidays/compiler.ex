@@ -877,7 +877,11 @@ defmodule Tempo.Holidays.Compiler do
   # US `and if sunday … if saturday …` is all-add, while Tonga's `if … then …
   # and if … then …` is shift-then-add. `weekend` expands to Saturday and
   # Sunday; a comma list (`saturday,sunday`) is taken verbatim.
-  @substitute_pattern ~r/(\band\b\s+)?if\s+([a-z, ]+?)\s+then\s+(next|previous)\s+([a-z]+)/i
+  # The target is always a weekday name; bounding it (rather than a greedy
+  # `[a-z]+`) keeps a missing space between chained clauses — date-holidays'
+  # Taiwan New Year writes `…next Saturdayif Wednesday…` — from swallowing the
+  # next clause's `if` into the target and derailing the whole chain.
+  @substitute_pattern ~r/(\band\b\s+)?if\s+([a-z, ]+?)\s+then\s+(next|previous)\s+(#{@weekday_alt})/i
 
   defp extract_substitution(rule) do
     initial_mode = if Regex.match?(~r/\bsubstitutes\b/i, rule), do: :substitute_only, else: :shift
