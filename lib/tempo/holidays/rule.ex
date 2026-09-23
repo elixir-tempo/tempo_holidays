@@ -289,28 +289,53 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # `to_year` is exclusive, so the inclusive domain runs to `to_year - 1`. Only a
-  # closed range yields a self-bounding domain; an open-ended `since`/`until`
-  # cannot bound itself, so it stays the ungated base recurrence.
-  defp year_domain(%__MODULE__{from_year: from, to_year: to} = rule)
-       when is_integer(from) and is_integer(to) do
+  # `to_year` is exclusive, so a closed range's inclusive domain runs to
+  # `to_year - 1`. An even/odd/leap rule adds an `e`/`o`/`l` filter — on the
+  # range, or as an open `..e` domain when the rule has no range. An open-ended
+  # `since`/`until` with nothing else cannot bound itself, so it keeps the
+  # ungated base recurrence.
+  defp year_domain(%__MODULE__{} = rule) do
     if domain_blocking_gate?(rule) do
       :none
     else
-      {:ok, "{#{from}Y..#{to - 1}Y#{disable_exclusions(rule)}}"}
+      build_year_domain(year_range(rule), year_filter(rule), rule)
     end
   end
 
-  defp year_domain(_rule), do: :none
+  defp year_range(%__MODULE__{from_year: from, to_year: to})
+       when is_integer(from) and is_integer(to),
+       do: {from, to}
 
-  # Gates the year domain cannot also carry, so a rule bearing one keeps its
-  # ungated base recurrence rather than a domain that silently drops the gate.
-  # A `substitute` is orthogonal (it shifts the observed day, not the year), so
-  # it does not block.
+  defp year_range(_rule), do: :open
+
+  defp year_filter(%__MODULE__{year_parity: :even}), do: "e"
+  defp year_filter(%__MODULE__{year_parity: :odd}), do: "o"
+  defp year_filter(%__MODULE__{leap: :leap}), do: "l"
+  defp year_filter(_rule), do: ""
+
+  # Nothing gated — the base recurrence stands.
+  defp build_year_domain(:open, "", _rule), do: :none
+
+  # An open even/odd/leap filter (`..e`) with no year range of its own.
+  defp build_year_domain(:open, filter, _rule), do: {:ok, "..#{filter}"}
+
+  # A closed `since`/`until` range, with any `^` exclusions and an optional
+  # even/odd/leap filter.
+  defp build_year_domain({from, to}, filter, rule) do
+    {:ok, "{#{from}Y..#{to - 1}Y#{disable_exclusions(rule)}}#{filter}"}
+  end
+
+  # Gates the year domain cannot carry, so a rule bearing one keeps its ungated
+  # base recurrence rather than a domain that silently drops the gate: an
+  # `active` window, an `enable`d ad-hoc date, a non-leap or every-N-years rule,
+  # a weekday gate, or both a parity and a leap filter at once (the domain takes
+  # only one). A `substitute` is orthogonal (it shifts the observed day, not the
+  # year), so it does not block.
   defp domain_blocking_gate?(%__MODULE__{} = rule) do
     rule.active not in [nil, []] or rule.enable not in [nil, []] or
-      not is_nil(rule.year_parity) or not is_nil(rule.leap) or
-      not is_nil(rule.every_years) or not is_nil(rule.weekday_gate)
+      rule.leap == :non_leap or not is_nil(rule.every_years) or
+      not is_nil(rule.weekday_gate) or
+      (not is_nil(rule.year_parity) and rule.leap == :leap)
   end
 
   # A `^year` exclusion for each disabled date (a pure removal — a disable paired
