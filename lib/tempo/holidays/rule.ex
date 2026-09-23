@@ -184,6 +184,63 @@ defmodule Tempo.Holidays.Rule do
   end
 
   @doc """
+  Returns the rule's base occurrences as a re-materialisable `%Tempo.Interval{}`
+  recurrence, for `Tempo.Holidays.recurrence_set/2`.
+
+  Where a holiday is a plain recurrence — a fixed date, an nth weekday, a
+  calendar date, a computed event — this is the rule as an unbounded recurrence
+  that projects onto any window. Rules that cannot stand alone as a recurrence —
+  a bridge or `if`-holiday move (which depends on the year's other holidays), or
+  the lunisolar traditional-month query (which resolves per year) — return
+  `:needs_window`, so the caller materialises them concretely against a bound.
+
+  ### Arguments
+
+  * `rule` is a `t:t/0`.
+
+  ### Returns
+
+  * `{:ok, recurrence}` with a `t:Tempo.Interval.t/0` recurrence.
+
+  * `:needs_window` when the rule needs a bound to materialise.
+
+  * `{:error, reason}` when the recurrence cannot be constructed.
+
+  ### Examples
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
+      iex> {:ok, recurrence} = Tempo.Holidays.Rule.recurrence(rule)
+      iex> Tempo.to_iso8601(recurrence)
+      "R/../P1Y/FL12M25DN"
+
+  """
+  @spec recurrence(t()) :: {:ok, Tempo.Interval.t()} | :needs_window | {:error, term()}
+  def recurrence(%__MODULE__{kind: :fixed, month: month, day: day}) do
+    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN")
+  end
+
+  def recurrence(%__MODULE__{kind: :weekday} = rule) do
+    Tempo.from_iso8601(weekday_iso(rule))
+  end
+
+  def recurrence(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
+      when kind in [:hebrew, :persian] do
+    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
+  end
+
+  def recurrence(%__MODULE__{kind: :julian, month: month, day: day}) do
+    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=julian]")
+  end
+
+  def recurrence(%__MODULE__{kind: kind, offset: offset})
+      when kind in [:easter, :orthodox] and offset in [nil, 0] do
+    event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
+    Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
+  end
+
+  def recurrence(%__MODULE__{}), do: :needs_window
+
+  @doc """
   Whether a rule carries an inter-holiday `t:conditional/0`.
 
   A conditional rule (a *bridge* day, or an `if is … holiday then …` move)

@@ -84,6 +84,54 @@ defmodule Tempo.Holidays do
     resolve_holidays(target, options)
   end
 
+  @doc """
+  Builds a territory's holidays as a `t:Tempo.RecurrenceSet.t/0`.
+
+  Each holiday that stands alone as a recurrence becomes a re-materialisable
+  recurrence member carrying its `%{name:, type:}` as metadata, so the whole set
+  composes with a diary through set algebra —
+  `Tempo.intersection(diary, Tempo.Holidays.recurrence_set(:AU))` finds the diary
+  entries that fall on a holiday. Holidays that need a window (a bridge or
+  `if`-holiday move, the lunisolar traditional-month) are omitted here; use
+  `materialise/3` for the complete concrete set over a year.
+
+  Takes the same target/options as `recurrences/2`.
+
+  ### Returns
+
+  * `{:ok, recurrence_set}` with a `t:Tempo.RecurrenceSet.t/0`, or
+
+  * `{:error, reason}`.
+
+  ### Examples
+
+      iex> {:ok, set} = Tempo.Holidays.recurrence_set(:AU)
+      iex> is_struct(set, Tempo.RecurrenceSet)
+      true
+
+  """
+  @spec recurrence_set(target(), keyword()) ::
+          {:ok, Tempo.RecurrenceSet.t()} | {:error, {atom(), term()}}
+  def recurrence_set(target \\ [], options \\ [])
+
+  def recurrence_set(options, extra) when is_list(options) do
+    recurrence_set(nil, Keyword.merge(options, extra))
+  end
+
+  def recurrence_set(target, options) do
+    with {:ok, holidays} <- recurrences(target, options) do
+      members = Enum.flat_map(holidays, &holiday_member/1)
+      {:ok, Tempo.RecurrenceSet.new(members)}
+    end
+  end
+
+  defp holiday_member(%Holiday{rule: rule, name: name, type: type}) do
+    case Rule.recurrence(rule) do
+      {:ok, recurrence} -> [%{recurrence | metadata: %{name: name, type: type}}]
+      _needs_window_or_error -> []
+    end
+  end
+
   defp resolve_holidays(target, options) do
     with {:ok, resolved} <- Locale.resolve(target, options) do
       Data.for_territory(resolved.territory, resolved.division, resolved.subdivision)
