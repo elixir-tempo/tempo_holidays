@@ -23,7 +23,9 @@ the Islamic civil-date `divergent` differences.
 
 ## In progress
 
-* [ ] **Conformance harness speed** — the full corpus took ~25 min. Tempo's tokenizer now parses each shared prefix once (a §12.10 window ~1.2 s → ~3.5 ms, a selection ~15 ms → ~0.4 ms), which took the run to ~5.4 min. Remaining: time spent in Astro and Calendrical (their own performance work is under way), `materialise/2` re-parsing its ISO strings on every call, and harness parallelism.
+* [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s now that `materialise/2` evaluates parsed recurrences, which parse nothing per check but make lunisolar holidays ~10× slower until lunations are cheap (below). Then: harness parallelism.
+
+* [ ] **Lunations** — a lunisolar holiday through its recurrence costs ~140–280 ms a year: one year of `FL1m1DN[u-ca=chinese]` makes ~230 Calendrical calls, 1,428 new-moon searches and 8,568 `Astro.Lunar.nth_new_moon` evaluations for ~13 lunations. Revisit where each belongs: the lunations themselves in Astro, Calendrical's per-call year rebuild, Tempo's calendar-call count.
 
 ## Blocked
 
@@ -38,6 +40,8 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **`materialise/2` on the parsed form** — it evaluates each rule's recurrence, built once per territory (`Rule.prepare/1`, cached by `Data`) or per distinct rule in the harness; `materialise_concrete/2` keeps the kind-by-kind path for the 24 `:needs_window` rules and as the independent check. 2026-09-24.
 
 * [x] **Gates in recurrences** — year ranges, `active` windows, every-N-years and weekday gates fold into the recurrence, and a substitution or `disable`/`enable` move makes it a `Tempo.RecurrenceSet`; 1,804 of 1,828 stored rules match `materialise/2` exactly over 2000–2035. 2026-09-24.
 
