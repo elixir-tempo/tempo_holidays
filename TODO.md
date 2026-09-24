@@ -23,9 +23,9 @@ the Islamic civil-date `divergent` differences.
 
 ## In progress
 
-* [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s now that `materialise/2` evaluates parsed recurrences, which parse nothing per check but make lunisolar holidays ~10× slower until lunations are cheap (below). Then: harness parallelism.
+* [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2). Then: harness parallelism.
 
-* [ ] **Lunations** — a lunisolar holiday through its recurrence costs ~140–280 ms a year: one year of `FL1m1DN[u-ca=chinese]` makes ~230 Calendrical calls, 1,428 new-moon searches and 8,568 `Astro.Lunar.nth_new_moon` evaluations for ~13 lunations. Revisit where each belongs: the lunations themselves in Astro, Calendrical's per-call year rebuild, Tempo's calendar-call count.
+* [ ] **Lunations** — Astro (2 lunations per new-moon search, was 6), Calendrical (each new year and new moon once per question) and Tempo (swaps share a candidate's day numbers) take the lunisolar workload from 53.1 s to 2.07 s, results identical. Left: Tempo's traditional-month ordinal builds a whole date through `new/3`, awaiting a Calendrical traditional→ordinal API.
 
 ## Blocked
 
