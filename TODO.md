@@ -11,7 +11,10 @@ the Islamic civil-date `divergent` differences.
 
 * [ ] **Holidays as a Tempo grammar** — the core objective: express a holiday as a Tempo interval-set value so it composes with other Tempo values (`free_time ∩ holidays`). Categorisation by rule family and a phased path in [plans/holiday-grammar.md](plans/holiday-grammar.md).
 
-* [ ] **Close the remaining declarative gaps** — `Rule.recurrence/1` emits a standalone recurrence for 1219/1478 rules; 80 stay `:needs_window` (lunisolar, islamic day-rollover/multi-day, tz equinox, solar term, easter multi-day) and 194 gates are dropped. Options per family, plus the compiler↔cookbook consistency reconciliation, in [plans/declarative-recurrence-gaps.md](plans/declarative-recurrence-gaps.md). First task there is a live crash: the solar-term `cal=nil` build bug.
+* [ ] **Gates dropped from recurrences** — a rule's substitute, weekday gate and `disable`/`enable`/`active` gates are not carried into `Rule.recurrence/1`, so `recurrence_set/2` emits the bare base date: wrong outright for substitute-only rules (KR's `substitutes 2030-02-03 if Sunday then next Tuesday` yields 3 Feb itself) and weekday-gated ones (JP's `05-04 not on sunday, monday`). Express them (`^` exclusions for `disable`, the domain for `active`, weekday-limited windows for substitutes) or return `:needs_window`.
+* [ ] **5th-weekday overflow** — `5th monday in October` overflows into November in date-holidays and `materialise/2`, but its recurrence `FL10M1K5IN` yields nothing in a four-Monday October (8 corpus years). `FLLL10M1DN/P35DN1K5IN` expresses the overflow; it is a §12.10 window, so ~1.3 s to parse until Tempo's grammar fix.
+* [ ] **Close the last declarative gaps** — 7 of 1,547 corpus rules stay `:needs_window`: 4 equinox and 1 solstice in a non-UTC timezone, and 2 `nested_after_date`. Options in [plans/declarative-recurrence-gaps.md](plans/declarative-recurrence-gaps.md).
+* [ ] **Conformance harness speed** — the full corpus takes ~25 min. Lead: a plain ISO selection parse costs ~17 ms warm and `materialise/2` re-parses its ISO strings on every call; a §12.10 window costs ~1.3 s. Profile before concluding.
 
 * [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
@@ -30,6 +33,8 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Declarative lunisolar, Islamic-rollover and multi-day recurrences** — lunisolar via the `m` traditional-month selection (offset folded into the day, the eve a backward window; 58/58), the Islamic `30 <month>` rollover as a window's last day, and `count > 1` spans as `:occurrence_duration`; conditional rules now return `:needs_window` and `recurrence_set/2` keeps member span metadata. 11,546 recurrence-vs-materialise spans exact. 2026-09-24.
 
 * [x] **Taiwan Chinese New Year makeup days** — the substitution target is now weekday-bounded, so date-holidays' malformed chained TW rule (`…then next Saturdayif Wednesday…`, a missing space) parses instead of derailing; the 7-way lieu-day chain compiles and computes the correct observed dates. 2026-09-23.
 

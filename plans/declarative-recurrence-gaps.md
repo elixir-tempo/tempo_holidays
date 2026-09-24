@@ -1,6 +1,8 @@
 # Declarative recurrence — remaining gaps
 
-**Status:** planning, 2026-09-23
+**Status:** in progress, 2026-09-24
+
+Current standing: lunisolar, the Islamic rollover and multi-day spans, the solar-term bug and solar-term recurrences are done; only **7** of 1,547 distinct corpus rules stay `:needs_window` (5 non-UTC equinox/solstice, 2 `nested_after_date`). Multi-day spans shipped as an `:occurrence_duration` directive rather than the `FLL…/P<count>DN` window proposed below, because a span window over a windowed base nests into a parse that exceeds 300 s. The analysis below is as written on 2026-09-23.
 
 `Rule.recurrence/1` now emits a standalone, re-materialisable `%Tempo.Interval{}` recurrence for **1219 of 1478** distinct date-holidays rules (up from 1080 before the "Full" pass, which added islamic, easter/orthodox offsets, and relative/nested weekdays). **80** rules still return `:needs_window`, and a further **194 gate-instances** are dropped from otherwise-faithful recurrences. This document explores options to close each, and reconciles the compiler's emitted forms with the Tempo holiday cookbook.
 
@@ -90,10 +92,13 @@ Reconciliation options (the cookbook is the doc, the compiler is the implementat
 
 ## Tasks
 
-* [ ] **Fix the solar-term `cal=nil` build bug** — trace `Build`/`DateHolidays.compile_days`, restore `Calendrical.Chinese`, add a built-rule regression test. Live crash; do first.
-* [ ] **Multi-day span recurrences** — islamic and easter/orthodox `count > 1` as `FLL…/P<count>DN`; validate against `materialise/2`.
-* [ ] **Verify tz equinox/solstice** across 2000–2100; relax the guard for zones that never shift, else scope a tz-aware `(event)E` in Tempo.
-* [ ] **Solar-term recurrence** — re-add `Calendrical.Lunisolar.solar_term_name/1`, emit `(term)EN` (after the build fix).
-* [ ] **Reconcile the cookbook** with the emitted forms — relative/nested weekday (§12.10), calendar (selection-first), easter windows (formula).
-* [ ] **Decide lossy-vs-`:needs_window`** for gates the recurrence cannot carry, and whether to pursue open-ended domain ranges / `active` date-windows in Tempo.
-* [ ] **Lunisolar** — decide (b) traditional-month selection vs (c) event resolver; both are larger, cross-repo pieces.
+* [ ] **Decide lossy-vs-`:needs_window`** for gates the recurrence cannot carry — now known to be *wrong*, not just lossy, for substitute-only and weekday-gated rules — and whether to pursue open-ended domain ranges / `active` date-windows in Tempo.
+* [ ] **Verify tz equinox/solstice** across 2000–2100; relax the guard for zones that never shift, else scope a tz-aware `(event)e` in Tempo.
+* [ ] **Reconcile the cookbook** with the emitted forms — relative/nested weekday (§12.10), calendar (selection-first), easter windows (formula), and now lunisolar `m` and multi-day spans.
+
+### Done
+
+* [x] **Lunisolar** — (b) the traditional-month `m` selection, with the offset folded into the day and the eve as a backward window; 58/58. 2026-09-24.
+* [x] **Multi-day span recurrences** — `count > 1` as an `:occurrence_duration` directive over any base (not `FLL…/P<count>DN`, whose nested form parses in >300 s). 2026-09-24.
+* [x] **Solar-term recurrence** — `Calendrical.Lunisolar.solar_term_name/1`, emitting `(term)eN`. 2026-09-24.
+* [x] **Fix the solar-term `cal=nil` build bug** — rebuilt data carries `Calendrical.Chinese`, and `materialise_base` defaults a nil meridian. 2026-09-24.
