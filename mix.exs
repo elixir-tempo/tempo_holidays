@@ -104,7 +104,9 @@ defmodule Tempo.Holidays.MixProject do
       # unreleased as of 1.3.0. `override` because ex_tempo/localize pull the
       # hex calendrical as a child. Becomes {:calendrical, "~> 1.4"} before publish.
       {:calendrical, path: "../../localize/calendrical", override: true},
-      {:astro, "~> 2.6"},
+      # `override` because the Calendrical path dep points astro at a local
+      # checkout during co-development; the published release carries that work.
+      {:astro, "~> 2.6", override: true},
       # Equinox/solstice holidays computed for a named IANA timezone (Chile's
       # solstice `in America/Santiago`) need a time-zone database; numeric
       # offsets and GMT do not. Tz is the one Astro and Calendrical already use.
@@ -112,8 +114,9 @@ defmodule Tempo.Holidays.MixProject do
       # Optional: resolves a `{lng, lat}` location to an IANA zone for the
       # `day_start: :evening` projection. A zone id needs no resolver, and
       # `:sunset` returns a UTC instant, so tz_world is only pulled in when a
-      # caller projects an evening day-start from a location.
-      {:tz_world, "~> 2.3", optional: true},
+      # caller projects an evening day-start from a location. 2.5 is the floor:
+      # its SpatialIndex lookups are about 1,500 times faster.
+      {:tz_world, "~> 2.5", optional: true},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
       {:localize, "~> 1.3"},
