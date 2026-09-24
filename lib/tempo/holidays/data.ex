@@ -8,11 +8,13 @@ defmodule Tempo.Holidays.Data do
   it needs no JSON at runtime, so it works on every supported OTP.
 
   `for_territory/1` reads one territory's file; `territories/0` lists those that
-  carry data.
+  carry data. A territory is loaded once and kept, its rules prepared
+  (`Tempo.Holidays.Rule.prepare/1`) so that every later projection evaluates
+  their already-built recurrences.
 
   """
 
-  alias Tempo.Holidays.Holiday
+  alias Tempo.Holidays.{Holiday, Rule}
 
   @doc """
   Return the compiled holidays for a territory.
@@ -46,7 +48,7 @@ defmodule Tempo.Holidays.Data do
 
   def for_territory(territory, division, subdivision)
       when is_atom(territory) or is_binary(territory) do
-    case load(upcase(territory)) do
+    case prepared(upcase(territory)) do
       {:ok, country} -> {:ok, effective(country, upcase(division), upcase(subdivision))}
       :error -> {:error, {:unknown_territory, territory}}
     end
@@ -103,6 +105,49 @@ defmodule Tempo.Holidays.Data do
       _ -> []
     end
   end
+
+  # A territory's data, loaded and prepared once — every rule's recurrence built
+  # (`Rule.prepare/1`) — and kept for the life of the VM, so projecting its
+  # holidays again builds and parses nothing. Each territory is a single
+  # `:persistent_term` entry written once, which costs no global GC.
+  defp prepared(code) do
+    key = {__MODULE__, code}
+
+    case :persistent_term.get(key, nil) do
+      nil -> load_and_prepare(key, code)
+      territory -> {:ok, territory}
+    end
+  end
+
+  defp load_and_prepare(key, code) do
+    with {:ok, territory} <- load(code) do
+      prepared = prepare_territory(territory)
+      :persistent_term.put(key, prepared)
+      {:ok, prepared}
+    end
+  end
+
+  defp prepare_territory(%{country: country, states: states} = territory) do
+    %{territory | country: prepare_holidays(country), states: Map.new(states, &prepare_state/1)}
+  end
+
+  defp prepare_state({code, %{holidays: holidays, regions: regions} = state})
+       when is_map(regions) do
+    regions =
+      Map.new(regions, fn {region_code, region} -> prepare_region(region_code, region) end)
+
+    {code, %{state | holidays: prepare_holidays(holidays), regions: regions}}
+  end
+
+  defp prepare_state({code, %{holidays: holidays} = state}),
+    do: {code, %{state | holidays: prepare_holidays(holidays)}}
+
+  defp prepare_region(code, %{holidays: holidays} = region),
+    do: {code, %{region | holidays: prepare_holidays(holidays)}}
+
+  defp prepare_holidays(holidays), do: Enum.map(holidays, &prepare_holiday/1)
+
+  defp prepare_holiday(%Holiday{rule: rule} = holiday), do: %{holiday | rule: Rule.prepare(rule)}
 
   # `File.read/1` returns a tagged tuple, so a missing territory file never
   # raises — it is simply an unknown territory.

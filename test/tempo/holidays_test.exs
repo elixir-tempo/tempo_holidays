@@ -75,11 +75,12 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  # The recurrence and `materialise/2` agree, span for span, in every year.
+  # The recurrence agrees, span for span, with the independent kind-by-kind
+  # computation (`materialise_concrete/2`) in every year.
   defp assert_matches_materialise(rule, years) do
     for year <- years do
       {:ok, bound} = Tempo.from_iso8601("#{year}Y")
-      {:ok, intervals} = Rule.materialise(rule, bound)
+      {:ok, intervals} = Rule.materialise_concrete(rule, bound)
       assert {year, recurrence_spans(rule, bound)} == {year, material_spans(intervals)}
     end
   end
@@ -172,7 +173,7 @@ defmodule Tempo.HolidaysTest do
 
         {:ok, occurrences} = Tempo.to_interval(Tempo.RecurrenceSet.new(members), bound: ~o"2026")
         occurrences = Tempo.IntervalSet.to_list(occurrences)
-        {:ok, expected} = Rule.materialise(holiday.rule, ~o"2026")
+        {:ok, expected} = Rule.materialise_concrete(holiday.rule, ~o"2026")
 
         assert occurrences != []
         assert material_spans(occurrences) == material_spans(expected)
@@ -202,13 +203,13 @@ defmodule Tempo.HolidaysTest do
     # Calendrical's to speed up, not this test's to wait for.
     test "an Islamic day-30 rollover materialises exactly as materialise/2" do
       rule = %Rule{kind: :islamic, month: 2, day: 30, calendar: Calendrical.Islamic.Civil}
-      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
       assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
     end
 
     test "an Islamic single day within the month is a direct selection" do
       rule = %Rule{kind: :islamic, month: 9, day: 15, calendar: Calendrical.Islamic.Observational}
-      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
       assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
     end
 
@@ -223,7 +224,7 @@ defmodule Tempo.HolidaysTest do
         calendar: Calendrical.Islamic.Civil
       }
 
-      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
       assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
     end
 
@@ -237,7 +238,7 @@ defmodule Tempo.HolidaysTest do
       }
 
       for year <- [~o"2025", ~o"2026", ~o"2027"] do
-        {:ok, intervals} = Rule.materialise(rule, year)
+        {:ok, intervals} = Rule.materialise_concrete(rule, year)
         assert recurrence_dates(rule, year) == greg_dates(intervals)
       end
     end
@@ -264,7 +265,7 @@ defmodule Tempo.HolidaysTest do
       }
 
       for year <- [~o"2025", ~o"2026", ~o"2029"] do
-        {:ok, intervals} = Rule.materialise(rule, year)
+        {:ok, intervals} = Rule.materialise_concrete(rule, year)
         assert recurrence_dates(rule, year) == greg_dates(intervals)
       end
     end
@@ -279,7 +280,7 @@ defmodule Tempo.HolidaysTest do
         leap_month: false
       }
 
-      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
       # Compare the spans, not just the start days: a 3-day CNY holiday.
       assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
     end
@@ -296,7 +297,7 @@ defmodule Tempo.HolidaysTest do
         leap_month: false
       }
 
-      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
       assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
     end
   end
@@ -412,6 +413,50 @@ defmodule Tempo.HolidaysTest do
 
     test "a non-leap-year rule has no domain filter yet, so it needs a window" do
       assert Rule.recurrence(compiled("09-11 in non-leap years")) == :needs_window
+    end
+  end
+
+  describe "materialise/2 through the parsed recurrence" do
+    test "a prepared rule carries its recurrence" do
+      rule = "12-25 and if saturday, sunday then next monday" |> compiled() |> Rule.prepare()
+      assert %Tempo.RecurrenceSet{} = rule.recurrence
+      assert Rule.recurrence(rule) == {:ok, rule.recurrence}
+    end
+
+    for rule_string <- [
+          "12-25",
+          "3rd monday in January",
+          "easter -2",
+          "10 Dhu al-Hijjah",
+          "chinese 01-0-01",
+          "12-25 and if saturday, sunday then next monday"
+        ] do
+      test "#{rule_string} materialises as the concrete computation does, prepared or not" do
+        rule = compiled(unquote(rule_string))
+        prepared = Rule.prepare(rule)
+
+        for year <- [~o"2025", ~o"2026"] do
+          {:ok, concrete} = Rule.materialise_concrete(rule, year)
+          {:ok, unprepared} = Rule.materialise(rule, year)
+          {:ok, parsed} = Rule.materialise(prepared, year)
+          assert material_spans(unprepared) == material_spans(concrete)
+          assert material_spans(parsed) == material_spans(concrete)
+        end
+      end
+    end
+
+    test "a rule with no standalone recurrence is prepared as :needs_window and computed concretely" do
+      rule = "09-22 if 09-21 and 09-23 is public holiday" |> compiled() |> Rule.prepare()
+      assert rule.recurrence == :needs_window
+      assert Rule.materialise(rule, ~o"2026") == Rule.materialise_concrete(rule, ~o"2026")
+    end
+
+    test "a territory's rules come prepared" do
+      {:ok, holidays} = Holidays.recurrences(:JP)
+      refute Enum.any?(holidays, &is_nil(&1.rule.recurrence))
+
+      bridge = Enum.find(holidays, &Rule.conditional?(&1.rule))
+      assert bridge.rule.recurrence == :needs_window
     end
   end
 

@@ -11,9 +11,10 @@ defmodule Tempo.Holidays.Build do
   yields the same output, and the data need not be vendored in git.
 
   `ensure_built/0` runs from the `:holidays` Mix compiler and is a no-op once
-  the current pinned data is in place — so warm builds, and every consumer
-  build (where the etf ships in the package), do no network I/O. `build/1`
-  forces a fresh download and is what `mix tempo.holidays.update` runs.
+  the current pinned data is in place, in the current data format — so warm
+  builds, and every consumer build (where the etf ships in the package), do no
+  network I/O, while a change to the serialised structs regenerates it.
+  `build/1` forces a fresh download and is what `mix tempo.holidays.update` runs.
 
   This module is Mix-only: it runs at the maintainer's build time, never at a
   consumer's runtime.
@@ -26,6 +27,11 @@ defmodule Tempo.Holidays.Build do
   @pinned_version "3.37.0"
   @source "https://cdn.jsdelivr.net/npm/date-holidays@#{@pinned_version}/data/holidays.json"
   @language "en"
+
+  # The shape of the data itself — the `%Holiday{}` and `%Rule{}` structs it
+  # serialises. Bump it with any change to those structs, so every build
+  # regenerates the data instead of loading structs of an older shape.
+  @data_format 2
 
   @doc "The exact date-holidays version the data is built from."
   def pinned_version, do: @pinned_version
@@ -67,7 +73,7 @@ defmodule Tempo.Holidays.Build do
         count + write_territory(directory, bundle, code, language)
       end)
 
-    File.write!(marker_path(), @pinned_version)
+    File.write!(marker_path(), marker())
     {:ok, written}
   end
 
@@ -220,9 +226,13 @@ defmodule Tempo.Holidays.Build do
 
   # ── paths ───────────────────────────────────────────────────────────
 
+  # The data on disk is current when it was built from the pinned version in the
+  # current data format.
   defp built? do
-    File.read(marker_path()) == {:ok, @pinned_version}
+    File.read(marker_path()) == {:ok, marker()}
   end
+
+  defp marker, do: "#{@pinned_version}+#{@data_format}"
 
   defp marker_path, do: Path.join(output_dir(), "VERSION")
 

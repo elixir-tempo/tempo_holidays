@@ -17,7 +17,8 @@ defmodule Tempo.Holidays.Conformance do
           known_unsupported: %{atom() => non_neg_integer()},
           mismatched: %{atom() => non_neg_integer()},
           divergent: %{atom() => non_neg_integer()},
-          samples: [map()]
+          samples: [map()],
+          prepared: %{{String.t(), [Rule.t()] | nil} => Rule.t()}
         }
 
   @doc "Run conformance over the given fixtures, returning aggregate stats."
@@ -38,7 +39,8 @@ defmodule Tempo.Holidays.Conformance do
       known_unsupported: %{},
       mismatched: %{},
       divergent: %{},
-      samples: []
+      samples: [],
+      prepared: %{}
     }
   end
 
@@ -103,11 +105,30 @@ defmodule Tempo.Holidays.Conformance do
     acc = %{acc | rules: acc.rules + 1}
     context = Map.merge(base, %{rule: rule, expected: expected, present: present_fun(base, rule)})
 
-    case Compiler.compile(rule) do
-      {:ok, compiled} -> check_materialised(attach_gates(compiled, context.gates), context, acc)
-      {:error, _} -> record_unsupported(acc, rule)
+    case prepared_rule(rule, context.gates, acc) do
+      {:ok, prepared, acc} -> check_materialised(prepared, context, acc)
+      {:error, acc} -> record_unsupported(acc, rule)
     end
   end
+
+  # Compile, gate and prepare each distinct rule once — keyed by its source and
+  # the gates the territory's built data gives it — so its recurrence is built a
+  # single time however many fixtures exercise it.
+  defp prepared_rule(rule, gates, acc) do
+    key = {rule, Map.get(gates, rule)}
+
+    case Map.fetch(acc.prepared, key) do
+      {:ok, prepared} -> {:ok, prepared, acc}
+      :error -> compile_and_prepare(Compiler.compile(rule), gates, key, acc)
+    end
+  end
+
+  defp compile_and_prepare({:ok, compiled}, gates, key, acc) do
+    prepared = compiled |> attach_gates(gates) |> Rule.prepare()
+    {:ok, prepared, %{acc | prepared: Map.put(acc.prepared, key, prepared)}}
+  end
+
+  defp compile_and_prepare({:error, _reason}, _gates, _key, acc), do: {:error, acc}
 
   # A rule that does not compile is a defect unless it is an accepted known gap
   # (`accepted_unsupported?/1`), which is tracked in its own bucket — the way

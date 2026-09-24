@@ -5,7 +5,12 @@ defmodule Tempo.Holidays.Rule do
   A rule is the calendar-agnostic *recurrence* behind a holiday, compiled
   from a [date-holidays](https://github.com/commenthol/date-holidays) rule
   string by `Tempo.Holidays.Compiler`. `materialise/2` projects it onto a
-  concrete year, yielding the `t:Tempo.Interval.t/0` for that occurrence.
+  concrete year, yielding the `t:Tempo.Interval.t/0` for that occurrence, by
+  evaluating the rule's recurrence (`recurrence/1`) — built once by
+  `prepare/1`, so projecting a prepared rule onto any number of years parses
+  nothing. `materialise_concrete/2` computes the same occurrences kind by kind:
+  the path for a rule with no standalone recurrence, and an independent check
+  of the ones that have one.
 
   Each `:kind` maps to the machinery that can express it: `:fixed`,
   `:weekday`, `:relative_weekday` and `:nested_weekday` (a weekday relative to
@@ -104,7 +109,8 @@ defmodule Tempo.Holidays.Rule do
           disable: [Date.t()] | nil,
           enable: [Date.t()] | nil,
           conditional: conditional() | nil,
-          source: String.t() | nil
+          source: String.t() | nil,
+          recurrence: Interval.t() | Tempo.RecurrenceSet.t() | :needs_window | nil
         }
 
   @typedoc """
@@ -157,12 +163,21 @@ defmodule Tempo.Holidays.Rule do
     :disable,
     :enable,
     :conditional,
-    :source
+    :source,
+    # The rule's recurrence once `prepare/1` has built it (or `:needs_window`
+    # when it has none); `nil` until then.
+    :recurrence
   ]
 
   @doc """
   Project a rule onto a Gregorian `year`, returning its occurrences as
   intervals.
+
+  The rule's recurrence (`recurrence/1`) is evaluated against the year, so a
+  rule that `prepare/1` has already built is projected without building or
+  parsing anything. A rule with no standalone recurrence — a bridge or
+  `if`-holiday move, an equinox or solstice outside UTC, a Vietnamese date — is
+  computed kind by kind instead (`materialise_concrete/2`).
 
   Most holidays fall exactly once a year, but a lunar-calendar holiday can
   fall zero, one or two times within a single Gregorian year — Eid al-Fitr
@@ -193,8 +208,96 @@ defmodule Tempo.Holidays.Rule do
   """
   @spec materialise(t(), Tempo.t()) :: {:ok, [Interval.t()]} | {:error, term()}
   def materialise(%__MODULE__{} = rule, %Tempo{} = year) do
+    case built_recurrence(rule) do
+      :needs_window -> materialise_concrete(rule, year)
+      recurrence -> materialise_recurrence(recurrence, year)
+    end
+  end
+
+  @doc """
+  Project a rule onto a Gregorian `year` by computing its kind directly, without
+  its recurrence.
+
+  This is how `materialise/2` projects a rule that has no standalone recurrence.
+  For one that has, it is a second, independent computation of the same
+  occurrences — the check that `recurrence/1` is exact.
+
+  ### Arguments
+
+  * `rule` is a `t:t/0`.
+
+  * `year` is a year-resolution Gregorian `t:Tempo.t/0` such as `~o"2026"`.
+
+  ### Returns
+
+  * `{:ok, [t:Tempo.Interval.t/0]}` — the holiday's spans in that Gregorian
+    year, earliest first, as for `materialise/2`.
+
+  * `{:error, reason}` when the rule cannot be projected.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
+      iex> {:ok, [interval]} = Tempo.Holidays.Rule.materialise_concrete(rule, ~o"2026")
+      iex> Tempo.Interval.from(interval)
+      ~o"2026Y12M25D"
+
+  """
+  @spec materialise_concrete(t(), Tempo.t()) :: {:ok, [Interval.t()]} | {:error, term()}
+  def materialise_concrete(%__MODULE__{} = rule, %Tempo{} = year) do
     with {:ok, occurrences} <- gather_occurrences(rule, year) do
       move_disabled(occurrences, rule, year)
+    end
+  end
+
+  @doc """
+  Returns the rule with its recurrence built and attached.
+
+  `materialise/2` evaluates a rule's recurrence, so a prepared rule — which
+  carries it — is projected onto any number of years without its recurrence
+  being built or parsed again. `Tempo.Holidays.Data` prepares every rule it
+  loads.
+
+  ### Arguments
+
+  * `rule` is a `t:t/0`.
+
+  ### Returns
+
+  * The `t:t/0` with `:recurrence` set to its recurrence, or to `:needs_window`
+    when it has no standalone recurrence (see `recurrence/1`).
+
+  ### Examples
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
+      iex> prepared = Tempo.Holidays.Rule.prepare(rule)
+      iex> Tempo.to_iso8601(prepared.recurrence)
+      "R/../P1Y/FL12M25DN"
+
+  """
+  @spec prepare(t()) :: t()
+  def prepare(%__MODULE__{recurrence: nil} = rule),
+    do: %{rule | recurrence: build_recurrence(rule)}
+
+  def prepare(%__MODULE__{} = rule), do: rule
+
+  # A prepared rule carries its recurrence; an unprepared one builds it here.
+  defp built_recurrence(%__MODULE__{recurrence: nil} = rule), do: build_recurrence(rule)
+  defp built_recurrence(%__MODULE__{recurrence: recurrence}), do: recurrence
+
+  # The rule's recurrence, or `:needs_window` for a rule that has none (a
+  # recurrence that cannot be constructed is computed concretely as well).
+  defp build_recurrence(rule) do
+    case recurrence(rule) do
+      {:ok, recurrence} -> recurrence
+      _needs_window_or_error -> :needs_window
+    end
+  end
+
+  defp materialise_recurrence(recurrence, year) do
+    with {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
+      {:ok, Tempo.IntervalSet.to_list(set)}
     end
   end
 
@@ -271,6 +374,13 @@ defmodule Tempo.Holidays.Rule do
 
   @spec recurrence(t()) ::
           {:ok, Interval.t() | Tempo.RecurrenceSet.t()} | :needs_window | {:error, term()}
+  # A prepared rule already carries its recurrence (see `prepare/1`).
+  def recurrence(%__MODULE__{recurrence: :needs_window}), do: :needs_window
+  def recurrence(%__MODULE__{recurrence: %Interval{} = recurrence}), do: {:ok, recurrence}
+
+  def recurrence(%__MODULE__{recurrence: %Tempo.RecurrenceSet{} = recurrence}),
+    do: {:ok, recurrence}
+
   # A conditional rule (a bridge day, an `if is … holiday then …` move) depends on
   # the year's other holidays, so it has no standalone recurrence.
   def recurrence(%__MODULE__{conditional: conditional}) when not is_nil(conditional),
