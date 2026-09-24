@@ -19,11 +19,15 @@ defmodule Tempo.Holidays.Rule do
   `[u-ca=…]`-tagged value.
 
   `recurrence/1` re-expresses most kinds as a standalone, re-materialisable
-  `%Tempo.Interval{}` recurrence: a calendar date under `[u-ca=…]`, a moveable
-  feast as a §12.10 window off `(easter)e`, a relative or nested weekday as a
-  window off its anchor date. The kinds that stay `:needs_window` are the
-  lunisolar traditional-month query, an Islamic day-rollover or multi-day span,
-  a timezone-specific equinox, and the inter-holiday bridge / `if`-holiday.
+  `%Tempo.Interval{}` recurrence: a calendar date under `[u-ca=…]`, a lunisolar
+  date as a traditional-month `m` selection under `[u-ca=…]`, a moveable feast as
+  a §12.10 window off `(easter)e`, a relative or nested weekday as a window off
+  its anchor date, an Islamic day-rollover as the last day of a window off the
+  month's 1st, and a lunisolar eve or day-offset folded into the day (`net_day =
+  day + offset`). A multi-day holiday (`count > 1`) adds an `:occurrence_duration`
+  span over any of these. The kinds that stay `:needs_window` are a
+  timezone-specific equinox/solstice, a shifted or non-Chinese-meridian solar
+  term, and the inter-holiday bridge / `if`-holiday.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -229,10 +233,31 @@ defmodule Tempo.Holidays.Rule do
       "R/{2020Y..2024Y}/P1Y/FL12M25DN"
 
   """
+  # The kinds whose `count` is a multi-day span (the others use `count` for a
+  # weekday, an instance or a solar-term index, so they take no span).
+  @span_kinds [
+    :fixed,
+    :easter,
+    :orthodox,
+    :equinox,
+    :solstice,
+    :hebrew,
+    :persian,
+    :julian,
+    :islamic,
+    :lunisolar
+  ]
+
   @spec recurrence(t()) :: {:ok, Tempo.Interval.t()} | :needs_window | {:error, term()}
+  # A conditional rule (a bridge day, an `if is … holiday then …` move) depends on
+  # the year's other holidays, so it has no standalone recurrence.
+  def recurrence(%__MODULE__{conditional: conditional}) when not is_nil(conditional),
+    do: :needs_window
+
   def recurrence(%__MODULE__{} = rule) do
-    with {:ok, base} <- base_recurrence(rule) do
-      apply_year_domain(base, rule)
+    with {:ok, base} <- base_recurrence(rule),
+         {:ok, domained} <- apply_year_domain(base, rule) do
+      {:ok, apply_span(domained, rule)}
     end
   end
 
@@ -290,18 +315,24 @@ defmodule Tempo.Holidays.Rule do
   end
 
   # An Islamic fixed date is a `[u-ca=islamic-*]` selection, like the Hebrew and
-  # Persian ones. Guarded to a valid, single-day date: date-holidays' `30 Ramadan`
-  # style day-beyond-the-month (a sunset-convention rollover) and multi-day spans
-  # need the concrete `materialise/2` handling, so they stay `:needs_window`.
-  defp base_recurrence(%__MODULE__{
-         kind: :islamic,
-         calendar: calendar,
-         month: month,
-         day: day,
-         count: count
-       })
-       when day <= 29 and count in [nil, 1] do
+  # Persian ones. A single day within the month is the direct selection; a
+  # multi-day span (`count > 1`) is added by `apply_span/2`.
+  defp base_recurrence(%__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day})
+       when is_integer(day) and day <= 29 do
     Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
+  end
+
+  # A day at or beyond the month's length (date-holidays' `30 Ramadan`, `30
+  # Safar`) is the sunset-convention rollover: the 1st of the month plus `day - 1`
+  # days, which becomes the next month's 1st when the month is short. Declaratively
+  # that is the final day of the `day`-long window from the 1st — `{1..7}K-1I`
+  # picks the window's last day regardless of weekday — reproducing the same
+  # in-calendar arithmetic `materialise/2` uses, never forming an out-of-range date.
+  defp base_recurrence(%__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day})
+       when is_integer(day) and day >= 30 do
+    Tempo.from_iso8601(
+      "R/../P1Y/FLLL#{month}M1DN/P#{day}DN{1..7}K-1IN[u-ca=#{calendar_tag(calendar)}]"
+    )
   end
 
   defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
@@ -313,11 +344,9 @@ defmodule Tempo.Holidays.Rule do
   # A moveable feast a fixed offset from Easter (Ash Wednesday −46, Ascension
   # +39, …). Easter is a Sunday, so `easter + offset` lands on a derivable
   # weekday, expressed as an ISO 8601-2 §12.10 window off `(easter)e` picking
-  # that weekday. A multi-day span (`count > 1`) needs the concrete span, so it
-  # stays `:needs_window`.
-  defp base_recurrence(%__MODULE__{kind: kind, offset: offset, count: count})
-       when kind in [:easter, :orthodox] and is_integer(offset) and offset != 0 and
-              count in [nil, 1] do
+  # that weekday. A multi-day span (`count > 1`) is added by `apply_span/2`.
+  defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
+       when kind in [:easter, :orthodox] and is_integer(offset) and offset != 0 do
     event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
     Tempo.from_iso8601("R/../P1Y/FLLL(#{event})eN/#{easter_offset_window(offset)}N")
   end
@@ -344,7 +373,41 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
+  # A lunisolar date (Chinese, Korean/dangi or Vietnamese) is a traditional-month
+  # `m` selection under `[u-ca=…]`: `<month>m<day>D`, or `<month>+m<day>D` for a
+  # leap month. The traditional→ordinal step and the Gregorian-year attribution
+  # (a late lunar month falling in the following year) are the selection's own,
+  # resolved per year at materialisation — so it round-trips and re-materialises
+  # like the calendar-date tiers. A day-offset folds into the day (`net_day = day
+  # + offset`), so `day 1` shifted `-1` and a `day 0` are the same eve; a multi-day
+  # span is added by `apply_span/2`. (Vietnamese shares the CLDR `:chinese`
+  # identifier, so it resolves through the Chinese calendar — the two agree over
+  # the corpus.)
+  defp base_recurrence(%__MODULE__{
+         kind: :lunisolar,
+         calendar: calendar,
+         month: month,
+         day: day,
+         leap_month: leap_month,
+         offset: offset
+       })
+       when is_integer(month) and is_integer(day) do
+    designator = if leap_month, do: "#{month}+m", else: "#{month}m"
+    net_day = day + (offset || 0)
+    Tempo.from_iso8601(lunisolar_selection(designator, net_day, calendar_tag(calendar)))
+  end
+
   defp base_recurrence(%__MODULE__{}), do: :needs_window
+
+  # A single lunisolar occurrence at `net_day` of the traditional month.
+  # `net_day >= 1` is a forward `m` selection; `net_day <= 0` is the eve — a
+  # backward window off the 1st whose first day (`{1..7}K1I`, the earliest
+  # regardless of weekday) lands `net_day - 1` days before it.
+  defp lunisolar_selection(designator, net_day, tag) when net_day >= 1,
+    do: "R/../P1Y/FL#{designator}#{net_day}DN[u-ca=#{tag}]"
+
+  defp lunisolar_selection(designator, net_day, tag),
+    do: "R/../P1Y/FLLL#{designator}1DN/-P#{1 - net_day}DN{1..7}K1IN[u-ca=#{tag}]"
 
   defp solar_event_name(:equinox, 3), do: "march-equinox"
   defp solar_event_name(:equinox, 9), do: "september-equinox"
@@ -388,6 +451,22 @@ defmodule Tempo.Holidays.Rule do
         |> Tempo.from_iso8601()
     end
   end
+
+  # A multi-day holiday (`count > 1`) spans that many days from each occurrence.
+  # It is carried as an `:occurrence_duration` directive (the mechanism iCal DTEND
+  # uses) rather than a §12.10 span window, because the span is orthogonal to how
+  # the occurrence's start resolves — a plain date, a calendar date, a computed
+  # event, an Islamic rollover, or a lunisolar eve all take the same span — and
+  # because a span window over a *windowed* base nests into an exponentially slow
+  # parse. Applied after the year-domain step, which round-trips through ISO 8601
+  # and would drop the metadata. Only `@span_kinds` treat `count` as a span.
+  defp apply_span(%Interval{} = recurrence, %__MODULE__{kind: kind, count: count})
+       when kind in @span_kinds and is_integer(count) and count > 1 do
+    duration = %Tempo.Duration{time: [day: count]}
+    %{recurrence | metadata: Map.put(recurrence.metadata, :occurrence_duration, duration)}
+  end
+
+  defp apply_span(recurrence, _rule), do: recurrence
 
   # `to_year` is exclusive, so a closed range's inclusive domain runs to
   # `to_year - 1`. An even/odd/leap rule adds an `e`/`o`/`l` filter — on the

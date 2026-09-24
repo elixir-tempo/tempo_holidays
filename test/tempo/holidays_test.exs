@@ -30,12 +30,60 @@ defmodule Tempo.HolidaysTest do
   defp gregorian_dates(rule_string, year) do
     {:ok, rule} = Compiler.compile(rule_string)
     {:ok, intervals} = Rule.materialise(rule, year)
+    greg_dates(intervals)
+  end
 
-    Enum.map(intervals, fn interval ->
+  # The sorted Gregorian ISO dates a list of intervals falls on.
+  defp greg_dates(intervals) do
+    intervals
+    |> Enum.map(fn interval ->
       {:ok, date} = Tempo.to_date(Tempo.Interval.from(interval))
       {:ok, iso} = Date.convert(date, Calendar.ISO)
       Date.to_iso8601(iso)
     end)
+    |> Enum.sort()
+  end
+
+  # The Gregorian dates a rule's `recurrence/1` materialises to in `year`.
+  defp recurrence_dates(rule, year) do
+    {:ok, recurrence} = Rule.recurrence(rule)
+    {:ok, set} = Tempo.to_interval(recurrence, bound: year)
+    greg_dates(Tempo.IntervalSet.to_list(set))
+  end
+
+  # The sorted `from..to` Gregorian spans of a list of intervals — so a
+  # multi-day holiday is compared by its whole extent, not just its start.
+  defp material_spans(intervals) do
+    intervals
+    |> Enum.map(fn interval ->
+      "#{greg(Tempo.Interval.from(interval))}..#{greg(Tempo.Interval.to(interval))}"
+    end)
+    |> Enum.sort()
+  end
+
+  defp recurrence_spans(rule, year) do
+    {:ok, recurrence} = Rule.recurrence(rule)
+    {:ok, set} = Tempo.to_interval(recurrence, bound: year)
+    material_spans(Tempo.IntervalSet.to_list(set))
+  end
+
+  defp greg(%Tempo{} = tempo) do
+    {:ok, date} = Tempo.to_date(tempo)
+    {:ok, iso} = Date.convert(date, Calendar.ISO)
+    Date.to_iso8601(iso)
+  end
+
+  defp greg(other), do: inspect(other)
+
+  # Holiday names are not unique (a territory can have many rules under one
+  # name), so a recurrence-set member is paired with its holiday by position: the
+  # set holds the declarative holidays' recurrences, in order.
+  defp holiday_members(territory) do
+    {:ok, holidays} = Holidays.recurrences(territory)
+    declarative = Enum.filter(holidays, &match?({:ok, _}, Rule.recurrence(&1.rule)))
+    {:ok, set} = Holidays.recurrence_set(territory)
+    assert length(set.members) == length(declarative)
+    Enum.zip(declarative, set.members)
   end
 
   doctest Tempo.Holidays
@@ -67,6 +115,147 @@ defmodule Tempo.HolidaysTest do
 
     test "a value that is neither atom nor string is an invalid locale, not a crash" do
       assert {:error, {:invalid_locale, 123}} = Holidays.recurrences(123)
+    end
+  end
+
+  describe "recurrence_set/2 members" do
+    # Through the public API, a multi-day holiday must keep its span (carried as
+    # an `:occurrence_duration` directive) alongside its name, and the directive
+    # must not leak onto the materialised occurrence.
+    for {territory, name} <- [
+          {:VN, "Vietnamese New Year Holidays"},
+          {:SA, "End of Ramadan (Eid al-Fitr)"},
+          {:KR, "Korean New Year"}
+        ] do
+      test "#{territory} #{name} keeps its multi-day span and its name" do
+        {holiday, member} =
+          Enum.find(holiday_members(unquote(territory)), fn {holiday, _member} ->
+            holiday.name == unquote(name) and is_integer(holiday.rule.count) and
+              holiday.rule.count > 1
+          end)
+
+        {:ok, occurrences} = Tempo.to_interval(Tempo.RecurrenceSet.new([member]), bound: ~o"2026")
+        occurrences = Tempo.IntervalSet.to_list(occurrences)
+        {:ok, expected} = Rule.materialise(holiday.rule, ~o"2026")
+
+        assert occurrences != []
+        assert material_spans(occurrences) == material_spans(expected)
+        assert Enum.all?(occurrences, &(&1.metadata[:name] == unquote(name)))
+        refute Enum.any?(occurrences, &Map.has_key?(&1.metadata, :occurrence_duration))
+      end
+    end
+
+    test "a conditional (bridge-day) holiday has no standalone recurrence" do
+      {:ok, holidays} = Holidays.recurrences(:JP)
+      bridge = Enum.find(holidays, &Rule.conditional?(&1.rule))
+      assert bridge.rule.source == "09-22 if 09-21 and 09-23 is public holiday"
+      assert Rule.recurrence(bridge.rule) == :needs_window
+
+      # Every set member pairs with a non-conditional holiday.
+      refute Enum.any?(holiday_members(:JP), fn {holiday, _member} ->
+               Rule.conditional?(holiday.rule)
+             end)
+    end
+  end
+
+  describe "Rule.recurrence/1 declarative forms" do
+    test "an Islamic day-30 rollover materialises exactly as materialise/2" do
+      rule = %Rule{kind: :islamic, month: 2, day: 30, calendar: Calendrical.Islamic.Observational}
+      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
+    end
+
+    test "an Islamic single day within the month is a direct selection" do
+      rule = %Rule{kind: :islamic, month: 9, day: 15, calendar: Calendrical.Islamic.Observational}
+      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
+    end
+
+    test "an Islamic multi-day rollover span matches materialise/2" do
+      # Saudi Eid al-Fitr: 30 Ramadan (a rollover) for 4 days.
+      rule = %Rule{
+        kind: :islamic,
+        month: 9,
+        day: 30,
+        count: 4,
+        calendar: Calendrical.Islamic.Observational
+      }
+
+      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
+    end
+
+    test "a lunisolar traditional-month date matches materialise/2 across a leap boundary" do
+      rule = %Rule{
+        kind: :lunisolar,
+        month: 1,
+        day: 1,
+        calendar: Calendrical.Chinese,
+        leap_month: false
+      }
+
+      for year <- [~o"2025", ~o"2026", ~o"2027"] do
+        {:ok, intervals} = Rule.materialise(rule, year)
+        assert recurrence_dates(rule, year) == greg_dates(intervals)
+      end
+    end
+
+    test "a lunisolar Chinese New Year lands on its known Gregorian date" do
+      rule = %Rule{
+        kind: :lunisolar,
+        month: 1,
+        day: 1,
+        calendar: Calendrical.Chinese,
+        leap_month: false
+      }
+
+      assert recurrence_dates(rule, ~o"2026") == ["2026-02-17"]
+    end
+
+    test "a lunisolar `day 0` eve matches materialise/2 (day 1, shifted back)" do
+      rule = %Rule{
+        kind: :lunisolar,
+        month: 1,
+        day: 0,
+        calendar: Calendrical.Chinese,
+        leap_month: false
+      }
+
+      for year <- [~o"2025", ~o"2026", ~o"2029"] do
+        {:ok, intervals} = Rule.materialise(rule, year)
+        assert recurrence_dates(rule, year) == greg_dates(intervals)
+      end
+    end
+
+    test "a lunisolar multi-day holiday is a §12.10 span matching materialise/2" do
+      rule = %Rule{
+        kind: :lunisolar,
+        month: 1,
+        day: 1,
+        count: 3,
+        calendar: Calendrical.Chinese,
+        leap_month: false
+      }
+
+      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      # Compare the spans, not just the start days: a 3-day CNY holiday.
+      assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
+    end
+
+    test "a lunisolar day-offset with a span (Tết eve, 5 days) folds and matches materialise/2" do
+      # offset -1 folds into the day (net_day 0 = the eve), then a 5-day span.
+      rule = %Rule{
+        kind: :lunisolar,
+        month: 1,
+        day: 1,
+        offset: -1,
+        count: 5,
+        calendar: Calendrical.Vietnamese,
+        leap_month: false
+      }
+
+      {:ok, intervals} = Rule.materialise(rule, ~o"2026")
+      assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
     end
   end
 

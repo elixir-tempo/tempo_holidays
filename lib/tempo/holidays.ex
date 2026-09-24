@@ -125,10 +125,17 @@ defmodule Tempo.Holidays do
     end
   end
 
+  # The holiday's name and type are merged into the recurrence's metadata, not
+  # written over it: a multi-day holiday carries its span there as an
+  # `:occurrence_duration` directive, which replacing the map would discard.
   defp holiday_member(%Holiday{rule: rule, name: name, type: type}) do
     case Rule.recurrence(rule) do
-      {:ok, recurrence} -> [%{recurrence | metadata: %{name: name, type: type}}]
-      _needs_window_or_error -> []
+      {:ok, recurrence} ->
+        metadata = Map.merge(recurrence.metadata, %{name: name, type: type})
+        [%{recurrence | metadata: metadata}]
+
+      _needs_window_or_error ->
+        []
     end
   end
 
