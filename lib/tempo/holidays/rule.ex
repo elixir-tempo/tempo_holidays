@@ -12,7 +12,7 @@ defmodule Tempo.Holidays.Rule do
   a weekday-in-month, such as US Election Day) are Tempo-native date selections
   and arithmetic; `:easter` / `:orthodox` are computed through Calendrical's
   ecclesiastical calendar, since Easter has no fixed-date RRULE and is instead
-  a `(easter)E` computed event; and `:islamic`, `:hebrew`, `:persian` and
+  a `(easter)e` computed event; and `:islamic`, `:hebrew`, `:persian` and
   `:julian` (Orthodox Christmas and the like) are each materialised in their
   own calendar as a yearly recurrence bounded to the year — Islamic via Umm
   al-Qura, Julian via Calendrical's non-CLDR Julian calendar — returned as an
@@ -20,7 +20,7 @@ defmodule Tempo.Holidays.Rule do
 
   `recurrence/1` re-expresses most kinds as a standalone, re-materialisable
   `%Tempo.Interval{}` recurrence: a calendar date under `[u-ca=…]`, a moveable
-  feast as a §12.10 window off `(easter)E`, a relative or nested weekday as a
+  feast as a §12.10 window off `(easter)e`, a relative or nested weekday as a
   window off its anchor date. The kinds that stay `:needs_window` are the
   lunisolar traditional-month query, an Islamic day-rollover or multi-day span,
   a timezone-specific equinox, and the inter-holiday bridge / `if`-holiday.
@@ -307,19 +307,19 @@ defmodule Tempo.Holidays.Rule do
   defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
        when kind in [:easter, :orthodox] and offset in [nil, 0] do
     event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
-    Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
+    Tempo.from_iso8601("R/../P1Y/FL(#{event})eN")
   end
 
   # A moveable feast a fixed offset from Easter (Ash Wednesday −46, Ascension
   # +39, …). Easter is a Sunday, so `easter + offset` lands on a derivable
-  # weekday, expressed as an ISO 8601-2 §12.10 window off `(easter)E` picking
+  # weekday, expressed as an ISO 8601-2 §12.10 window off `(easter)e` picking
   # that weekday. A multi-day span (`count > 1`) needs the concrete span, so it
   # stays `:needs_window`.
   defp base_recurrence(%__MODULE__{kind: kind, offset: offset, count: count})
        when kind in [:easter, :orthodox] and is_integer(offset) and offset != 0 and
               count in [nil, 1] do
     event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
-    Tempo.from_iso8601("R/../P1Y/FLLL(#{event})EN/#{easter_offset_window(offset)}N")
+    Tempo.from_iso8601("R/../P1Y/FLLL(#{event})eN/#{easter_offset_window(offset)}N")
   end
 
   defp base_recurrence(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
@@ -327,7 +327,20 @@ defmodule Tempo.Holidays.Rule do
               timezone in [nil, "GMT", "UTC"] do
     case solar_event_name(kind, month) do
       nil -> :needs_window
-      event -> Tempo.from_iso8601("R/../P1Y/FL(#{event})EN")
+      event -> Tempo.from_iso8601("R/../P1Y/FL(#{event})eN")
+    end
+  end
+
+  # A Chinese solar term is the built-in `(term)e` event — the same jié-qì that
+  # `materialise_base` computes through Calendrical, which also names the 1-based
+  # index. `(term)e` resolves at the Chinese meridian by default, so a `day` past
+  # the term's first (a shift) or a non-Chinese meridian needs the concrete
+  # projection and stays `:needs_window`.
+  defp base_recurrence(%__MODULE__{kind: :solar_term, calendar: calendar, count: term, day: day})
+       when calendar in [nil, Calendrical.Chinese] and day in [nil, 1] do
+    case Calendrical.Lunisolar.solar_term_name(term) do
+      {:ok, name} -> Tempo.from_iso8601("R/../P1Y/FL(#{name})eN")
+      {:error, _reason} -> :needs_window
     end
   end
 
@@ -339,7 +352,7 @@ defmodule Tempo.Holidays.Rule do
   defp solar_event_name(:solstice, 12), do: "december-solstice"
   defp solar_event_name(_kind, _month), do: nil
 
-  # The §12.10 window that picks `easter + offset` off `(easter)E`: a forward
+  # The §12.10 window that picks `easter + offset` off `(easter)e`: a forward
   # window taking the last occurrence of the target weekday for a positive
   # offset, a backward window taking the first for a negative one. Easter is a
   # Sunday (ISO weekday 7), so the weekday is `mod(6 + offset, 7) + 1`.
@@ -955,13 +968,17 @@ defmodule Tempo.Holidays.Rule do
   # resolves the 1-based term index to the Gregorian day the sun reaches its
   # ecliptic longitude, observed at the calendar's meridian (`calendar.location/1`);
   # nothing calendrical is computed here. `<day>` is a 1-based offset into the
-  # term. Solar, so a Gregorian civil date.
+  # term. Solar, so a Gregorian civil date. The meridian defaults to the Chinese
+  # one when the rule carries no calendar — solar terms are Chinese-tradition —
+  # so a missing calendar projects correctly rather than crashing on `nil`.
   defp materialise_base(
          %__MODULE__{kind: :solar_term, calendar: calendar, count: term, day: day},
          %Tempo{} = year
        ) do
+    meridian = calendar || Calendrical.Chinese
+
     with {:ok, date} <-
-           Calendrical.Lunisolar.solar_term(term, Tempo.year(year), &calendar.location(&1)) do
+           Calendrical.Lunisolar.solar_term(term, Tempo.year(year), &meridian.location(&1)) do
       date
       |> Tempo.from_elixir()
       |> Tempo.shift(day: day - 1)
@@ -1052,13 +1069,13 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # A holiday fixed by a computed event (`(easter)E`, `(orthodox-easter)E`) plus
+  # A holiday fixed by a computed event (`(easter)e`, `(orthodox-easter)e`) plus
   # a day `offset`. The whole calendar computation is delegated to `Tempo.Event`
   # (and Calendrical/Astro beneath it): the event recurrence bounded to the year
   # resolves the event's date, `Tempo.shift` applies the offset, and `count`
   # extends the span. Nothing here computes a date.
   defp computed_event_holiday(event, offset, count, %Tempo{} = year) do
-    with {:ok, recurrence} <- Tempo.from_iso8601("R/../P1Y/FL(#{event})EN"),
+    with {:ok, recurrence} <- Tempo.from_iso8601("R/../P1Y/FL(#{event})eN"),
          {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
       set
       |> Tempo.IntervalSet.to_list()

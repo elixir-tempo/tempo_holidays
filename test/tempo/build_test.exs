@@ -1,7 +1,9 @@
 defmodule Tempo.Holidays.BuildTest do
   use ExUnit.Case, async: true
 
-  alias Tempo.Holidays.Build
+  import Tempo.Sigils
+
+  alias Tempo.Holidays.{Build, Rule}
 
   describe "holidays_from_bundle/3" do
     setup do
@@ -62,6 +64,31 @@ defmodule Tempo.Holidays.BuildTest do
 
       # Inherited Christmas kept, Thanksgiving removed, own Founders' Day added.
       assert names == ["Christmas Day", "Founders' Day"]
+    end
+  end
+
+  # Regression: a stale build once stored `calendar: nil` for solar-term rules,
+  # so `Rule.materialise/2` crashed calling `nil.location/1`. The build must set
+  # the meridian, and materialise must not crash if it is ever missing.
+  describe "solar-term calendar" do
+    test "a built solar-term rule carries its Chinese calendar" do
+      bundle = %{
+        "holidays" => %{
+          "CX" => %{"days" => %{"chinese 5-01 solarterm" => %{"name" => %{"en" => "Qingming"}}}}
+        }
+      }
+
+      [holiday] = Build.holidays_from_bundle(bundle, "CX", "en")
+      assert holiday.rule.kind == :solar_term
+      assert holiday.rule.calendar == Calendrical.Chinese
+    end
+
+    test "materialise defaults to the Chinese meridian when the calendar is absent" do
+      rule = %Rule{kind: :solar_term, calendar: nil, count: 5, day: 1}
+      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
+      # Qingming 2026 is 5 April at the Chinese meridian.
+      assert Rule.materialise(%{rule | calendar: Calendrical.Chinese}, ~o"2026") ==
+               {:ok, [interval]}
     end
   end
 end
