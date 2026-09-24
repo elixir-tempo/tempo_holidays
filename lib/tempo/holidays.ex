@@ -87,12 +87,14 @@ defmodule Tempo.Holidays do
   @doc """
   Builds a territory's holidays as a `t:Tempo.RecurrenceSet.t/0`.
 
-  Each holiday that stands alone as a recurrence becomes a re-materialisable
-  recurrence member carrying its `%{name:, type:}` as metadata, so the whole set
-  composes with a diary through set algebra —
+  Each holiday that stands alone as a recurrence becomes one or more
+  re-materialisable recurrence members — several for a substituted holiday (its
+  own date and its observed days) — each carrying the holiday's `%{name:, type:}`
+  as metadata, so the whole set composes with a diary through set algebra —
   `Tempo.intersection(diary, Tempo.Holidays.recurrence_set(:AU))` finds the diary
-  entries that fall on a holiday. Holidays that need a window (a bridge or
-  `if`-holiday move, the lunisolar traditional-month) are omitted here; use
+  entries that fall on a holiday. Holidays that need a window (see
+  `Tempo.Holidays.Rule.recurrence/1`: a bridge or `if`-holiday move, an
+  equinox or solstice outside UTC, a Vietnamese date) are omitted here; use
   `materialise/3` for the complete concrete set over a year.
 
   Takes the same target/options as `recurrences/2`.
@@ -125,18 +127,26 @@ defmodule Tempo.Holidays do
     end
   end
 
-  # The holiday's name and type are merged into the recurrence's metadata, not
-  # written over it: a multi-day holiday carries its span there as an
-  # `:occurrence_duration` directive, which replacing the map would discard.
+  # A holiday is one recurrence, or a set of them (a substituted holiday's own
+  # date and its observed days), each becoming a member. The holiday's name and
+  # type are merged into each member's metadata, not written over it: a
+  # multi-day holiday carries its span there as an `:occurrence_duration`
+  # directive, which replacing the map would discard.
   defp holiday_member(%Holiday{rule: rule, name: name, type: type}) do
     case Rule.recurrence(rule) do
+      {:ok, %Tempo.RecurrenceSet{members: members}} ->
+        Enum.map(members, &named_member(&1, name, type))
+
       {:ok, recurrence} ->
-        metadata = Map.merge(recurrence.metadata, %{name: name, type: type})
-        [%{recurrence | metadata: metadata}]
+        [named_member(recurrence, name, type)]
 
       _needs_window_or_error ->
         []
     end
+  end
+
+  defp named_member(recurrence, name, type) do
+    %{recurrence | metadata: Map.merge(recurrence.metadata, %{name: name, type: type})}
   end
 
   defp resolve_holidays(target, options) do

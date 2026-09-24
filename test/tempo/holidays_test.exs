@@ -67,6 +67,28 @@ defmodule Tempo.HolidaysTest do
     material_spans(Tempo.IntervalSet.to_list(set))
   end
 
+  # A rule's recurrence as ISO 8601 — one string per member.
+  defp members_iso(rule) do
+    case Rule.recurrence(rule) do
+      {:ok, %Tempo.RecurrenceSet{members: members}} -> Enum.map(members, &Tempo.to_iso8601/1)
+      {:ok, recurrence} -> [Tempo.to_iso8601(recurrence)]
+    end
+  end
+
+  # The recurrence and `materialise/2` agree, span for span, in every year.
+  defp assert_matches_materialise(rule, years) do
+    for year <- years do
+      {:ok, bound} = Tempo.from_iso8601("#{year}Y")
+      {:ok, intervals} = Rule.materialise(rule, bound)
+      assert {year, recurrence_spans(rule, bound)} == {year, material_spans(intervals)}
+    end
+  end
+
+  defp compiled(rule_string, gates \\ []) do
+    {:ok, rule} = Compiler.compile(rule_string)
+    struct!(rule, gates)
+  end
+
   defp greg(%Tempo{} = tempo) do
     {:ok, date} = Tempo.to_date(tempo)
     {:ok, iso} = Date.convert(date, Calendar.ISO)
@@ -76,15 +98,25 @@ defmodule Tempo.HolidaysTest do
   defp greg(other), do: inspect(other)
 
   # Holiday names are not unique (a territory can have many rules under one
-  # name), so a recurrence-set member is paired with its holiday by position: the
-  # set holds the declarative holidays' recurrences, in order.
+  # name), so recurrence-set members are paired with their holiday by position:
+  # the set holds each declarative holiday's members in order — one for a single
+  # recurrence, several for a recurrence set — and every member is accounted for.
   defp holiday_members(territory) do
     {:ok, holidays} = Holidays.recurrences(territory)
-    declarative = Enum.filter(holidays, &match?({:ok, _}, Rule.recurrence(&1.rule)))
     {:ok, set} = Holidays.recurrence_set(territory)
-    assert length(set.members) == length(declarative)
-    Enum.zip(declarative, set.members)
+
+    {pairs, []} =
+      Enum.flat_map_reduce(holidays, set.members, fn holiday, members ->
+        {taken, rest} = Enum.split(members, member_count(Rule.recurrence(holiday.rule)))
+        {Enum.map(taken, &{holiday, &1}), rest}
+      end)
+
+    pairs
   end
+
+  defp member_count({:ok, %Tempo.RecurrenceSet{members: members}}), do: length(members)
+  defp member_count({:ok, _recurrence}), do: 1
+  defp member_count(_needs_window), do: 0
 
   doctest Tempo.Holidays
   doctest Tempo.Holidays.Data
@@ -123,18 +155,22 @@ defmodule Tempo.HolidaysTest do
     # an `:occurrence_duration` directive) alongside its name, and the directive
     # must not leak onto the materialised occurrence.
     for {territory, name} <- [
-          {:VN, "Vietnamese New Year Holidays"},
+          {:CX, "Chinese New Year"},
           {:SA, "End of Ramadan (Eid al-Fitr)"},
           {:KR, "Korean New Year"}
         ] do
       test "#{territory} #{name} keeps its multi-day span and its name" do
-        {holiday, member} =
-          Enum.find(holiday_members(unquote(territory)), fn {holiday, _member} ->
+        pairs = holiday_members(unquote(territory))
+
+        {holiday, _member} =
+          Enum.find(pairs, fn {holiday, _member} ->
             holiday.name == unquote(name) and is_integer(holiday.rule.count) and
               holiday.rule.count > 1
           end)
 
-        {:ok, occurrences} = Tempo.to_interval(Tempo.RecurrenceSet.new([member]), bound: ~o"2026")
+        members = for {^holiday, member} <- pairs, do: member
+
+        {:ok, occurrences} = Tempo.to_interval(Tempo.RecurrenceSet.new(members), bound: ~o"2026")
         occurrences = Tempo.IntervalSet.to_list(occurrences)
         {:ok, expected} = Rule.materialise(holiday.rule, ~o"2026")
 
@@ -248,7 +284,7 @@ defmodule Tempo.HolidaysTest do
       assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
     end
 
-    test "a lunisolar day-offset with a span (Tết eve, 5 days) folds and matches materialise/2" do
+    test "a lunisolar day-offset with a span (a New Year's eve, 5 days) folds and matches materialise/2" do
       # offset -1 folds into the day (net_day 0 = the eve), then a 5-day span.
       rule = %Rule{
         kind: :lunisolar,
@@ -256,12 +292,126 @@ defmodule Tempo.HolidaysTest do
         day: 1,
         offset: -1,
         count: 5,
-        calendar: Calendrical.Vietnamese,
+        calendar: Calendrical.Chinese,
         leap_month: false
       }
 
       {:ok, intervals} = Rule.materialise(rule, ~o"2026")
       assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
+    end
+  end
+
+  describe "Rule.recurrence/1 gates" do
+    test "an added observed day is a second member, a window off the weekend date" do
+      rule = compiled("12-25 and if saturday, sunday then next monday")
+
+      assert members_iso(rule) == [
+               "R/../P1Y/FL12M25DN",
+               "R/../P1Y/FLLL12M25D{6..7}KN/P8DN1K-1IN"
+             ]
+
+      assert_matches_materialise(rule, 2019..2028)
+    end
+
+    test "a moved date keeps only the weekdays it stays on" do
+      rule = compiled("01-01 if sunday then next monday")
+      assert members_iso(rule) == ["R/../P1Y/FL1M1D{1..6}KN", "R/../P1Y/FLLL1M1D7KN/P8DN1K-1IN"]
+      assert_matches_materialise(rule, 2019..2028)
+    end
+
+    test "a substitute-only rule is the observed day alone" do
+      rule = compiled("substitutes 01-01 if sunday then next monday")
+      assert members_iso(rule) == ["R/../P1Y/FLLL1M1D7KN/P8DN1K-1IN"]
+      assert_matches_materialise(rule, 2019..2028)
+    end
+
+    test "ordered clauses each take the weekdays no earlier clause claimed" do
+      assert_matches_materialise(
+        compiled("12-26 if saturday then next monday if sunday then next tuesday"),
+        2019..2028
+      )
+
+      assert_matches_materialise(
+        compiled(
+          "06-04 if thursday,friday,saturday,sunday then next monday and if tuesday then previous monday"
+        ),
+        2019..2028
+      )
+    end
+
+    test "an observed day crossing into the next year lands there" do
+      # 10 Dhu al-Hijjah 1427 (Umm al-Qura) is Sunday 31 December 2006; its
+      # observed Monday is 1 January 2007.
+      rule = compiled("10 Dhu al-Hijjah and if sunday then next monday")
+      assert_matches_materialise(rule, 2005..2008)
+    end
+
+    test "a feast's substitution resolves statically from Easter" do
+      rule = compiled("orthodox and if sunday then next monday since 2000")
+
+      assert members_iso(rule) == [
+               "R/{2000Y..}/P1Y/FL(orthodox-easter)eN",
+               "R/{2000Y..}/P1Y/FLLL(orthodox-easter)eN/P2DN1K-1IN"
+             ]
+
+      assert_matches_materialise(rule, 1998..2003)
+    end
+
+    test "a weekday gate is a weekday limit" do
+      rule = compiled("05-04 not on sunday, monday")
+      assert members_iso(rule) == ["R/../P1Y/FL5M4D{2..6}KN"]
+      assert_matches_materialise(rule, 2019..2028)
+    end
+
+    test "an open since or until is an open domain" do
+      assert members_iso(compiled("01-02 since 2017")) == ["R/{2017Y..}/P1Y/FL1M2DN"]
+      assert_matches_materialise(compiled("01-02 since 2017"), 2015..2019)
+
+      assert members_iso(compiled("12-26 prior to 2023")) == ["R/{..2022Y}/P1Y/FL12M26DN"]
+      assert_matches_materialise(compiled("12-26 prior to 2023"), 2020..2025)
+    end
+
+    test "every N years since a year is a cadence phased from it" do
+      rule = compiled("tuesday after 1st monday in November every 4 years since 1848")
+
+      assert members_iso(rule) == ["R/{1848Y..}/P4Y/FLLL11M1K1IN/P7DN2K-1IN"]
+      assert_matches_materialise(rule, 2019..2029)
+    end
+
+    test "even years since a year keep both gates" do
+      rule = compiled("tuesday after 1st monday in November in even years since 2020")
+      assert members_iso(rule) == ["R/{2020Y..}e/P1Y/FLLL11M1K1IN/P7DN2K-1IN"]
+      assert_matches_materialise(rule, 2016..2025)
+    end
+
+    test "an active window becomes the years whose occurrence it contains" do
+      # 10 June 1984 is inside the window, 10 June 1988 is not.
+      rule = compiled("06-10", active: [{~D[1984-03-23], ~D[1988-05-17]}])
+      assert members_iso(rule) == ["R/{1984Y..1987Y}/P1Y/FL6M10DN"]
+      assert_matches_materialise(rule, 1982..1990)
+    end
+
+    test "a disable/enable move excludes the year and adds the moved date" do
+      rule =
+        compiled("4th monday in November", disable: [~D[2015-11-23]], enable: [~D[2015-11-27]])
+
+      assert members_iso(rule) == [
+               "R/{..2014Y,2016Y..}/P1Y/FL11M1K4IN",
+               "R/{2015Y}/P1Y/FL11M27DN"
+             ]
+
+      assert_matches_materialise(rule, 2013..2018)
+    end
+
+    test "a move keeps a lunar holiday's other occurrence in the same year" do
+      # 12 Rabi al-awwal falls twice in 2015 (3 January and 23 December); only
+      # the second is moved.
+      rule = compiled("12 Rabi al-awwal", disable: [~D[2015-12-23]], enable: [~D[2015-12-24]])
+      assert_matches_materialise(rule, 2014..2016)
+    end
+
+    test "a non-leap-year rule has no domain filter yet, so it needs a window" do
+      assert Rule.recurrence(compiled("09-11 in non-leap years")) == :needs_window
     end
   end
 
@@ -873,6 +1023,22 @@ defmodule Tempo.HolidaysTest do
       {:ok, to} = Tempo.to_date(Tempo.Interval.to(interval))
       {:ok, to_iso} = Date.convert(to, Calendar.ISO)
       assert Date.to_iso8601(to_iso) == "2025-02-02"
+    end
+
+    test "a year the Vietnamese and Chinese calendars split lands on the Vietnamese day" do
+      # Vietnam's meridian (UTC+7) starts some months a day — or, with a
+      # different leap month, a month — before China's (UTC+8).
+      assert gregorian_dates("vietnamese 1-0-1", ~o"2007") == ["2007-02-17"]
+      assert gregorian_dates("chinese 01-0-01", ~o"2007") == ["2007-02-18"]
+      assert gregorian_dates("vietnamese 1-0-1", ~o"1985") == ["1985-01-21"]
+      assert gregorian_dates("vietnamese 3-0-10", ~o"2037") == ["2037-04-24"]
+    end
+
+    test "a Vietnamese date has no recurrence until its calendar can be named" do
+      # Calendrical.Vietnamese reports the CLDR type `:chinese`, which names the
+      # Chinese calendar, so no `[u-ca=…]` identifier selects it.
+      {:ok, rule} = Compiler.compile("vietnamese 1-0-1")
+      assert Rule.recurrence(rule) == :needs_window
     end
   end
 

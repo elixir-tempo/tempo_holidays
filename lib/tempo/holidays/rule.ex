@@ -18,16 +18,20 @@ defmodule Tempo.Holidays.Rule do
   al-Qura, Julian via Calendrical's non-CLDR Julian calendar — returned as an
   `[u-ca=…]`-tagged value.
 
-  `recurrence/1` re-expresses most kinds as a standalone, re-materialisable
-  `%Tempo.Interval{}` recurrence: a calendar date under `[u-ca=…]`, a lunisolar
+  `recurrence/1` re-expresses a rule, gates and all, as a standalone,
+  re-materialisable recurrence: a calendar date under `[u-ca=…]`, a lunisolar
   date as a traditional-month `m` selection under `[u-ca=…]`, a moveable feast as
   a §12.10 window off `(easter)e`, a relative or nested weekday as a window off
   its anchor date, an Islamic day-rollover as the last day of a window off the
   month's 1st, and a lunisolar eve or day-offset folded into the day (`net_day =
   day + offset`). A multi-day holiday (`count > 1`) adds an `:occurrence_duration`
-  span over any of these. The kinds that stay `:needs_window` are a
+  span over any of these. Its year gates (`since`/`until`, `active` windows,
+  every-N-years, even/odd/leap) become the recurrence's `{…}` domain and a weekday
+  gate a weekday limit; an observed-date substitution or a `disable`/`enable` move
+  makes it a `%Tempo.RecurrenceSet{}` of several. What stays `:needs_window` is a
   timezone-specific equinox/solstice, a shifted or non-Chinese-meridian solar
-  term, and the inter-holiday bridge / `if`-holiday.
+  term, the inter-holiday bridge / `if`-holiday, a non-leap-year rule, and a date
+  in a calendar with no faithful `[u-ca=…]` identifier (Vietnamese).
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -195,18 +199,27 @@ defmodule Tempo.Holidays.Rule do
   end
 
   @doc """
-  Returns the rule's base occurrences as a re-materialisable `%Tempo.Interval{}`
-  recurrence, for `Tempo.Holidays.recurrence_set/2`.
+  Returns the rule as a re-materialisable recurrence, for
+  `Tempo.Holidays.recurrence_set/2`.
 
-  Where a holiday is a plain recurrence — a fixed date, an nth weekday, a
-  calendar date, a computed event — this is the rule as an unbounded recurrence
-  that projects onto any window. A `since`/`until` year range folds into the
-  recurrence's `{…}` domain — `to_year` is exclusive (the half-open `[from, to)`
-  convention), so the domain runs to `to_year - 1`, with a `^`-excluded year for
-  each disabled date. Rules that cannot stand alone as a recurrence — a bridge or
-  `if`-holiday move (which depends on the year's other holidays), or the
-  lunisolar traditional-month query (which resolves per year) — return
-  `:needs_window`, so the caller materialises them concretely against a bound.
+  A holiday that falls on one date a year — a fixed date, an nth weekday, a
+  calendar date, a computed event — is a single `%Tempo.Interval{}` recurrence
+  that projects onto any window. Its gates are part of the recurrence: a
+  `since`/`until` range, an `active` window and an every-N-years cadence fold into
+  the `{…}` year domain (`to_year` is exclusive, the half-open `[from, to)`
+  convention), an even/odd/leap rule into the domain's filter, and a weekday gate
+  into a weekday limit (`FL5M4D{2..6}KN`). A holiday with an observed-date
+  substitution is several recurrences at once — the date itself on the weekdays
+  that keep it, and a §12.10 window off the date for each clause that moves it
+  (`FLLL12M25D{6..7}KN/P8DN1K-1IN`, "the following Monday when Christmas falls on a
+  weekend") — so it is a `%Tempo.RecurrenceSet{}`, as is a `disable`/`enable`
+  move, whose moved date is a member of its own. Both materialise the same way,
+  through `Tempo.to_interval/2` with a `:bound`.
+
+  A rule that cannot stand alone as a recurrence returns `:needs_window`, so the
+  caller materialises it concretely against a bound: a bridge or `if`-holiday
+  move (which depends on the year's other holidays), an equinox or solstice
+  outside UTC, and any gate the recurrence cannot carry exactly.
 
   ### Arguments
 
@@ -214,7 +227,8 @@ defmodule Tempo.Holidays.Rule do
 
   ### Returns
 
-  * `{:ok, recurrence}` with a `t:Tempo.Interval.t/0` recurrence.
+  * `{:ok, recurrence}` with a `t:Tempo.Interval.t/0` recurrence, or a
+    `t:Tempo.RecurrenceSet.t/0` of them.
 
   * `:needs_window` when the rule needs a bound to materialise.
 
@@ -232,6 +246,11 @@ defmodule Tempo.Holidays.Rule do
       iex> Tempo.to_iso8601(recurrence)
       "R/{2020Y..2024Y}/P1Y/FL12M25DN"
 
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25 and if saturday, sunday then next monday")
+      iex> {:ok, recurrence} = Tempo.Holidays.Rule.recurrence(rule)
+      iex> Enum.map(recurrence.members, &Tempo.to_iso8601/1)
+      ["R/../P1Y/FL12M25DN", "R/../P1Y/FLLL12M25D{6..7}KN/P8DN1K-1IN"]
+
   """
   # The kinds whose `count` is a multi-day span (the others use `count` for a
   # weekday, an instance or a solar-term index, so they take no span).
@@ -248,36 +267,61 @@ defmodule Tempo.Holidays.Rule do
     :lunisolar
   ]
 
-  @spec recurrence(t()) :: {:ok, Tempo.Interval.t()} | :needs_window | {:error, term()}
+  @all_weekdays [1, 2, 3, 4, 5, 6, 7]
+
+  @spec recurrence(t()) ::
+          {:ok, Interval.t() | Tempo.RecurrenceSet.t()} | :needs_window | {:error, term()}
   # A conditional rule (a bridge day, an `if is … holiday then …` move) depends on
   # the year's other holidays, so it has no standalone recurrence.
   def recurrence(%__MODULE__{conditional: conditional}) when not is_nil(conditional),
     do: :needs_window
 
   def recurrence(%__MODULE__{} = rule) do
-    with {:ok, base} <- base_recurrence(rule),
-         {:ok, domained} <- apply_year_domain(base, rule) do
-      {:ok, apply_span(domained, rule)}
+    with {:ok, shapes} <- occurrence_shapes(rule),
+         {:ok, domain} <- year_domain(rule),
+         members = Enum.map(shapes, fn {role, shape} -> member(role, shape, domain) end),
+         {:ok, members} <- moved_members(members, rule),
+         {:ok, recurrences} <- reduce_ok(members, &member_recurrence(&1, rule)) do
+      {:ok, assemble(Enum.reject(recurrences, &is_nil/1))}
     end
   end
 
-  # The base recurrence for the rule's kind, before any year-domain gate is
-  # applied. A kind that cannot stand alone as a recurrence returns
-  # `:needs_window`.
-  defp base_recurrence(%__MODULE__{kind: :fixed, month: month, day: day}) do
-    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN")
+  # ── occurrence shapes ─────────────────────────────────────────────────
+  #
+  # A shape is the selection part of a recurrence — `FL…N` plus any `[u-ca=…]`
+  # suffix — tagged `:base` (the holiday's own date, which a multi-day span
+  # extends) or `:observed` (a substituted day). The year domain goes in front of
+  # each when the members are built.
+
+  # An ungated rule is its base alone.
+  defp occurrence_shapes(%__MODULE__{substitute: substitute, weekday_gate: nil} = rule)
+       when substitute in [nil, []] do
+    with {:ok, shape} <- base_shape(rule), do: {:ok, [{:base, shape}]}
   end
 
-  defp base_recurrence(%__MODULE__{kind: :weekday} = rule) do
-    Tempo.from_iso8601(weekday_iso(rule))
+  # Easter falls on a Sunday, so a moveable feast's weekday is fixed and a gate
+  # or substitution resolves statically — the observed day is another offset.
+  defp occurrence_shapes(%__MODULE__{kind: kind} = rule) when kind in [:easter, :orthodox] do
+    {:ok, easter_gated_shapes(rule)}
   end
+
+  # A weekday gate or a substitution limits the plain date the holiday falls on
+  # to weekdays, and opens each observed-day window from it.
+  defp occurrence_shapes(%__MODULE__{} = rule) do
+    case plain_anchor(rule) do
+      {:ok, anchor, suffix} -> {:ok, gated_shapes(rule, anchor, suffix)}
+      :none -> :needs_window
+    end
+  end
+
+  defp base_shape(%__MODULE__{kind: :weekday} = rule), do: {:ok, weekday_shape(rule)}
 
   # A weekday relative to a fixed date — "Monday before 06-01", "Friday after
   # 06-19". An ISO 8601-2 §12.10 window off the anchor date picks the count-th
   # target weekday in the direction; taking the window off the real date lets
   # Tempo resolve the month boundary and leap years, so the recurrence stays
   # year-independent.
-  defp base_recurrence(%__MODULE__{
+  defp base_shape(%__MODULE__{
          kind: :relative_weekday,
          month: month,
          day: day,
@@ -285,15 +329,14 @@ defmodule Tempo.Holidays.Rule do
          direction: direction,
          count: count
        }) do
-    window = relative_weekday_window(direction, count || 1, target)
-    Tempo.from_iso8601("R/../P1Y/FLLL#{month}M#{day}DN/#{window}N")
+    {:ok, "FLLL#{month}M#{day}DN/#{relative_weekday_window(direction, count || 1, target)}N"}
   end
 
   # A weekday relative to an nth weekday-in-month — "Friday after the 4th
   # Thursday in November" (Black Friday), "Tuesday after the 1st Monday in
   # November" (US Election Day). The inner nth weekday is the anchor; a §12.10
   # window off it picks the outer weekday.
-  defp base_recurrence(%__MODULE__{
+  defp base_shape(%__MODULE__{
          kind: :nested_weekday,
          month: month,
          inner_weekday: inner,
@@ -301,89 +344,40 @@ defmodule Tempo.Holidays.Rule do
          direction: direction,
          count: count
        }) do
-    window = relative_weekday_window(direction, 1, outer)
-    Tempo.from_iso8601("R/../P1Y/FLLL#{month}M#{inner}K#{count}IN/#{window}N")
+    {:ok, "FLLL#{month}M#{inner}K#{count}IN/#{relative_weekday_window(direction, 1, outer)}N"}
   end
 
-  defp base_recurrence(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
-       when kind in [:hebrew, :persian] do
-    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
+  # Easter itself, or a moveable feast a fixed offset from it (Ash Wednesday −46,
+  # Ascension +39, …) as a §12.10 window off `(easter)e`. A multi-day span
+  # (`count > 1`) is added by `apply_span/2`.
+  defp base_shape(%__MODULE__{kind: kind, offset: offset}) when kind in [:easter, :orthodox] do
+    {:ok, easter_shape(kind, offset || 0)}
   end
 
-  defp base_recurrence(%__MODULE__{kind: :julian, month: month, day: day}) do
-    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=julian]")
+  defp base_shape(%__MODULE__{} = rule) do
+    case plain_anchor(rule) do
+      {:ok, anchor, suffix} -> {:ok, "FL#{anchor}N#{suffix}"}
+      :none -> offset_base_shape(rule)
+    end
   end
 
-  # An Islamic fixed date is a `[u-ca=islamic-*]` selection, like the Hebrew and
-  # Persian ones. A single day within the month is the direct selection; a
-  # multi-day span (`count > 1`) is added by `apply_span/2`.
-  defp base_recurrence(%__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day})
-       when is_integer(day) and day <= 29 do
-    Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{calendar_tag(calendar)}]")
-  end
-
-  # A day at or beyond the month's length (date-holidays' `30 Ramadan`, `30
-  # Safar`) is the sunset-convention rollover: the 1st of the month plus `day - 1`
-  # days, which becomes the next month's 1st when the month is short. Declaratively
-  # that is the final day of the `day`-long window from the 1st — `{1..7}K-1I`
-  # picks the window's last day regardless of weekday — reproducing the same
-  # in-calendar arithmetic `materialise/2` uses, never forming an out-of-range date.
-  defp base_recurrence(%__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day})
+  # A day at or beyond the Islamic month's length (date-holidays' `30 Ramadan`,
+  # `30 Safar`) is the sunset-convention rollover: the 1st of the month plus
+  # `day - 1` days, which becomes the next month's 1st when the month is short.
+  # Declaratively that is the final day of the `day`-long window from the 1st —
+  # `{1..7}K-1I` picks the window's last day regardless of weekday — reproducing
+  # the same in-calendar arithmetic `materialise/2` uses, never forming an
+  # out-of-range date.
+  defp offset_base_shape(%__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day})
        when is_integer(day) and day >= 30 do
-    Tempo.from_iso8601(
-      "R/../P1Y/FLLL#{month}M1DN/P#{day}DN{1..7}K-1IN[u-ca=#{calendar_tag(calendar)}]"
-    )
+    calendar_window("FLLL#{month}M1DN/P#{day}DN{1..7}K-1IN", calendar)
   end
 
-  defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
-       when kind in [:easter, :orthodox] and offset in [nil, 0] do
-    event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
-    Tempo.from_iso8601("R/../P1Y/FL(#{event})eN")
-  end
-
-  # A moveable feast a fixed offset from Easter (Ash Wednesday −46, Ascension
-  # +39, …). Easter is a Sunday, so `easter + offset` lands on a derivable
-  # weekday, expressed as an ISO 8601-2 §12.10 window off `(easter)e` picking
-  # that weekday. A multi-day span (`count > 1`) is added by `apply_span/2`.
-  defp base_recurrence(%__MODULE__{kind: kind, offset: offset})
-       when kind in [:easter, :orthodox] and is_integer(offset) and offset != 0 do
-    event = if kind == :orthodox, do: "orthodox-easter", else: "easter"
-    Tempo.from_iso8601("R/../P1Y/FLLL(#{event})eN/#{easter_offset_window(offset)}N")
-  end
-
-  defp base_recurrence(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
-       when kind in [:equinox, :solstice] and offset in [nil, 0] and
-              timezone in [nil, "GMT", "UTC"] do
-    case solar_event_name(kind, month) do
-      nil -> :needs_window
-      event -> Tempo.from_iso8601("R/../P1Y/FL(#{event})eN")
-    end
-  end
-
-  # A Chinese solar term is the built-in `(term)e` event — the same jié-qì that
-  # `materialise_base` computes through Calendrical, which also names the 1-based
-  # index. `(term)e` resolves at the Chinese meridian by default, so a `day` past
-  # the term's first (a shift) or a non-Chinese meridian needs the concrete
-  # projection and stays `:needs_window`.
-  defp base_recurrence(%__MODULE__{kind: :solar_term, calendar: calendar, count: term, day: day})
-       when calendar in [nil, Calendrical.Chinese] and day in [nil, 1] do
-    case Calendrical.Lunisolar.solar_term_name(term) do
-      {:ok, name} -> Tempo.from_iso8601("R/../P1Y/FL(#{name})eN")
-      {:error, _reason} -> :needs_window
-    end
-  end
-
-  # A lunisolar date (Chinese, Korean/dangi or Vietnamese) is a traditional-month
-  # `m` selection under `[u-ca=…]`: `<month>m<day>D`, or `<month>+m<day>D` for a
-  # leap month. The traditional→ordinal step and the Gregorian-year attribution
-  # (a late lunar month falling in the following year) are the selection's own,
-  # resolved per year at materialisation — so it round-trips and re-materialises
-  # like the calendar-date tiers. A day-offset folds into the day (`net_day = day
-  # + offset`), so `day 1` shifted `-1` and a `day 0` are the same eve; a multi-day
-  # span is added by `apply_span/2`. (Vietnamese shares the CLDR `:chinese`
-  # identifier, so it resolves through the Chinese calendar — the two agree over
-  # the corpus.)
-  defp base_recurrence(%__MODULE__{
+  # A lunisolar day-offset folds into the day (`net_day = day + offset`), so `day
+  # 1` shifted `-1` and a `day 0` are the same eve. At or before the eve it is a
+  # backward window off the traditional month's 1st, whose first day (`{1..7}K1I`,
+  # the earliest regardless of weekday) lands `net_day - 1` days before it.
+  defp offset_base_shape(%__MODULE__{
          kind: :lunisolar,
          calendar: calendar,
          month: month,
@@ -392,28 +386,115 @@ defmodule Tempo.Holidays.Rule do
          offset: offset
        })
        when is_integer(month) and is_integer(day) do
-    designator = if leap_month, do: "#{month}+m", else: "#{month}m"
-    net_day = day + (offset || 0)
-    Tempo.from_iso8601(lunisolar_selection(designator, net_day, calendar_tag(calendar)))
+    case day + (offset || 0) do
+      net_day when net_day <= 0 ->
+        designator = lunisolar_designator(month, leap_month)
+        calendar_window("FLLL#{designator}1DN/-P#{1 - net_day}DN{1..7}K1IN", calendar)
+
+      _later_day ->
+        :needs_window
+    end
   end
 
-  defp base_recurrence(%__MODULE__{}), do: :needs_window
+  defp offset_base_shape(%__MODULE__{}), do: :needs_window
 
-  # A single lunisolar occurrence at `net_day` of the traditional month.
-  # `net_day >= 1` is a forward `m` selection; `net_day <= 0` is the eve — a
-  # backward window off the 1st whose first day (`{1..7}K1I`, the earliest
-  # regardless of weekday) lands `net_day - 1` days before it.
-  defp lunisolar_selection(designator, net_day, tag) when net_day >= 1,
-    do: "R/../P1Y/FL#{designator}#{net_day}DN[u-ca=#{tag}]"
+  # A calendar window shape, when the calendar can be named in `[u-ca=…]`.
+  defp calendar_window(window, calendar) do
+    case calendar_suffix(calendar) do
+      {:ok, suffix} -> {:ok, window <> suffix}
+      :error -> :needs_window
+    end
+  end
 
-  defp lunisolar_selection(designator, net_day, tag),
-    do: "R/../P1Y/FLLL#{designator}1DN/-P#{1 - net_day}DN{1..7}K1IN[u-ca=#{tag}]"
+  # The plain date a rule falls on, as a selection with any calendar suffix — the
+  # anchor a weekday gate limits and a substitution opens its window from. A
+  # calendar date is a `[u-ca=…]` selection; a lunisolar date is a
+  # traditional-month `m` selection (`<month>+m` for a leap month), whose
+  # traditional→ordinal step and Gregorian-year attribution resolve per year at
+  # materialisation; a Chinese solar term and a UTC equinox or solstice are
+  # computed events. `:none` for a kind whose date is itself a window off
+  # another, that needs a concrete projection (a shifted or non-Chinese-meridian
+  # solar term, an equinox or solstice in another timezone), or whose calendar
+  # has no faithful `[u-ca=…]` identifier (Vietnamese, whose CLDR type names the
+  # Chinese calendar). Easter and its feasts never come here — their weekday is
+  # fixed, so their gates resolve statically.
+  defp plain_anchor(%__MODULE__{kind: :fixed, month: month, day: day}),
+    do: {:ok, "#{month}M#{day}D", ""}
+
+  defp plain_anchor(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
+       when kind in [:hebrew, :persian] do
+    calendar_anchor("#{month}M#{day}D", calendar)
+  end
+
+  defp plain_anchor(%__MODULE__{kind: :julian, month: month, day: day}),
+    do: {:ok, "#{month}M#{day}D", "[u-ca=julian]"}
+
+  defp plain_anchor(%__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day})
+       when is_integer(day) and day <= 29 do
+    calendar_anchor("#{month}M#{day}D", calendar)
+  end
+
+  defp plain_anchor(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
+       when kind in [:equinox, :solstice] and offset in [nil, 0] and
+              timezone in [nil, "GMT", "UTC"] do
+    case solar_event_name(kind, month) do
+      nil -> :none
+      event -> {:ok, "(#{event})e", ""}
+    end
+  end
+
+  defp plain_anchor(%__MODULE__{kind: :solar_term, calendar: calendar, count: term, day: day})
+       when calendar in [nil, Calendrical.Chinese] and day in [nil, 1] do
+    case Calendrical.Lunisolar.solar_term_name(term) do
+      {:ok, name} -> {:ok, "(#{name})e", ""}
+      {:error, _reason} -> :none
+    end
+  end
+
+  defp plain_anchor(%__MODULE__{
+         kind: :lunisolar,
+         calendar: calendar,
+         month: month,
+         day: day,
+         leap_month: leap_month,
+         offset: offset
+       })
+       when is_integer(month) and is_integer(day) do
+    case day + (offset || 0) do
+      net_day when net_day >= 1 ->
+        calendar_anchor("#{lunisolar_designator(month, leap_month)}#{net_day}D", calendar)
+
+      _eve ->
+        :none
+    end
+  end
+
+  defp plain_anchor(%__MODULE__{}), do: :none
+
+  # A calendar date as a plain anchor, when the calendar can be named.
+  defp calendar_anchor(selection, calendar) do
+    case calendar_suffix(calendar) do
+      {:ok, suffix} -> {:ok, selection, suffix}
+      :error -> :none
+    end
+  end
+
+  defp lunisolar_designator(month, true), do: "#{month}+m"
+  defp lunisolar_designator(month, _leap_month), do: "#{month}m"
 
   defp solar_event_name(:equinox, 3), do: "march-equinox"
   defp solar_event_name(:equinox, 9), do: "september-equinox"
   defp solar_event_name(:solstice, 6), do: "june-solstice"
   defp solar_event_name(:solstice, 12), do: "december-solstice"
   defp solar_event_name(_kind, _month), do: nil
+
+  defp easter_event(:orthodox), do: "orthodox-easter"
+  defp easter_event(:easter), do: "easter"
+
+  defp easter_shape(kind, 0), do: "FL(#{easter_event(kind)})eN"
+
+  defp easter_shape(kind, offset),
+    do: "FLLL(#{easter_event(kind)})eN/#{easter_offset_window(offset)}N"
 
   # The §12.10 window that picks `easter + offset` off `(easter)e`: a forward
   # window taking the last occurrence of the target weekday for a positive
@@ -435,31 +516,394 @@ defmodule Tempo.Holidays.Rule do
   defp relative_weekday_window(:before, count, target), do: "-P#{7 * count}DN#{target}K1I"
   defp relative_weekday_window(:after, count, target), do: "P#{7 * count}DN#{target}K-1I"
 
-  # Fold a `since`/`until` year range (and any disabled years) into the base
-  # recurrence's `{…}` domain by rewriting its leading open `..` domain. A rule
-  # carrying a gate the year domain cannot express keeps the ungated base
-  # recurrence.
-  defp apply_year_domain(base, rule) do
-    case year_domain(rule) do
-      :none ->
-        {:ok, base}
+  # ── weekday gates and observed-date substitution ─────────────────────
 
-      {:ok, domain} ->
-        base
-        |> Tempo.to_iso8601()
-        |> String.replace("R/../", "R/#{domain}/", global: false)
-        |> Tempo.from_iso8601()
+  # The date itself is kept on the weekdays that keep it — the gate's, less those
+  # a clause moves (unless the clause adds the observed day rather than moving
+  # to it), and none when a `substitutes` clause did not fire — and each clause
+  # that fires is a §12.10 window off the date, limited to its weekdays.
+  defp gated_shapes(rule, anchor, suffix) do
+    {kept, observed} = substitution_plan(rule.substitute || [], gate_weekdays(rule.weekday_gate))
+
+    base = if kept == [], do: [], else: [{:base, limited_shape(anchor, suffix, kept)}]
+
+    windows =
+      for {weekdays, direction, target} <- observed, weekdays != [] do
+        {:observed, observed_shape(anchor, suffix, weekdays, direction, target)}
+      end
+
+    base ++ windows
+  end
+
+  defp gate_weekdays(nil), do: @all_weekdays
+  defp gate_weekdays({:only, weekdays}), do: Enum.filter(@all_weekdays, &(&1 in weekdays))
+  defp gate_weekdays({:except, weekdays}), do: Enum.reject(@all_weekdays, &(&1 in weekdays))
+
+  # Walk the clauses in order, as `substitute_all/2` does: each fires on the
+  # allowed weekdays no earlier clause claimed. Returns the weekdays that keep the
+  # date, and each clause's `{weekdays, direction, target}`.
+  defp substitution_plan(clauses, allowed) do
+    {observed, claimed, added} =
+      Enum.reduce(clauses, {[], [], []}, fn {triggers, direction, target, mode},
+                                            {observed, claimed, added} ->
+        fires = Enum.filter(allowed, &(&1 in triggers and &1 not in claimed))
+        added = if mode == :add, do: added ++ fires, else: added
+        {observed ++ [{fires, direction, target}], claimed ++ triggers, added}
+      end)
+
+    untriggered =
+      if substitute_only?(clauses), do: [], else: Enum.reject(allowed, &(&1 in claimed))
+
+    {Enum.sort(untriggered ++ added), observed}
+  end
+
+  defp substitute_only?(clauses), do: Enum.any?(clauses, &(elem(&1, 3) == :substitute_only))
+
+  defp limited_shape(anchor, suffix, @all_weekdays), do: "FL#{anchor}N#{suffix}"
+
+  defp limited_shape(anchor, suffix, weekdays),
+    do: "FL#{anchor}#{weekday_set(weekdays)}KN#{suffix}"
+
+  defp observed_shape(anchor, suffix, weekdays, direction, target) do
+    limit = if weekdays == @all_weekdays, do: "", else: "#{weekday_set(weekdays)}K"
+    "FLLL#{anchor}#{limit}N/#{observed_window(direction, target)}N#{suffix}"
+  end
+
+  # date-holidays observes a clause's target weekday strictly after (or before)
+  # the date — a full week on when it is the date's own weekday — which is the
+  # last `target` in the eight days from the date, or the first in the seven
+  # days before it.
+  defp observed_window(:next, target), do: "P8DN#{target}K-1I"
+  defp observed_window(:previous, target), do: "-P7DN#{target}K1I"
+
+  # A weekday set as a selection value, as Tempo renders it: a single weekday
+  # bare, consecutive runs as ranges — `{6..7}`, `{1..5}`, `{1,3..5}`.
+  defp weekday_set([weekday]), do: Integer.to_string(weekday)
+
+  defp weekday_set(weekdays) do
+    "{" <> (weekdays |> weekday_runs() |> Enum.map_join(",", &weekday_run/1)) <> "}"
+  end
+
+  defp weekday_runs(weekdays) do
+    Enum.chunk_while(weekdays, [], &extend_run/2, &close_run/1)
+  end
+
+  defp extend_run(weekday, [previous | _] = run) when weekday == previous + 1,
+    do: {:cont, [weekday | run]}
+
+  defp extend_run(weekday, []), do: {:cont, [weekday]}
+  defp extend_run(weekday, run), do: {:cont, Enum.reverse(run), [weekday]}
+
+  defp close_run([]), do: {:cont, []}
+  defp close_run(run), do: {:cont, Enum.reverse(run), []}
+
+  defp weekday_run([first, _second | _rest] = run), do: "#{first}..#{List.last(run)}"
+  defp weekday_run([weekday]), do: Integer.to_string(weekday)
+
+  # Easter is a Sunday, so a feast `offset` days from it falls on a fixed weekday:
+  # a gate either always or never admits it, and the first clause that fires on
+  # that weekday moves it to another fixed offset.
+  defp easter_gated_shapes(%__MODULE__{kind: kind, offset: offset} = rule) do
+    offset = offset || 0
+    weekday = easter_offset_weekday(offset)
+
+    if weekday in gate_weekdays(rule.weekday_gate),
+      do: easter_substituted(kind, offset, weekday, rule.substitute || []),
+      else: []
+  end
+
+  defp easter_substituted(kind, offset, weekday, clauses) do
+    clauses
+    |> Enum.find(fn {triggers, _direction, _target, _mode} -> weekday in triggers end)
+    |> easter_observed(kind, offset, weekday, clauses)
+  end
+
+  defp easter_observed(nil, kind, offset, _weekday, clauses) do
+    if substitute_only?(clauses), do: [], else: [{:base, easter_shape(kind, offset)}]
+  end
+
+  defp easter_observed({_triggers, direction, target, mode}, kind, offset, weekday, _clauses) do
+    observed =
+      {:observed, easter_shape(kind, offset + observed_shift(weekday, direction, target))}
+
+    if mode == :add, do: [{:base, easter_shape(kind, offset)}, observed], else: [observed]
+  end
+
+  # The days from a date on `weekday` to the clause's observed day — strictly
+  # after or before, a full week when the target is the date's own weekday.
+  defp observed_shift(weekday, :next, target),
+    do: nonzero_shift(Integer.mod(target - weekday, 7), 7)
+
+  defp observed_shift(weekday, :previous, target),
+    do: nonzero_shift(-Integer.mod(weekday - target, 7), -7)
+
+  # ── the year domain ───────────────────────────────────────────────────
+
+  # The rule's year gates as a recurrence domain: the inclusive year ranges it is
+  # active in (`since`/`until`, intersected with any `active` windows), the years
+  # a disabled date excludes (added per member by `moved_members/2`), an
+  # even/odd/leap filter, and the cadence of an every-N-years rule.
+  defp year_domain(%__MODULE__{} = rule) do
+    with {:ok, filter} <- domain_filter(rule),
+         {:ok, ranges} <- active_ranges(rule),
+         {:ok, cadence} <- domain_cadence(rule, ranges) do
+      {:ok, %{ranges: ranges, exclusions: [], filter: filter, cadence: cadence}}
     end
+  end
+
+  # A domain carries one filter, so a rule both even/odd and leap stays concrete,
+  # as does a non-leap rule, which has no filter spelling.
+  defp domain_filter(%__MODULE__{year_parity: parity, leap: leap})
+       when not is_nil(parity) and not is_nil(leap),
+       do: :needs_window
+
+  defp domain_filter(%__MODULE__{year_parity: :even}), do: {:ok, "e"}
+  defp domain_filter(%__MODULE__{year_parity: :odd}), do: {:ok, "o"}
+  defp domain_filter(%__MODULE__{leap: :leap}), do: {:ok, "l"}
+  defp domain_filter(%__MODULE__{leap: :non_leap}), do: :needs_window
+  defp domain_filter(%__MODULE__{}), do: {:ok, ""}
+
+  # Every N years counts from the `since` year, so the domain must start there.
+  defp domain_cadence(%__MODULE__{every_years: nil}, _ranges), do: {:ok, 1}
+
+  defp domain_cadence(%__MODULE__{every_years: every, from_year: from}, [{from, _to}])
+       when is_integer(every) and is_integer(from),
+       do: {:ok, every}
+
+  defp domain_cadence(%__MODULE__{}, _ranges), do: :needs_window
+
+  # `since`/`until` is an inclusive year range (`to_year` is exclusive). An
+  # `active` window is date-precise, but a holiday that falls once a year is
+  # inside it exactly in the years its date is, so each window becomes the range
+  # of years whose occurrence it contains — decided at the window's first and
+  # last year by materialising the base there — intersected with `since`/`until`.
+  defp active_ranges(%__MODULE__{active: active} = rule) when active in [nil, []] do
+    {:ok, rule |> since_until_range() |> intersect_ranges({nil, nil}) |> List.wrap()}
+  end
+
+  defp active_ranges(%__MODULE__{active: active} = rule) do
+    with {:ok, windows} <- reduce_ok(active, &active_year_range(rule, &1)) do
+      {:ok, Enum.flat_map(windows, &List.wrap(intersect_ranges(&1, since_until_range(rule))))}
+    end
+  end
+
+  defp since_until_range(%__MODULE__{from_year: from, to_year: nil}), do: {from, nil}
+  defp since_until_range(%__MODULE__{from_year: from, to_year: to}), do: {from, to - 1}
+
+  defp active_year_range(rule, {from_date, to_date}) do
+    with {:ok, first} <- first_active_year(rule, from_date),
+         {:ok, last} <- last_active_year(rule, to_date) do
+      {:ok, {first, last}}
+    end
+  end
+
+  defp first_active_year(_rule, nil), do: {:ok, nil}
+
+  defp first_active_year(rule, %Date{year: year} = from) do
+    rule
+    |> base_days_in(year)
+    |> first_year_from(year, Date.to_gregorian_days(from))
+  end
+
+  defp first_year_from({:ok, [days]}, year, from_days),
+    do: {:ok, if(days >= from_days, do: year, else: year + 1)}
+
+  defp first_year_from({:ok, []}, year, _from_days), do: {:ok, year + 1}
+  defp first_year_from(_other, _year, _from_days), do: :needs_window
+
+  defp last_active_year(_rule, nil), do: {:ok, nil}
+
+  defp last_active_year(rule, %Date{year: year} = to) do
+    rule
+    |> base_days_in(year)
+    |> last_year_before(year, Date.to_gregorian_days(to))
+  end
+
+  defp last_year_before({:ok, [days]}, year, to_days),
+    do: {:ok, if(days < to_days, do: year, else: year - 1)}
+
+  defp last_year_before({:ok, []}, year, _to_days), do: {:ok, year - 1}
+  defp last_year_before(_other, _year, _to_days), do: :needs_window
+
+  # The Gregorian day counts of the rule's base occurrences in `year`.
+  defp base_days_in(rule, year) do
+    with {:ok, tempo} <- Tempo.from_iso8601("#{year}Y"),
+         {:ok, occurrences} <- materialise_base(rule, tempo) do
+      reduce_ok(occurrences, &occurrence_day_count/1)
+    end
+  end
+
+  defp occurrence_day_count(interval) do
+    case occurrence_days(interval) do
+      {:ok, days} -> {:ok, days}
+      :error -> {:error, :no_gregorian_date}
+    end
+  end
+
+  # Two inclusive year ranges' overlap (`nil` is an open end), or `nil` when
+  # they do not meet.
+  defp intersect_ranges({from_1, to_1}, {from_2, to_2}) do
+    from = later_year(from_1, from_2)
+    to = earlier_year(to_1, to_2)
+    if is_integer(from) and is_integer(to) and from > to, do: nil, else: {from, to}
+  end
+
+  defp later_year(nil, year), do: year
+  defp later_year(year, nil), do: year
+  defp later_year(year_1, year_2), do: max(year_1, year_2)
+
+  defp earlier_year(nil, year), do: year
+  defp earlier_year(year, nil), do: year
+  defp earlier_year(year_1, year_2), do: min(year_1, year_2)
+
+  # ── disable / enable moves ────────────────────────────────────────────
+
+  # date-holidays' `disable`/`enable` move an occurrence (`move_disabled/3`): where
+  # a disabled date is one of the rule's occurrences that year, it is dropped and
+  # the year's enabled dates are added in its place. Declaratively, the member
+  # producing the disabled date excludes that year from its domain and each
+  # enabled date is a one-year member of its own — as is any occurrence the
+  # excluded member still keeps that year (a lunar holiday falling twice in it,
+  # only one of them disabled).
+  defp moved_members(members, %__MODULE__{disable: disable}) when disable in [nil, []],
+    do: {:ok, members}
+
+  defp moved_members(members, %__MODULE__{disable: disable, enable: enable}) do
+    blocked = MapSet.new(disable, &Date.to_gregorian_days/1)
+
+    disable
+    |> Enum.map(& &1.year)
+    |> Enum.uniq()
+    |> Enum.reduce_while({:ok, members}, fn year, {:ok, acc} ->
+      case move_year(acc, year, blocked, enable || []) do
+        {:ok, moved} -> {:cont, {:ok, moved}}
+        other -> {:halt, other}
+      end
+    end)
+  end
+
+  defp move_year(members, year, blocked, enable) do
+    with {:ok, matches} <- reduce_ok(members, &member_match(&1, year, blocked)) do
+      apply_move(matches, members, year, enable)
+    end
+  end
+
+  defp apply_move(matches, members, year, enable) do
+    if Enum.any?(matches, &match?({:matched, _kept}, &1)) do
+      moved =
+        members
+        |> Enum.zip(matches)
+        |> Enum.flat_map(&moved_member(&1, year))
+
+      {:ok, moved ++ enabled_members(enable, year)}
+    else
+      {:ok, members}
+    end
+  end
+
+  defp moved_member({member, :none}, _year), do: [member]
+
+  defp moved_member({member, {:matched, kept}}, year),
+    do: [exclude_year(member, year) | kept_members(member, kept)]
+
+  # Whether any of a member's occurrences in `year` is disabled — `{:matched,
+  # kept}` with the day counts of the ones it keeps — or none is (`:none`).
+  defp member_match(member, year, blocked) do
+    with {:ok, days} <- member_days_in(member, year) do
+      case Enum.split_with(days, &MapSet.member?(blocked, &1)) do
+        {[], _kept} -> {:ok, :none}
+        {_matched, kept} -> {:ok, {:matched, kept}}
+      end
+    end
+  end
+
+  # The occurrences a member keeps in a year it is excluded from, each a one-year
+  # member on its Gregorian date, in the member's role.
+  defp kept_members(%{role: role}, kept_days) do
+    for days <- kept_days do
+      date = Date.from_gregorian_days(days)
+      member(role, "FL#{date.month}M#{date.day}DN", single_year_domain(date.year))
+    end
+  end
+
+  defp member_days_in(%{domain: %{ranges: []}}, _year), do: {:ok, []}
+
+  defp member_days_in(member, year) do
+    with {:ok, recurrence} <- Tempo.from_iso8601(member_iso(member)),
+         {:ok, bound} <- Tempo.from_iso8601("#{year}Y"),
+         {:ok, set} <- Tempo.to_interval(recurrence, bound: bound) do
+      set |> Tempo.IntervalSet.to_list() |> reduce_ok(&occurrence_day_count/1)
+    end
+  end
+
+  defp exclude_year(%{domain: domain} = member, year),
+    do: %{member | domain: %{domain | exclusions: [year | domain.exclusions]}}
+
+  defp enabled_members(enable, year) do
+    for %Date{year: ^year, month: month, day: day} <- enable do
+      member(:enabled, "FL#{month}M#{day}DN", single_year_domain(year))
+    end
+  end
+
+  defp single_year_domain(year),
+    do: %{ranges: [{year, year}], exclusions: [], filter: "", cadence: 1}
+
+  # ── members ───────────────────────────────────────────────────────────
+
+  defp member(role, shape, domain), do: %{role: role, shape: shape, domain: domain}
+
+  # A member whose domain admits no year never occurs, so it is dropped.
+  defp member_recurrence(%{domain: %{ranges: []}}, _rule), do: {:ok, nil}
+
+  defp member_recurrence(%{role: role} = member, rule) do
+    with {:ok, recurrence} <- Tempo.from_iso8601(member_iso(member)) do
+      {:ok, if(role == :base, do: apply_span(recurrence, rule), else: recurrence)}
+    end
+  end
+
+  defp member_iso(%{shape: shape, domain: domain}),
+    do: "R/#{render_domain(domain)}/P#{domain.cadence}Y/#{shape}"
+
+  # One member is the recurrence itself; several are a recurrence set.
+  defp assemble([recurrence]), do: recurrence
+  defp assemble(recurrences), do: Tempo.RecurrenceSet.new(recurrences)
+
+  # A domain as ISO 8601-2 set syntax: `..` when open, `{2017Y..}` or
+  # `{2020Y..2024Y,^2022Y}` otherwise, with any even/odd/leap filter after it. A
+  # fully open domain cannot hold an exclusion (`{..,^2020Y}` is not a set), so
+  # it is split around the excluded years instead (`{..2019Y,2021Y..}`).
+  defp render_domain(%{ranges: [{nil, nil}], exclusions: [], filter: filter}), do: ".." <> filter
+
+  defp render_domain(%{ranges: [{nil, nil}], exclusions: exclusions} = domain),
+    do: render_domain(%{domain | ranges: split_open_range(exclusions), exclusions: []})
+
+  defp render_domain(%{ranges: ranges, exclusions: exclusions, filter: filter}) do
+    members = Enum.map(ranges, &render_range/1) ++ Enum.map(Enum.sort(exclusions), &"^#{&1}Y")
+    "{" <> Enum.join(members, ",") <> "}" <> filter
+  end
+
+  defp render_range({nil, to}), do: "..#{to}Y"
+  defp render_range({from, nil}), do: "#{from}Y.."
+  defp render_range({year, year}), do: "#{year}Y"
+  defp render_range({from, to}), do: "#{from}Y..#{to}Y"
+
+  defp split_open_range(exclusions) do
+    years = exclusions |> Enum.uniq() |> Enum.sort()
+    starts = [nil | Enum.map(years, &(&1 + 1))]
+    ends = Enum.map(years, &(&1 - 1)) ++ [nil]
+
+    starts
+    |> Enum.zip(ends)
+    |> Enum.reject(fn {from, to} -> is_integer(from) and is_integer(to) and from > to end)
   end
 
   # A multi-day holiday (`count > 1`) spans that many days from each occurrence.
   # It is carried as an `:occurrence_duration` directive (the mechanism iCal DTEND
   # uses) rather than a §12.10 span window, because the span is orthogonal to how
   # the occurrence's start resolves — a plain date, a calendar date, a computed
-  # event, an Islamic rollover, or a lunisolar eve all take the same span — and
-  # because a span window over a *windowed* base nests into an exponentially slow
-  # parse. Applied after the year-domain step, which round-trips through ISO 8601
-  # and would drop the metadata. Only `@span_kinds` treat `count` as a span.
+  # event, an Islamic rollover, or a lunisolar eve all take the same span. Only
+  # the holiday's own date takes it — an observed day is a single day, as
+  # `materialise/2` observes it — and only `@span_kinds` treat `count` as a span.
   defp apply_span(%Interval{} = recurrence, %__MODULE__{kind: kind, count: count})
        when kind in @span_kinds and is_integer(count) and count > 1 do
     duration = %Tempo.Duration{time: [day: count]}
@@ -467,64 +911,6 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp apply_span(recurrence, _rule), do: recurrence
-
-  # `to_year` is exclusive, so a closed range's inclusive domain runs to
-  # `to_year - 1`. An even/odd/leap rule adds an `e`/`o`/`l` filter — on the
-  # range, or as an open `..e` domain when the rule has no range. An open-ended
-  # `since`/`until` with nothing else cannot bound itself, so it keeps the
-  # ungated base recurrence.
-  defp year_domain(%__MODULE__{} = rule) do
-    if domain_blocking_gate?(rule) do
-      :none
-    else
-      build_year_domain(year_range(rule), year_filter(rule), rule)
-    end
-  end
-
-  defp year_range(%__MODULE__{from_year: from, to_year: to})
-       when is_integer(from) and is_integer(to),
-       do: {from, to}
-
-  defp year_range(_rule), do: :open
-
-  defp year_filter(%__MODULE__{year_parity: :even}), do: "e"
-  defp year_filter(%__MODULE__{year_parity: :odd}), do: "o"
-  defp year_filter(%__MODULE__{leap: :leap}), do: "l"
-  defp year_filter(_rule), do: ""
-
-  # Nothing gated — the base recurrence stands.
-  defp build_year_domain(:open, "", _rule), do: :none
-
-  # An open even/odd/leap filter (`..e`) with no year range of its own.
-  defp build_year_domain(:open, filter, _rule), do: {:ok, "..#{filter}"}
-
-  # A closed `since`/`until` range, with any `^` exclusions and an optional
-  # even/odd/leap filter.
-  defp build_year_domain({from, to}, filter, rule) do
-    {:ok, "{#{from}Y..#{to - 1}Y#{disable_exclusions(rule)}}#{filter}"}
-  end
-
-  # Gates the year domain cannot carry, so a rule bearing one keeps its ungated
-  # base recurrence rather than a domain that silently drops the gate: an
-  # `active` window, an `enable`d ad-hoc date, a non-leap or every-N-years rule,
-  # a weekday gate, or both a parity and a leap filter at once (the domain takes
-  # only one). A `substitute` is orthogonal (it shifts the observed day, not the
-  # year), so it does not block.
-  defp domain_blocking_gate?(%__MODULE__{} = rule) do
-    rule.active not in [nil, []] or rule.enable not in [nil, []] or
-      rule.leap == :non_leap or not is_nil(rule.every_years) or
-      not is_nil(rule.weekday_gate) or
-      (not is_nil(rule.year_parity) and rule.leap == :leap)
-  end
-
-  # A `^year` exclusion for each disabled date (a pure removal — a disable paired
-  # with an `enable` is a move, which `domain_blocking_gate?/1` keeps out of the
-  # domain).
-  defp disable_exclusions(%__MODULE__{disable: disable}) when is_list(disable) do
-    Enum.map_join(disable, fn %Date{year: year} -> ",^#{year}Y" end)
-  end
-
-  defp disable_exclusions(_rule), do: ""
 
   @doc """
   Whether a rule carries an inter-holiday `t:conditional/0`.
@@ -999,7 +1385,10 @@ defmodule Tempo.Holidays.Rule do
          %Tempo{} = year
        )
        when kind in [:hebrew, :persian] do
-    calendar_date_holiday(calendar_tag(calendar), month, day, count, year)
+    case calendar_tag(calendar) do
+      {:ok, tag} -> calendar_date_holiday(tag, month, day, count, year)
+      :error -> {:error, {:unnamed_calendar, calendar}}
+    end
   end
 
   # date-holidays encodes some Islamic holidays as a day *beyond* the month's
@@ -1013,7 +1402,10 @@ defmodule Tempo.Holidays.Rule do
          %__MODULE__{kind: :islamic, calendar: calendar, month: month, day: day, count: count},
          %Tempo{} = year
        ) do
-    offset_calendar_holiday(calendar_tag(calendar), month, day - 1, count, year)
+    case calendar_tag(calendar) do
+      {:ok, tag} -> offset_calendar_holiday(tag, month, day - 1, count, year)
+      :error -> {:error, {:unnamed_calendar, calendar}}
+    end
   end
 
   # A lunisolar date — Chinese (`chinese …`), Korean (`korean …`) or Vietnamese
@@ -1200,17 +1592,20 @@ defmodule Tempo.Holidays.Rule do
   # rolled-over Islamic day converts to its true in-calendar value (a `30 Safar`
   # in a 29-day Safar becomes `1 Rabi al-awwal`).
   defp converted_interval(%Date{} = gregorian, calendar, count) do
-    tag = calendar_tag(calendar)
-
     with {:ok, in_calendar} <- Date.convert(gregorian, calendar),
-         {:ok, base} <-
-           Tempo.from_iso8601(
-             "#{in_calendar.year}Y#{in_calendar.month}M#{in_calendar.day}D[u-ca=#{tag}]"
-           ),
+         {:ok, base} <- in_calendar_tempo(in_calendar, calendar_tag(calendar)),
          {:ok, interval} <- first_interval(Tempo.to_interval(base)) do
       {:ok, span_days(interval, base, count)}
     end
   end
+
+  # An in-calendar date as a Tempo value: tagged `[u-ca=…]` when the calendar has
+  # a faithful identifier, otherwise carried by its calendar module alone — never
+  # relabelled as a different calendar that shares its CLDR type.
+  defp in_calendar_tempo(%Date{year: year, month: month, day: day}, {:ok, tag}),
+    do: Tempo.from_iso8601("#{year}Y#{month}M#{day}D[u-ca=#{tag}]")
+
+  defp in_calendar_tempo(%Date{} = date, :error), do: {:ok, Tempo.from_elixir(date)}
 
   # The UTC instant of the named event in the given Gregorian year.
   defp solar_event_utc(:equinox, 3, year), do: Astro.equinox(year, :march)
@@ -1256,10 +1651,38 @@ defmodule Tempo.Holidays.Rule do
   defp to_minutes(""), do: 0
   defp to_minutes(minutes), do: String.to_integer(minutes)
 
-  # The BCP 47 `u-ca` calendar tag for a Calendrical module — its CLDR type
-  # with underscores as hyphens (`:islamic_umalqura` → "islamic-umalqura").
+  # The IXDTF `u-ca` identifier that names a Calendrical calendar faithfully — one
+  # that resolves back to the same module: a registered non-CLDR calendar
+  # (`julian`), or the calendar's CLDR type with underscores as hyphens
+  # (`:islamic_umalqura` → "islamic-umalqura") when that type resolves to it.
+  # `Calendrical.Vietnamese` reports the CLDR type `:chinese`, which names
+  # `Calendrical.Chinese` — a different calendar, whose months begin a day (or a
+  # month) apart in some years — so it has no faithful identifier: `:error`.
   defp calendar_tag(calendar) do
-    calendar.cldr_calendar_type() |> Atom.to_string() |> String.replace("_", "-")
+    case registered_calendar_tag(calendar) do
+      nil -> cldr_calendar_tag(calendar)
+      tag -> {:ok, tag}
+    end
+  end
+
+  defp registered_calendar_tag(calendar) do
+    Enum.find_value(Calendrical.additional_calendars(), fn {identifier, module} ->
+      if module == calendar, do: Atom.to_string(identifier)
+    end)
+  end
+
+  defp cldr_calendar_tag(calendar) do
+    type = calendar.cldr_calendar_type()
+
+    case Calendrical.calendar_from_cldr_calendar_type(type) do
+      {:ok, ^calendar} -> {:ok, type |> Atom.to_string() |> String.replace("_", "-")}
+      _other -> :error
+    end
+  end
+
+  # A recurrence's `[u-ca=…]` suffix, when the calendar can be named.
+  defp calendar_suffix(calendar) do
+    with {:ok, tag} <- calendar_tag(calendar), do: {:ok, "[u-ca=#{tag}]"}
   end
 
   # A one-day interval already spans a single day; a longer holiday moves
@@ -1335,23 +1758,25 @@ defmodule Tempo.Holidays.Rule do
 
   # ── projection helpers ──────────────────────────────────────────────
 
-  # ISO 8601-2 recurring selection `R/../P1Y/FL<month>M<count>I<weekday>KN`
+  # ISO 8601-2 recurring selection `R/../P1Y/FL<month>M<weekday>K<count>IN`
   # — "every year, the <count>th <weekday> of <month>" — materialised
   # against the target year by `Tempo.to_interval/2`. No `:anchor` is
   # needed; the bound year supplies it.
+  defp weekday_iso(rule), do: "R/../P1Y/" <> weekday_shape(rule)
+
   # The `count`-th `weekday` of `month`. date-holidays counts the Nth weekday on
   # from the 1st, past the month's end if need be — the 5th Monday of a
   # four-Monday October is 1 November (NZ-MBH's anniversary) — so from the 5th
   # on it is taken within the `7n`-day window from the 1st, where each weekday
   # falls exactly n times. Up to the 4th it always lies inside the month, so the
   # plain selection is the same date. A negative count (`last`) cannot overflow.
-  defp weekday_iso(%__MODULE__{month: month, count: count, weekday: weekday})
+  defp weekday_shape(%__MODULE__{month: month, count: count, weekday: weekday})
        when is_integer(count) and count >= 5 do
-    "R/../P1Y/FLLL#{month}M1DN/P#{7 * count}DN#{weekday}K#{count}IN"
+    "FLLL#{month}M1DN/P#{7 * count}DN#{weekday}K#{count}IN"
   end
 
-  defp weekday_iso(%__MODULE__{month: month, count: count, weekday: weekday}) do
-    "R/../P1Y/FL#{month}M#{weekday}K#{count}IN"
+  defp weekday_shape(%__MODULE__{month: month, count: count, weekday: weekday}) do
+    "FL#{month}M#{weekday}K#{count}IN"
   end
 
   # The signed day offset from an anchor date (whose weekday is
