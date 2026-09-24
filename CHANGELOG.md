@@ -8,7 +8,7 @@ First release. Public holidays for every territory in the [date-holidays](https:
 
 * The full date-holidays grammar — fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar, solar-term and equinox/solstice dates, observed-date substitution, occurrence gates, and inter-holiday bridge days.
 
-* `Tempo.Holidays.recurrence_set/2` — a territory's holidays as a re-materialisable `Tempo.RecurrenceSet` that composes with a diary through `Tempo.intersection/2`. Lunisolar (the `m` traditional-month selection), Islamic-rollover and multi-day holidays are declarative recurrences.
+* `Tempo.Holidays.recurrence_set/2` — a territory's holidays as a re-materialisable `Tempo.RecurrenceSet` that composes with a diary through `Tempo.intersection/2`; 1,804 of the dataset's 1,828 rules are declarative recurrences, gates and observed-date substitution included.
 
 * `:day_start` projects a sunset-starting-calendar holiday onto the Gregorian timeline as a datetime interval beginning at sunset (or 18:00) the evening before.
 

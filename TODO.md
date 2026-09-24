@@ -11,8 +11,9 @@ the Islamic civil-date `divergent` differences.
 
 * [ ] **Holidays as a Tempo grammar** — the core objective: express a holiday as a Tempo interval-set value so it composes with other Tempo values (`free_time ∩ holidays`). Categorisation by rule family and a phased path in [plans/holiday-grammar.md](plans/holiday-grammar.md).
 
-* [ ] **Gates dropped from recurrences** — a rule's substitute, weekday gate and `disable`/`enable`/`active` gates are not carried into `Rule.recurrence/1`, so `recurrence_set/2` emits the bare base date: wrong outright for substitute-only rules (KR's `substitutes 2030-02-03 if Sunday then next Tuesday` yields 3 Feb itself) and weekday-gated ones (JP's `05-04 not on sunday, monday`). Express them (`^` exclusions for `disable`, the domain for `active`, weekday-limited windows for substitutes) or return `:needs_window`.
-* [ ] **Close the last declarative gaps** — 11 of 1,547 corpus rules stay `:needs_window`: 4 equinox and 1 solstice in a non-UTC timezone, 2 `nested_after_date`, and 4 conditional (bridge and `if` moves). Options in [plans/declarative-recurrence-gaps.md](plans/declarative-recurrence-gaps.md).
+* [ ] **Close the last declarative gaps** — of the 1,828 stored rules, 11 stay `:needs_window` for want of a form: 4 equinox and 1 solstice in a non-UTC timezone, 2 `nested_after_date`, and 4 conditional (bridge and `if` moves). Options in [plans/declarative-recurrence-gaps.md](plans/declarative-recurrence-gaps.md).
+
+* [ ] **Non-leap-year rules** — `09-11 in non-leap years` and two more need a domain filter for non-leap years, which Tempo has no spelling for (`l` keeps leap years). Awaiting the choice of spelling.
 
 * [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
@@ -26,6 +27,8 @@ the Islamic civil-date `divergent` differences.
 
 ## Blocked
 
+* [ ] **Vietnamese recurrences** — the 10 Vietnamese lunisolar rules stay `:needs_window` because no `[u-ca=…]` identifier names `Calendrical.Vietnamese` (its CLDR type `:chinese` names the Chinese calendar, which begins months a day or a month apart in some years). Blocked on Calendrical registering `vietnamese` in its additional calendars, as it does `julian`.
+
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
 ## Deferred
@@ -35,6 +38,10 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Gates in recurrences** — year ranges, `active` windows, every-N-years and weekday gates fold into the recurrence, and a substitution or `disable`/`enable` move makes it a `Tempo.RecurrenceSet`; 1,804 of 1,828 stored rules match `materialise/2` exactly over 2000–2035. 2026-09-24.
+
+* [x] **Vietnamese dates on the Vietnamese calendar** — `materialise/2` relabelled a Vietnamese date as Chinese (a shared CLDR type), landing on China's day in years the calendars split (Tết 2007 on 18 February, not the 17th). 2026-09-24.
 
 * [x] **5th-weekday overflow, declaratively** — the n-th weekday from the 5th on is taken within the `7n`-day window from the 1st (`FLLL10M1DN/P35DN1K5IN`), so `5th monday in October` overflows to 1 November as date-holidays does; `materialise/2` shares the form and the imperative `overflow_weekday/2` is gone. 2026-09-24.
 

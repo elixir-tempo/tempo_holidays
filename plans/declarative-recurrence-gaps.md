@@ -2,7 +2,7 @@
 
 **Status:** in progress, 2026-09-24
 
-Current standing: lunisolar, the Islamic rollover and multi-day spans, the solar-term bug and solar-term recurrences are done; only **7** of 1,547 distinct corpus rules stay `:needs_window` (5 non-UTC equinox/solstice, 2 `nested_after_date`). Multi-day spans shipped as an `:occurrence_duration` directive rather than the `FLL…/P<count>DN` window proposed below, because a span window over a windowed base nests into a parse that exceeds 300 s. The analysis below is as written on 2026-09-23.
+Current standing (2026-09-24): lunisolar, the Islamic rollover and multi-day spans, solar-term recurrences, and every gate are done. Of the 1,828 stored rules, **1,804** are declarative recurrences that match `materialise/2` exactly over 2000–2035 and each rule's gate boundary years; **24** stay `:needs_window` — 10 Vietnamese (no `[u-ca=…]` identifier names `Calendrical.Vietnamese`; blocked on Calendrical), 5 non-UTC equinox/solstice, 4 conditional, 3 non-leap-year (no filter spelling yet) and 2 `nested_after_date`. Multi-day spans shipped as an `:occurrence_duration` directive rather than the `FLL…/P<count>DN` window proposed below. The analysis below is as written on 2026-09-23, except where marked.
 
 `Rule.recurrence/1` now emits a standalone, re-materialisable `%Tempo.Interval{}` recurrence for **1219 of 1478** distinct date-holidays rules (up from 1080 before the "Full" pass, which added islamic, easter/orthodox offsets, and relative/nested weekdays). **80** rules still return `:needs_window`, and a further **194 gate-instances** are dropped from otherwise-faithful recurrences. This document explores options to close each, and reconciles the compiler's emitted forms with the Tempo holiday cookbook.
 
@@ -59,7 +59,20 @@ Recommendation: fix the build bug regardless of the recurrence work — it is a 
 
 `count > 1` on a moveable feast. Same shape as islamic multi-day: extend the §12.10 offset window with a `P<count>DN` span, or keep `:needs_window`. Low volume; do it alongside islamic multi-day.
 
-## The 194 dropped gates (a distinct concern)
+## Gates (resolved 2026-09-24)
+
+The census of the stored rules (not just the fixture strings, which never carry the `active`/`disable`/`enable` metadata) found 1,161 gated rules, ~760 of them emitting a lossy or wrong recurrence. The decision: a recurrence is exact or `:needs_window`, never lossy. Each gate now has a form:
+
+* **Year range, open or closed** → the domain, `{2017Y..}`, `{..2022Y}`, `{2020Y..2024Y}` (Tempo now closes an open range against the bound).
+* **`active` window** → a year range: a once-a-year holiday is inside a date window exactly in the years its date is, decided at the window's first and last year by materialising the base.
+* **Every N years** → a `P<N>Y` cadence over a domain starting at the `since` year (Tempo now steps the domain by the cadence).
+* **Weekday gate** → a weekday limit, `FL5M4D{2..6}KN`.
+* **Substitution** → a `Tempo.RecurrenceSet`: the date limited to the weekdays that keep it, plus one §12.10 window per clause off the date limited to the weekdays it fires on — `P8DN<t>K-1I` for "next", `-P7DN<t>K1I` for "previous". A window crossing the year lands in the right year (fixed in Tempo). Easter feasts resolve statically, their weekday being fixed.
+* **`disable`/`enable` move** → the producing member excludes the year and each enabled date — and any occurrence the member keeps that year — is a one-year member.
+
+Four Tempo defects surfaced and were fixed on the way: `(name)e` with a weekday limit raised, a domain ignored a multi-year cadence, open domain ranges would not materialise, and a window crossing the bound's year was lost or leaked. Also found: `materialise/2` relabelled a Vietnamese date as Chinese (fixed), and there is no way to name the Vietnamese calendar in a recurrence (upstream).
+
+### As written on 2026-09-23 (superseded)
 
 These are `{:ok, rec}` recurrences that silently drop a gate the domain cannot carry: `active` date-windows (77), open-ended `since`/`until` (61 + 18), `enable` (20), `weekday_gate` (10), `every_years` (3), `non_leap` (3), `conditional` (2). Two are Tempo-domain gaps worth their own exploration:
 
@@ -92,12 +105,14 @@ Reconciliation options (the cookbook is the doc, the compiler is the implementat
 
 ## Tasks
 
-* [ ] **Decide lossy-vs-`:needs_window`** for gates the recurrence cannot carry — now known to be *wrong*, not just lossy, for substitute-only and weekday-gated rules — and whether to pursue open-ended domain ranges / `active` date-windows in Tempo.
 * [ ] **Verify tz equinox/solstice** across 2000–2100; relax the guard for zones that never shift, else scope a tz-aware `(event)e` in Tempo.
+* [ ] **A non-leap-year filter** — a spelling beside `e`/`o`/`l`; closes 3 rules.
+* [ ] **Name the Vietnamese calendar** — Calendrical registering `vietnamese` in `additional_calendars/0`; closes 10 rules with no change here.
 * [ ] **Reconcile the cookbook** with the emitted forms — relative/nested weekday (§12.10), calendar (selection-first), easter windows (formula), and now lunisolar `m` and multi-day spans.
 
 ### Done
 
+* [x] **Gates** — exact or `:needs_window`, never lossy; every gate has a form (above). 1,804 of 1,828 rules exact. 2026-09-24.
 * [x] **Lunisolar** — (b) the traditional-month `m` selection, with the offset folded into the day and the eve as a backward window; 58/58. 2026-09-24.
 * [x] **Multi-day span recurrences** — `count > 1` as an `:occurrence_duration` directive over any base (not `FLL…/P<count>DN`, whose nested form parses in >300 s). 2026-09-24.
 * [x] **Solar-term recurrence** — `Calendrical.Lunisolar.solar_term_name/1`, emitting `(term)eN`. 2026-09-24.
