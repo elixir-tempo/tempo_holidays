@@ -11,6 +11,8 @@ the Islamic civil-date `divergent` differences.
 
 * [ ] **Holidays as a Tempo grammar** — the core objective: express a holiday as a Tempo interval-set value so it composes with other Tempo values (`free_time ∩ holidays`). Categorisation by rule family and a phased path in [plans/holiday-grammar.md](plans/holiday-grammar.md).
 
+* [ ] **Close the remaining declarative gaps** — `Rule.recurrence/1` emits a standalone recurrence for 1219/1478 rules; 80 stay `:needs_window` (lunisolar, islamic day-rollover/multi-day, tz equinox, solar term, easter multi-day) and 194 gates are dropped. Options per family, plus the compiler↔cookbook consistency reconciliation, in [plans/declarative-recurrence-gaps.md](plans/declarative-recurrence-gaps.md). First task there is a live crash: the solar-term `cal=nil` build bug.
+
 * [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: territory-local anchoring (derive a territory's zone/location from the locale) as a follow-up to the current canonical/explicit anchors.
