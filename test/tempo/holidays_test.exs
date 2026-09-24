@@ -159,8 +159,13 @@ defmodule Tempo.HolidaysTest do
   end
 
   describe "Rule.recurrence/1 declarative forms" do
+    # The rollover tests use the tabular Civil calendar, whose Safar (month 2)
+    # has 29 days, so day 30 genuinely rolls over. They check the recurrence
+    # *form* against `materialise/2`; under the Observational calendar every day
+    # of the rollover window costs a crescent-visibility computation, which is
+    # Calendrical's to speed up, not this test's to wait for.
     test "an Islamic day-30 rollover materialises exactly as materialise/2" do
-      rule = %Rule{kind: :islamic, month: 2, day: 30, calendar: Calendrical.Islamic.Observational}
+      rule = %Rule{kind: :islamic, month: 2, day: 30, calendar: Calendrical.Islamic.Civil}
       {:ok, intervals} = Rule.materialise(rule, ~o"2026")
       assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
     end
@@ -172,13 +177,14 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "an Islamic multi-day rollover span matches materialise/2" do
-      # Saudi Eid al-Fitr: 30 Ramadan (a rollover) for 4 days.
+      # The Saudi Eid al-Fitr shape — a day-30 rollover spanning 4 days — on the
+      # 29-day Civil Safar, so the rollover is exercised.
       rule = %Rule{
         kind: :islamic,
-        month: 9,
+        month: 2,
         day: 30,
         count: 4,
-        calendar: Calendrical.Islamic.Observational
+        calendar: Calendrical.Islamic.Civil
       }
 
       {:ok, intervals} = Rule.materialise(rule, ~o"2026")
@@ -658,6 +664,11 @@ defmodule Tempo.HolidaysTest do
 
       assert {:ok, [interval]} = Rule.materialise(rule, ~o"2027")
       assert Tempo.Interval.from(interval) == ~o"2027Y11M1D"
+
+      # The recurrence expresses the same count from the 1st declaratively —
+      # overflowing in a four-Monday October, inside October 2029 (five Mondays).
+      assert recurrence_dates(rule, ~o"2027") == ["2027-11-01"]
+      assert recurrence_dates(rule, ~o"2029") == ["2029-10-29"]
 
       # A "last" weekday cannot overflow — it simply does not occur past its month.
       {:ok, last} = Compiler.compile("last monday in May")
