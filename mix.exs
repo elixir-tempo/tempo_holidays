@@ -104,9 +104,9 @@ defmodule Tempo.Holidays.MixProject do
       # unreleased as of 1.3.0. `override` because ex_tempo/localize pull the
       # hex calendrical as a child. Becomes {:calendrical, "~> 1.4"} before publish.
       {:calendrical, path: "../../localize/calendrical", override: true},
-      # `override` because the Calendrical path dep points astro at a local
-      # checkout during co-development; the published release carries that work.
-      {:astro, "~> 2.6", override: true},
+      # The local Astro checkout during co-development (its crescent-visibility
+      # fixes are unreleased). Revert to a hex requirement once they ship.
+      {:astro, path: "../../astro", override: true},
       # Equinox/solstice holidays computed for a named IANA timezone (Chile's
       # solstice `in America/Santiago`) need a time-zone database; numeric
       # offsets and GMT do not. Tz is the one Astro and Calendrical already use.
