@@ -128,12 +128,13 @@ defmodule Tempo.Holidays.Compiler do
     "esfand" => 12
   }
 
-  # Hebrew month names → Calendrical's CLDR *civil* numbering (Tishrei = 1 …
-  # Elul = 13), which is what `Calendrical.Hebrew` expects. The leap month
-  # Adar I is position 6 (leap years only); the Adar that carries Purim is
-  # position 7 — Adar in an ordinary year, Adar II in a leap year. date-holidays
-  # writes that Adar as "AdarII" (the Adar before Nisan) in every year, so both
-  # "adar" and "adarii" map to 7. Common alternate spellings are included.
+  # Hebrew month names → the traditional (RFC 7529) month numbers, which name
+  # the same month in every year (Tishrei = 1 … Elul = 12); Tempo's `<n>m`
+  # resolves each to its position in the year. The Adar that carries Purim is
+  # 6 — Adar in an ordinary year, Adar II in a leap year — and date-holidays
+  # writes it "AdarII" (the Adar before Nisan) in every year, so both "adar"
+  # and "adarii" map to 6. Adar I, the leap month, follows month 5:
+  # `{5, :leap}`. Common alternate spellings are included.
   @hebrew_months %{
     "tishrei" => 1,
     "tishri" => 1,
@@ -144,17 +145,17 @@ defmodule Tempo.Holidays.Compiler do
     "tevet" => 4,
     "shvat" => 5,
     "shevat" => 5,
-    "adari" => 6,
-    "adar" => 7,
-    "adarii" => 7,
-    "nisan" => 8,
-    "iyyar" => 9,
-    "iyar" => 9,
-    "sivan" => 10,
-    "tamuz" => 11,
-    "tammuz" => 11,
-    "av" => 12,
-    "elul" => 13
+    "adari" => {5, :leap},
+    "adar" => 6,
+    "adarii" => 6,
+    "nisan" => 7,
+    "iyyar" => 8,
+    "iyar" => 8,
+    "sivan" => 9,
+    "tamuz" => 10,
+    "tammuz" => 10,
+    "av" => 11,
+    "elul" => 12
   }
 
   @doc """
@@ -754,11 +755,14 @@ defmodule Tempo.Holidays.Compiler do
 
     with [_, day, month_name | rest] <- Regex.run(pattern, rule),
          {kind, calendar, month} <- calendar_month(String.downcase(String.trim(month_name))) do
+      {month, leap_month} = split_leap_month(month)
+
       {:ok,
        %Rule{
          kind: kind,
          calendar: calendar,
          month: month,
+         leap_month: leap_month,
          day: String.to_integer(day),
          count: rest |> List.first() |> parse_span(),
          source: rule
@@ -785,6 +789,11 @@ defmodule Tempo.Holidays.Compiler do
         nil
     end
   end
+
+  # A leap month (Hebrew Adar I) is `{month, :leap}`: the rule keeps the month
+  # it follows and marks it a leap month.
+  defp split_leap_month({month, :leap}), do: {month, true}
+  defp split_leap_month(month), do: {month, nil}
 
   defp parse_span(nil), do: 1
   defp parse_span(""), do: 1

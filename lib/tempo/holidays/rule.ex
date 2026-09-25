@@ -498,7 +498,7 @@ defmodule Tempo.Holidays.Rule do
        when is_integer(month) and is_integer(day) do
     case day + (offset || 0) do
       net_day when net_day <= 0 ->
-        designator = lunisolar_designator(month, leap_month)
+        designator = traditional_designator(month, leap_month)
         calendar_window("FLLL#{designator}1DN/-P#{1 - net_day}DN{1..7}K1IN", calendar)
 
       _later_day ->
@@ -531,9 +531,9 @@ defmodule Tempo.Holidays.Rule do
   defp plain_anchor(%__MODULE__{kind: :fixed, month: month, day: day}),
     do: {:ok, "#{month}M#{day}D", ""}
 
-  defp plain_anchor(%__MODULE__{kind: kind, calendar: calendar, month: month, day: day})
+  defp plain_anchor(%__MODULE__{kind: kind, calendar: calendar, day: day} = rule)
        when kind in [:hebrew, :persian] do
-    calendar_anchor("#{month}M#{day}D", calendar)
+    calendar_anchor("#{month_designator(rule)}#{day}D", calendar)
   end
 
   defp plain_anchor(%__MODULE__{kind: :julian, month: month, day: day}),
@@ -572,7 +572,7 @@ defmodule Tempo.Holidays.Rule do
        when is_integer(month) and is_integer(day) do
     case day + (offset || 0) do
       net_day when net_day >= 1 ->
-        calendar_anchor("#{lunisolar_designator(month, leap_month)}#{net_day}D", calendar)
+        calendar_anchor("#{traditional_designator(month, leap_month)}#{net_day}D", calendar)
 
       _eve ->
         :none
@@ -589,8 +589,16 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  defp lunisolar_designator(month, true), do: "#{month}+m"
-  defp lunisolar_designator(month, _leap_month), do: "#{month}m"
+  defp traditional_designator(month, true), do: "#{month}+m"
+  defp traditional_designator(month, _leap_month), do: "#{month}m"
+
+  # A Hebrew month is named by its traditional number (`<n>m`, and `5+m` for
+  # Adar I), which Tempo resolves to its position in each year; a Persian
+  # month keeps its ordinal number.
+  defp month_designator(%__MODULE__{kind: :hebrew, month: month, leap_month: leap_month}),
+    do: traditional_designator(month, leap_month)
+
+  defp month_designator(%__MODULE__{month: month}), do: "#{month}M"
 
   defp solar_event_name(:equinox, 3), do: "march-equinox"
   defp solar_event_name(:equinox, 9), do: "september-equinox"
@@ -1491,12 +1499,12 @@ defmodule Tempo.Holidays.Rule do
   # date, as Eid al-Fitr in 2000) two — declaratively, Tempo resolving the
   # calendar arithmetic. A `count` greater than one spans that many days.
   defp materialise_base(
-         %__MODULE__{kind: kind, calendar: calendar, month: month, day: day, count: count},
+         %__MODULE__{kind: kind, calendar: calendar, day: day, count: count} = rule,
          %Tempo{} = year
        )
        when kind in [:hebrew, :persian] do
     case calendar_tag(calendar) do
-      {:ok, tag} -> calendar_date_holiday(tag, month, day, count, year)
+      {:ok, tag} -> calendar_date_holiday(tag, month_designator(rule), day, count, year)
       :error -> {:error, {:unnamed_calendar, calendar}}
     end
   end
@@ -1599,7 +1607,7 @@ defmodule Tempo.Holidays.Rule do
          %__MODULE__{kind: :julian, month: month, day: day, count: count},
          %Tempo{} = year
        ) do
-    calendar_date_holiday("julian", month, day, count, year)
+    calendar_date_holiday("julian", "#{month}M", day, count, year)
   end
 
   defp materialise_base(%__MODULE__{kind: kind, offset: offset, count: count}, %Tempo{} = year)
@@ -1609,15 +1617,15 @@ defmodule Tempo.Holidays.Rule do
   end
 
   # A fixed date in a `[u-ca=tag]` calendar, projected onto the Gregorian `year`
-  # declaratively: the yearly recurrence `R/../P1Y/FL<month>M<day>DN[u-ca=tag]`
+  # declaratively: the yearly recurrence `R/../P1Y/FL<month><day>DN[u-ca=tag]`
   # bounded to the year yields every occurrence that falls in it — zero, one,
   # or (for a calendar whose year drifts against the Gregorian one) two — each
   # returned in its own calendar. `count` greater than one extends the span to
   # that many days. Tempo resolves the calendar arithmetic, so nothing here
   # computes a date.
-  defp calendar_date_holiday(tag, month, day, count, %Tempo{} = year) do
+  defp calendar_date_holiday(tag, month_selector, day, count, %Tempo{} = year) do
     with {:ok, recurrence} <-
-           Tempo.from_iso8601("R/../P1Y/FL#{month}M#{day}DN[u-ca=#{tag}]"),
+           Tempo.from_iso8601("R/../P1Y/FL#{month_selector}#{day}DN[u-ca=#{tag}]"),
          {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
       intervals =
         set

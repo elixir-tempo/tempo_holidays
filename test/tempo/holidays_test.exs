@@ -704,18 +704,40 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "Adar II carries Purim in both leap and non-leap years" do
-      # date-holidays writes Purim as "14 AdarII"; Calendrical's civil month 7
-      # is the Adar before Nisan — Adar in an ordinary year, Adar II in a leap
-      # year — so the same number serves both.
+      # date-holidays writes Purim as "14 AdarII", the Adar before Nisan:
+      # traditional month 6, which is Adar, the 6th month of an ordinary year,
+      # and Adar II, the 7th month of a leap year.
       {:ok, rule} = Compiler.compile("14 AdarII")
 
       # 2025 → Hebrew 5785, an ordinary year.
       assert {:ok, [ordinary]} = Rule.materialise(rule, ~o"2025")
-      assert Tempo.Interval.from(ordinary) == ~o"5785Y7M14D[u-ca=hebrew]"
+      assert Tempo.Interval.from(ordinary) == ~o"5785Y6M14D[u-ca=hebrew]"
 
       # 2024 → Hebrew 5784, a leap year; month 7 is Adar II.
       assert {:ok, [leap]} = Rule.materialise(rule, ~o"2024")
       assert Tempo.Interval.from(leap) == ~o"5784Y7M14D[u-ca=hebrew]"
+    end
+
+    test "a month after Adar is the same month in ordinary and leap years" do
+      # Passover — 15 Nisan, the 7th month of the ordinary year 5786 (2026)
+      # and the 8th of the leap year 5787 (2027)
+      {:ok, rule} = Compiler.compile("15 Nisan")
+
+      assert {:ok, [ordinary]} = Rule.materialise(rule, ~o"2026")
+      assert Tempo.Interval.from(ordinary) == ~o"5786Y7M15D[u-ca=hebrew]"
+
+      assert {:ok, [leap]} = Rule.materialise(rule, ~o"2027")
+      assert Tempo.Interval.from(leap) == ~o"5787Y8M15D[u-ca=hebrew]"
+    end
+
+    test "Adar I occurs only in a leap year" do
+      {:ok, rule} = Compiler.compile("14 AdarI")
+      assert rule.month == 5 and rule.leap_month
+
+      # 2027 holds Adar I of the leap year 5787; 2026 holds none
+      assert {:ok, [adar_i]} = Rule.materialise(rule, ~o"2027")
+      assert Tempo.Interval.from(adar_i) == ~o"5787Y6M14D[u-ca=hebrew]"
+      assert {:ok, []} = Rule.materialise(rule, ~o"2026")
     end
   end
 

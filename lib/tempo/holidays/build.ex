@@ -29,9 +29,10 @@ defmodule Tempo.Holidays.Build do
   @language "en"
 
   # The shape of the data itself — the `%Holiday{}` and `%Rule{}` structs it
-  # serialises. Bump it with any change to those structs, so every build
+  # serialises. Bump it with any change to those structs, or to the values
+  # they hold (3: Hebrew months are traditional month numbers), so every build
   # regenerates the data instead of loading structs of an older shape.
-  @data_format 2
+  @data_format 3
 
   @doc "The exact date-holidays version the data is built from."
   def pinned_version, do: @pinned_version
