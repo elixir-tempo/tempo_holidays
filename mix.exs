@@ -100,13 +100,11 @@ defmodule Tempo.Holidays.MixProject do
     [
       # Path dep during co-development; becomes {:ex_tempo, "~> 1.6"} before publish.
       {:ex_tempo, path: "../tempo"},
-      # Path dep: the Islamic tier needs Calendrical's dates_in_gregorian_year,
-      # unreleased as of 1.3.0. `override` because ex_tempo/localize pull the
-      # hex calendrical as a child. Becomes {:calendrical, "~> 1.4"} before publish.
-      {:calendrical, path: "../../localize/calendrical", override: true},
-      # The local Astro checkout during co-development (its crescent-visibility
-      # fixes are unreleased). Revert to a hex requirement once they ship.
-      {:astro, path: "../../astro", override: true},
+      # GitHub main during co-development, as in Tempo: the Islamic tier needs
+      # Calendrical's dates_in_gregorian_year, unreleased as of 1.3.0. Becomes
+      # {:calendrical, "~> 1.4"} before publish.
+      {:calendrical, github: "elixir-localize/calendrical", branch: "main", override: true},
+      {:astro, "~> 2.7"},
       # Equinox/solstice holidays computed for a named IANA timezone (Chile's
       # solstice `in America/Santiago`) need a time-zone database; numeric
       # offsets and GMT do not. Tz is the one Astro and Calendrical already use.
@@ -118,8 +116,10 @@ defmodule Tempo.Holidays.MixProject do
       # its SpatialIndex lookups are about 1,500 times faster.
       {:tz_world, "~> 2.5", optional: true},
       # LanguageTag resolution (territory + language in one tag), locale-aware
-      # date/time formatting, and MF2 for any templated holiday notes.
-      {:localize, "~> 1.3"},
+      # date/time formatting, and MF2 for any templated holiday notes. GitHub
+      # main during co-development, as in Tempo; becomes {:localize, "~> 1.4"}
+      # before publish.
+      {:localize, github: "elixir-localize/localize", branch: "main", override: true},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
