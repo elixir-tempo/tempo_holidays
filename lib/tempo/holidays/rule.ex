@@ -35,8 +35,7 @@ defmodule Tempo.Holidays.Rule do
   gate a weekday limit; an observed-date substitution or a `disable`/`enable` move
   makes it a `%Tempo.RecurrenceSet{}` of several. What stays `:needs_window` is a
   timezone-specific equinox/solstice, a shifted or non-Chinese-meridian solar
-  term, the inter-holiday bridge / `if`-holiday, a non-leap-year rule, and a date
-  in a calendar with no faithful `[u-ca=…]` identifier (Vietnamese).
+  term, the inter-holiday bridge / `if`-holiday, and a non-leap-year rule.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -176,8 +175,8 @@ defmodule Tempo.Holidays.Rule do
   The rule's recurrence (`recurrence/1`) is evaluated against the year, so a
   rule that `prepare/1` has already built is projected without building or
   parsing anything. A rule with no standalone recurrence — a bridge or
-  `if`-holiday move, an equinox or solstice outside UTC, a Vietnamese date — is
-  computed kind by kind instead (`materialise_concrete/2`).
+  `if`-holiday move, an equinox or solstice outside UTC — is computed kind by
+  kind instead (`materialise_concrete/2`).
 
   Most holidays fall exactly once a year, but a lunar-calendar holiday can
   fall zero, one or two times within a single Gregorian year — Eid al-Fitr
@@ -525,9 +524,8 @@ defmodule Tempo.Holidays.Rule do
   # computed events. `:none` for a kind whose date is itself a window off
   # another, that needs a concrete projection (a shifted or non-Chinese-meridian
   # solar term, an equinox or solstice in another timezone), or whose calendar
-  # has no faithful `[u-ca=…]` identifier (Vietnamese, whose CLDR type names the
-  # Chinese calendar). Easter and its feasts never come here — their weekday is
-  # fixed, so their gates resolve statically.
+  # has no faithful `[u-ca=…]` identifier. Easter and its feasts never come
+  # here — their weekday is fixed, so their gates resolve statically.
   defp plain_anchor(%__MODULE__{kind: :fixed, month: month, day: day}),
     do: {:ok, "#{month}M#{day}D", ""}
 
@@ -1770,12 +1768,13 @@ defmodule Tempo.Holidays.Rule do
   defp to_minutes(minutes), do: String.to_integer(minutes)
 
   # The IXDTF `u-ca` identifier that names a Calendrical calendar faithfully — one
-  # that resolves back to the same module: a registered non-CLDR calendar
-  # (`julian`), or the calendar's CLDR type with underscores as hyphens
-  # (`:islamic_umalqura` → "islamic-umalqura") when that type resolves to it.
-  # `Calendrical.Vietnamese` reports the CLDR type `:chinese`, which names
-  # `Calendrical.Chinese` — a different calendar, whose months begin a day (or a
-  # month) apart in some years — so it has no faithful identifier: `:error`.
+  # that resolves back to the same module: its identifier among the calendars
+  # Calendrical registers apart (`julian`, `vietnamese`), or its CLDR type when
+  # that type resolves to it, either written with hyphens for underscores
+  # (`:islamic_umalqura` → "islamic-umalqura"). `Calendrical.Vietnamese`
+  # reports the CLDR type `:chinese`, which names `Calendrical.Chinese` — a
+  # different calendar, whose months begin a day (or a month) apart in some
+  # years — so it is named by its registered identifier.
   defp calendar_tag(calendar) do
     case registered_calendar_tag(calendar) do
       nil -> cldr_calendar_tag(calendar)
@@ -1785,7 +1784,7 @@ defmodule Tempo.Holidays.Rule do
 
   defp registered_calendar_tag(calendar) do
     Enum.find_value(Calendrical.additional_calendars(), fn {identifier, module} ->
-      if module == calendar, do: Atom.to_string(identifier)
+      if module == calendar, do: identifier |> Atom.to_string() |> String.replace("_", "-")
     end)
   end
 

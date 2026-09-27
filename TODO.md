@@ -29,8 +29,6 @@ the Islamic civil-date `divergent` differences.
 
 ## Blocked
 
-* [ ] **Vietnamese recurrences** — the 10 Vietnamese lunisolar rules stay `:needs_window` because no `[u-ca=…]` identifier names `Calendrical.Vietnamese` (its CLDR type `:chinese` names the Chinese calendar, which begins months a day or a month apart in some years). Blocked on Calendrical registering `vietnamese` in its additional calendars, as it does `julian`.
-
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
 ## Deferred
@@ -40,6 +38,8 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Vietnamese recurrences** — the 10 Vietnamese lunisolar rules are `[u-ca=vietnamese]` recurrences now that Calendrical registers the calendar, matching `materialise/2` over 2000–2035. 2026-09-27.
 
 * [x] **`materialise/2` on the parsed form** — it evaluates each rule's recurrence, built once per territory (`Rule.prepare/1`, cached by `Data`) or per distinct rule in the harness; `materialise_concrete/2` keeps the kind-by-kind path for the 24 `:needs_window` rules and as the independent check. 2026-09-24.
 

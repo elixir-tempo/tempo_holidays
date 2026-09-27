@@ -1101,11 +1101,15 @@ defmodule Tempo.HolidaysTest do
       assert gregorian_dates("vietnamese 3-0-10", ~o"2037") == ["2037-04-24"]
     end
 
-    test "a Vietnamese date has no recurrence until its calendar can be named" do
+    test "a Vietnamese date is a recurrence in the Vietnamese calendar" do
       # Calendrical.Vietnamese reports the CLDR type `:chinese`, which names the
-      # Chinese calendar, so no `[u-ca=…]` identifier selects it.
+      # Chinese calendar, so it is named by Calendrical's own identifier.
       {:ok, rule} = Compiler.compile("vietnamese 1-0-1")
-      assert Rule.recurrence(rule) == :needs_window
+      {:ok, recurrence} = Rule.recurrence(rule)
+      assert Tempo.to_iso8601(recurrence) =~ "[u-ca=vietnamese]"
+
+      {:ok, tet} = Tempo.to_interval(recurrence, bound: ~o"2007")
+      assert Tempo.relation(tet, ~o"2007-02-17") == :equals
     end
   end
 

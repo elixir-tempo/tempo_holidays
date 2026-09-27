@@ -94,8 +94,8 @@ defmodule Tempo.Holidays do
   `Tempo.intersection(diary, Tempo.Holidays.recurrence_set(:AU))` finds the diary
   entries that fall on a holiday. Holidays that need a window (see
   `Tempo.Holidays.Rule.recurrence/1`: a bridge or `if`-holiday move, an
-  equinox or solstice outside UTC, a Vietnamese date) are omitted here; use
-  `materialise/3` for the complete concrete set over a year.
+  equinox or solstice outside UTC) are omitted here; use `materialise/3` for
+  the complete concrete set over a year.
 
   Takes the same target/options as `recurrences/2`.
 
