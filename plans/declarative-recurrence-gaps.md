@@ -1,8 +1,8 @@
 # Declarative recurrence — remaining gaps
 
-**Status:** in progress, 2026-09-27
+**Status:** implemented (v0.1.0), 2026-09-27
 
-Current standing (2026-09-27): lunisolar, the Islamic rollover and multi-day spans, solar-term recurrences, every gate and the Vietnamese calendar are done. Of the 1,828 stored rules, **1,824** are declarative recurrences that match `materialise/2` exactly over 2000–2035 and each rule's gate boundary years; **4** stay `:needs_window`, all conditional on the year's other holidays (a bridge day and three `if` moves). Multi-day spans shipped as an `:occurrence_duration` directive rather than the `FLL…/P<count>DN` window proposed below. The analysis below is as written on 2026-09-23, except where marked.
+Current standing (2026-09-27): every one of the 1,828 stored rules is a declarative recurrence. 1,824 match `materialise/2` exactly over 2000–2035 and each rule's gate boundary years; the 4 conditional on the year's other holidays (a bridge day and three `if is … holiday then …` moves) are conditional members of their holiday set (`Tempo.RecurrenceSet.keep_when/2`, `move_when/2`), whose bases match exactly, whose resolution matches the concrete second pass over 2000–2035, and which conform to the date-holidays fixtures (168,186 matched, 0 mismatched). The history below records how each family got there.
 
 `Rule.recurrence/1` now emits a standalone, re-materialisable `%Tempo.Interval{}` recurrence for **1219 of 1478** distinct date-holidays rules (up from 1080 before the "Full" pass, which added islamic, easter/orthodox offsets, and relative/nested weekdays). **80** rules still return `:needs_window`, and a further **194 gate-instances** are dropped from otherwise-faithful recurrences. This document explores options to close each, and reconciles the compiler's emitted forms with the Tempo holiday cookbook.
 

@@ -1,6 +1,8 @@
 # Holidays as a Tempo grammar
 
-**Status:** draft, 2026-09-22
+**Status:** implemented (v0.1.0), 2026-09-27
+
+Every phase landed, some in a different form than proposed here: year gates fold into the recurrence's `{…}` domain rather than set operations, and the cross-holiday rules are conditional members of the holiday `Tempo.RecurrenceSet` rather than predicates over a supplied set.
 
 The long-term objective behind `tempo_holidays` is not a lookup table of dates. It is to express a holiday as a **Tempo interval-set value**, defined in Tempo's own grammar, so that a holiday composes with any other Tempo value through set algebra. The motivating query is `my_free_time ∩ holidays_in_my_region`, and its relatives (`workday − holidays`, "bookable slots at least an hour long in the mutual free time"). Today a holiday is an opaque [date-holidays](https://github.com/commenthol/date-holidays) rule string that we compile into a private `%Rule{}` and materialise onto a year. The aim is to lift the *definition* into Tempo grammar, extended as compatibly as possible, leaning on ISO 8601-2 and IXDTF.
 
@@ -128,14 +130,14 @@ At the end, a holiday is a Tempo recurrence from grammar (A–D) closed under th
 
 ## Tasks
 
-* [ ] Phase 1: `Tempo.Holidays` returns `IntervalSet`s; re-express `active`/`disable`/`enable` as set algebra; demonstrate `free_time ∩ holidays` and `IntervalSet.slots/3`.
+* [x] Phase 1: `Tempo.Holidays.recurrences/2` returns a `Tempo.RecurrenceSet` of the holidays and `materialise/3` a `Tempo.IntervalSet` of their occurrences, both tagged with each holiday's metadata; `active`/`disable`/`enable` fold into the recurrence. 2026-09-27.
 
-* [ ] Phase 2: additive selection operators (relative weekday, offset, parity/leap) in Tempo; migrate the compiler tiers.
+* [x] Phase 2: additive selection operators — §12.10 windows for relative weekdays and offsets, `e`/`o`/`l`/`c` domain filters. 2026-09-27.
 
-* [ ] Phase 3: one computed-selection mechanism; wire Easter (finish `orthodox`), equinox/solstice, solar term.
+* [x] Phase 3: computed events `(name)e` — Easter and Orthodox Easter, equinoxes and solstices (zoned), solar terms. 2026-09-27.
 
-* [ ] Phase 4: substitution as a declarative shift transform over the working-day primitives.
+* [x] Phase 4: substitution as observed-day members of a nested recurrence set. 2026-09-24.
 
-* [ ] Phase 5: cross-holiday predicates over a supplied holiday `IntervalSet`.
+* [x] Phase 5: cross-holiday conditions as conditional members (`Tempo.RecurrenceSet.keep_when/2`, `move_when/2`). 2026-09-27.
 
-* [ ] Close the `Tempo.to_iso8601/1` IXDTF re-emit gap if annotations are carried in string form (Tempo-side).
+* [x] Close the `Tempo.to_iso8601/1` IXDTF re-emit gap — not needed: holiday annotations are opaque value metadata, never IXDTF tags. 2026-09-27.

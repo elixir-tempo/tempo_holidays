@@ -1,36 +1,45 @@
 defmodule Tempo.Holidays do
   @moduledoc """
-  Holidays as Tempo recurrences, projectable onto any year.
+  Holidays as Tempo recurrences, projectable onto any window.
 
   A holiday is a *recurrence*, not a date: "Christmas is the 25th of
-  December", "Thanksgiving is the fourth Thursday of November". Each is
-  held as a `t:Tempo.Holidays.Holiday.t/0` — a name, a `:type`, and a
-  `t:Tempo.Holidays.Rule.t/0` — and `materialise/2` projects it onto a
-  concrete year to obtain the interval it occupies there.
+  December", "Thanksgiving is the fourth Thursday of November". A territory's
+  holidays are a `t:Tempo.RecurrenceSet.t/0` — one member per holiday, each
+  tagged with the holiday's metadata — and materialising it onto a window
+  gives the `t:Tempo.IntervalSet.t/0` of the holidays that fall there, each
+  occurrence tagged the same way. Because both are Tempo values, holidays
+  compose with anything else through set algebra.
 
   The data is the [date-holidays](https://github.com/commenthol/date-holidays)
   dataset for every territory, carrying every `:type` (public holidays through
-  to observances). Fixed dates and weekday-in-month holidays are native ISO
-  8601-2 selections (`FL12M25DN`, `FL6M1K2IN`); Easter-relative holidays are
-  computed through Calendrical's ecclesiastical calendar; Islamic holidays are
-  projected onto the Gregorian year through Calendrical and returned in the
-  Islamic calendar. A lunar holiday can fall twice in one Gregorian year, so
-  `materialise/2` returns a list of occurrences.
+  to observances). Fixed dates and weekday-in-month holidays are ISO 8601-2
+  selections (`FL12M25DN`, `FL6M1K2IN`); Easter-relative holidays are windows
+  off the computed `(easter)e` event; Islamic, Hebrew and other calendar
+  holidays are recurrences in their own calendar, returned in it; a holiday
+  observed on another day is a nested set of its own date and its observed
+  days; and a bridge day or a holiday moved off another is a conditional member
+  (`Tempo.RecurrenceSet.keep_when/2`, `move_when/2`), resolved against the
+  others when the set materialises.
+
+  Each holiday's metadata is `:id` (its date-holidays rule, unique within the
+  set, where names repeat), `:name` and `:type`; an observed day adds
+  `substitute: true`. The set's own metadata names its territory.
 
   ## Example
 
-      territory = :SA
+      {:ok, holidays} = Tempo.Holidays.recurrences(:AU)
+      {:ok, this_year} = Tempo.Holidays.materialise(holidays, ~o"2026")
 
-      {:ok, holidays}  = Tempo.Holidays.recurrences(territory)
-      {:ok, this_year} = Tempo.Holidays.materialise(territory, ~o"2026")
+      {:ok, clashes} = Tempo.intersection(my_diary, holidays, metadata: :merge)
 
-  > *"The recurrences are Saudi Arabia's holidays. Materialised onto 2026,
-  > each one lands on the day it falls that year — Eid al-Fitr and Eid
-  > al-Adha in the Islamic calendar."*
+  > *"Australia's **holidays** are a set of recurrences. **This year's** are the
+  > days they fall on in 2026; the diary's **clashes** are its entries that fall
+  > on one, each labelled with the holiday it hit."*
 
   """
 
   alias Tempo.Holidays.{Data, DayStart, Holiday, Locale, Rule}
+  alias Tempo.IntervalSet
 
   @typedoc """
   A holiday request's target: a positional CLDR territory code (atom or string,
@@ -39,8 +48,29 @@ defmodule Tempo.Holidays do
   """
   @type target :: atom() | String.t() | Localize.LanguageTag.t() | keyword()
 
+  @typedoc "The window a holiday set materialises over: a year, or any interval."
+  @type window :: Tempo.t() | Tempo.Interval.t()
+
+  # The calendars whose day begins at sunset, so `:day_start` projects their
+  # holidays onto the evening before.
+  @sunset_calendar_types [
+    :hebrew,
+    :islamic,
+    :islamic_civil,
+    :islamic_rgsa,
+    :islamic_tbla,
+    :islamic_umalqura
+  ]
+
+  defguardp is_window(value) when is_struct(value, Tempo) or is_struct(value, Tempo.Interval)
+
   @doc """
-  Return the holiday recurrences for a territory.
+  Returns a territory's holidays as a recurrence set.
+
+  Each member is one holiday — its recurrence, a nested set of its own date and
+  its observed days, or a conditional member for a bridge day or a holiday moved
+  off another — tagged with `:id`, `:name` and `:type` metadata. The set's own
+  metadata names the territory, and the division and subdivision when given.
 
   ### Arguments
 
@@ -60,8 +90,8 @@ defmodule Tempo.Holidays do
 
   ### Returns
 
-  * `{:ok, [t:Tempo.Holidays.Holiday.t/0]}` — the holidays for the most specific
-    level with data, falling back to the country.
+  * `{:ok, recurrence_set}` — a `t:Tempo.RecurrenceSet.t/0` of the holidays for
+    the most specific level with data, falling back to the country.
 
   * `{:error, {:unknown_territory, territory}}` or `{:error, {:invalid_locale,
     target}}`.
@@ -69,112 +99,76 @@ defmodule Tempo.Holidays do
   ### Examples
 
       iex> {:ok, holidays} = Tempo.Holidays.recurrences(:AU)
-      iex> Enum.map(holidays, & &1.name) |> Enum.take(2)
+      iex> holidays |> Tempo.RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1).name) |> Enum.take(2)
       ["New Year's Day", "Australia Day"]
+      iex> Tempo.RecurrenceSet.metadata(holidays)
+      %{territory: "AU"}
 
   """
-  @spec recurrences(target(), keyword()) :: {:ok, [Holiday.t()]} | {:error, {atom(), term()}}
+  @spec recurrences(target(), keyword()) ::
+          {:ok, Tempo.RecurrenceSet.t()} | {:error, {atom(), term()}}
   def recurrences(target \\ [], options \\ [])
 
   def recurrences(options, extra) when is_list(options) do
-    resolve_holidays(nil, Keyword.merge(options, extra))
+    holiday_set(nil, Keyword.merge(options, extra))
   end
 
   def recurrences(target, options) do
-    resolve_holidays(target, options)
+    holiday_set(target, options)
   end
 
-  @doc """
-  Builds a territory's holidays as a `t:Tempo.RecurrenceSet.t/0`.
-
-  Each holiday that stands alone as a recurrence becomes one or more
-  re-materialisable recurrence members — several for a substituted holiday (its
-  own date and its observed days) — each carrying the holiday's `%{name:, type:}`
-  as metadata, so the whole set composes with a diary through set algebra —
-  `Tempo.intersection(diary, Tempo.Holidays.recurrence_set(:AU))` finds the diary
-  entries that fall on a holiday. Holidays that need a window (see
-  `Tempo.Holidays.Rule.recurrence/1`: a bridge or `if`-holiday move, an
-  equinox or solstice outside UTC) are omitted here; use `materialise/3` for
-  the complete concrete set over a year.
-
-  Takes the same target/options as `recurrences/2`.
-
-  ### Returns
-
-  * `{:ok, recurrence_set}` with a `t:Tempo.RecurrenceSet.t/0`, or
-
-  * `{:error, reason}`.
-
-  ### Examples
-
-      iex> {:ok, set} = Tempo.Holidays.recurrence_set(:AU)
-      iex> is_struct(set, Tempo.RecurrenceSet)
-      true
-
-  """
-  @spec recurrence_set(target(), keyword()) ::
-          {:ok, Tempo.RecurrenceSet.t()} | {:error, {atom(), term()}}
-  def recurrence_set(target \\ [], options \\ [])
-
-  def recurrence_set(options, extra) when is_list(options) do
-    recurrence_set(nil, Keyword.merge(options, extra))
-  end
-
-  def recurrence_set(target, options) do
-    with {:ok, holidays} <- recurrences(target, options) do
+  defp holiday_set(target, options) do
+    with {:ok, resolved} <- Locale.resolve(target, options),
+         {:ok, holidays} <-
+           Data.for_territory(resolved.territory, resolved.division, resolved.subdivision) do
       members = Enum.flat_map(holidays, &holiday_member/1)
-      {:ok, Tempo.RecurrenceSet.new(members)}
+      {:ok, Tempo.RecurrenceSet.new(members, metadata: set_metadata(resolved))}
     end
   end
 
-  # A holiday is one recurrence, or a set of them (a substituted holiday's own
-  # date and its observed days), each becoming a member. The holiday's name and
-  # type are merged into each member's metadata, not written over it: a
-  # multi-day holiday carries its span there as an `:occurrence_duration`
-  # directive, which replacing the map would discard.
+  # A holiday is one member: its recurrence, tagged with the holiday's id, name
+  # and type over any metadata the recurrence carries (a multi-day holiday's
+  # span). A rule with no recurrence has no member.
   defp holiday_member(%Holiday{rule: rule, name: name, type: type}) do
     case Rule.recurrence(rule) do
-      {:ok, %Tempo.RecurrenceSet{members: members}} ->
-        Enum.map(members, &named_member(&1, name, type))
-
       {:ok, recurrence} ->
-        [named_member(recurrence, name, type)]
+        metadata =
+          Map.merge(Tempo.metadata(recurrence), %{id: rule.source, name: name, type: type})
+
+        [Tempo.put_metadata(recurrence, metadata)]
 
       _needs_window_or_error ->
         []
     end
   end
 
-  defp named_member(recurrence, name, type) do
-    %{recurrence | metadata: Map.merge(recurrence.metadata, %{name: name, type: type})}
-  end
-
-  defp resolve_holidays(target, options) do
-    with {:ok, resolved} <- Locale.resolve(target, options) do
-      Data.for_territory(resolved.territory, resolved.division, resolved.subdivision)
-    end
+  defp set_metadata(resolved) do
+    resolved
+    |> Map.take([:territory, :division, :subdivision])
+    |> Map.reject(fn {_level, code} -> is_nil(code) end)
   end
 
   @doc """
-  Project a territory's holidays onto `year`, date-sorted.
+  Projects holidays onto a window, earliest first.
 
-  Called as `materialise(target, year, options)` with a positional territory or
-  holiday list (as for `recurrences/2`), or as `materialise(year, options)` with
-  the target given by a `:territory` or `:locale` option.
+  Called as `materialise(target, window, options)` with a positional territory
+  (as for `recurrences/2`) or a recurrence set `recurrences/2` returned, or as
+  `materialise(window, options)` with the target given by a `:territory` or
+  `:locale` option.
 
   ### Arguments
 
-  * `target` names the territory as for `recurrences/2`, or is a list of
-    `t:Tempo.Holidays.Holiday.t/0` to project directly.
+  * `target` names the territory as for `recurrences/2`, or is a
+    `t:Tempo.RecurrenceSet.t/0` of holidays.
 
-  * `year` is a year-resolution `t:Tempo.t/0` such as `~o"2026"`.
+  * `window` is a year (`~o"2026"`) or any interval (`~o"2026-07/2027-07"`).
 
   ### Options
 
   * `:territory` / `:locale` — the target, as for `recurrences/2`.
 
   * `:division`, `:subdivision` — override the state / region level (ignored when
-    a holiday list is given).
+    a recurrence set is given).
 
   * `:day_start` — how a sunset-starting-calendar holiday (Islamic, Hebrew) is
     projected onto the Gregorian timeline. `:midnight` (the default) returns the
@@ -187,10 +181,11 @@ defmodule Tempo.Holidays do
 
   ### Returns
 
-  * `{:ok, [{t:Tempo.Holidays.Holiday.t/0, t:Tempo.Interval.t/0}]}` — each
-    holiday paired with the interval it occupies that year, earliest first. Under
-    a non-midnight `:day_start`, a sunset-starting holiday's interval is a
-    Gregorian datetime interval rather than an in-calendar day.
+  * `{:ok, interval_set}` — a `t:Tempo.IntervalSet.t/0` of the holidays'
+    occurrences starting in the window, each tagged with its holiday's metadata;
+    abutting occurrences of one holiday (a period date-holidays splits at a year
+    end) are one. Under a non-midnight `:day_start`, a sunset-starting holiday's
+    occurrence is a Gregorian datetime interval rather than an in-calendar day.
 
   * `{:error, {:unknown_territory, territory}}` or `{:error, {:invalid_locale,
     locale}}`.
@@ -199,130 +194,41 @@ defmodule Tempo.Holidays do
 
       iex> import Tempo.Sigils
       iex> {:ok, holidays} = Tempo.Holidays.materialise(:AU, ~o"2026")
-      iex> {holiday, interval} = hd(holidays)
-      iex> {holiday.name, Tempo.Interval.from(interval)}
+      iex> first = Tempo.IntervalSet.first(holidays)
+      iex> {Tempo.metadata(first).name, Tempo.Interval.from(first)}
       {"New Year's Day", ~o"2026Y1M1D"}
 
   """
-  @spec materialise(target() | [Holiday.t()] | Tempo.t(), Tempo.t() | keyword(), keyword()) ::
-          {:ok, [{Holiday.t(), Tempo.Interval.t()}]} | {:error, {atom(), term()}}
-  def materialise(target, year_or_options, options \\ [])
+  @spec materialise(
+          target() | Tempo.RecurrenceSet.t() | window(),
+          window() | keyword(),
+          keyword()
+        ) ::
+          {:ok, IntervalSet.t()} | {:error, term()}
+  def materialise(target, window_or_options, options \\ [])
 
-  def materialise(%Tempo{} = year, options, extra) when is_list(options) do
-    materialise_target(nil, year, Keyword.merge(options, extra))
+  def materialise(window, options, extra) when is_window(window) and is_list(options) do
+    materialise_target(nil, window, Keyword.merge(options, extra))
   end
 
-  def materialise(holidays, %Tempo{} = year, options) when is_list(holidays) do
-    {:ok, materialise_all(holidays, year, day_start(options))}
+  def materialise(%Tempo.RecurrenceSet{} = holidays, window, options) when is_window(window) do
+    materialise_set(holidays, window, options)
   end
 
-  def materialise(target, %Tempo{} = year, options) do
-    materialise_target(target, year, options)
+  def materialise(target, window, options) when is_window(window) do
+    materialise_target(target, window, options)
   end
 
-  defp materialise_target(target, year, options) do
-    with {:ok, holidays} <- resolve_holidays(target, options) do
-      {:ok, materialise_all(holidays, year, day_start(options))}
+  defp materialise_target(target, window, options) do
+    with {:ok, holidays} <- recurrences(target, options) do
+      materialise_set(holidays, window, options)
     end
   end
 
-  defp day_start(options), do: Keyword.get(options, :day_start, :midnight)
-
-  # A holiday whose rule cannot land in this year is dropped rather than
-  # failing the whole set — the same partial-support contract the compiler
-  # keeps.
-  #
-  # Materialisation is two passes, because a *conditional* holiday (a bridge
-  # day, or an `if is … holiday then …` move) depends on the *other* holidays of
-  # the year. The first pass materialises every holiday's base occurrences and
-  # tallies the year's holiday days by type; the second resolves each
-  # conditional against that tally (`Tempo.Holidays.Rule.resolve_conditional/4`).
-  defp materialise_all(holidays, year, day_start) do
-    base = Enum.map(holidays, fn holiday -> {holiday, base_occurrences(holiday, year)} end)
-    counts = occurrence_counts(base)
-
-    base
-    |> Enum.flat_map(&resolve_occurrences(&1, year, counts))
-    |> coalesce_by_name()
-    |> project_day_start(day_start)
-    |> Enum.sort_by(fn {_holiday, interval} -> Tempo.Interval.from(interval) end, Tempo)
-  end
-
-  # A day is just a day until it is projected onto the Gregorian timeline. With a
-  # non-midnight `day_start`, each sunset-starting-calendar occurrence (Islamic,
-  # Hebrew) is projected to the datetime interval that begins when its day begins;
-  # every other holiday, and `:midnight`, is left as the civil day it already is.
-  defp project_day_start(pairs, :midnight), do: pairs
-
-  defp project_day_start(pairs, day_start) do
-    Enum.map(pairs, fn {holiday, interval} ->
-      {holiday, project_occurrence(holiday, interval, day_start)}
-    end)
-  end
-
-  defp project_occurrence(
-         %Holiday{rule: %Rule{kind: kind, calendar: calendar}},
-         interval,
-         day_start
-       )
-       when kind in [:islamic, :hebrew] do
-    case DayStart.project(interval, calendar, day_start) do
-      {:ok, projected} -> projected
-      {:error, _} -> interval
-    end
-  end
-
-  defp project_occurrence(_holiday, interval, _day_start), do: interval
-
-  defp base_occurrences(%Holiday{rule: rule}, year) do
-    case Rule.materialise(rule, year) do
-      {:ok, intervals} -> intervals
-      {:error, _} -> []
-    end
-  end
-
-  # The year's holiday days as a `{gregorian_days, type} => count` tally, over
-  # every holiday's base occurrences.
-  defp occurrence_counts(base) do
-    Enum.reduce(base, %{}, fn {holiday, occurrences}, counts ->
-      tally(counts, occurrences, holiday.type)
-    end)
-  end
-
-  defp tally(counts, occurrences, type) do
-    Enum.reduce(occurrences, counts, &tally_one(&2, &1, type))
-  end
-
-  defp tally_one(counts, interval, type) do
-    case Rule.occurrence_days(interval) do
-      {:ok, days} -> Map.update(counts, {days, type}, 1, &(&1 + 1))
-      :error -> counts
-    end
-  end
-
-  defp resolve_occurrences({%Holiday{rule: rule} = holiday, occurrences}, year, counts) do
-    if Rule.conditional?(rule) do
-      present? = present_excluding(holiday, occurrences, counts)
-
-      case Rule.resolve_conditional(rule, occurrences, year, present?) do
-        {:ok, intervals} -> Enum.map(intervals, &{holiday, &1})
-        {:error, _} -> []
-      end
-    else
-      Enum.map(occurrences, &{holiday, &1})
-    end
-  end
-
-  # A `(gregorian_days, type) -> boolean()` for the second pass: does *another*
-  # holiday of `type` fall on `days`? A holiday never satisfies its own
-  # condition, so its own occurrences are discounted from the tally — mirroring
-  # date-holidays skipping the rule under test.
-  defp present_excluding(%Holiday{type: own_type}, occurrences, counts) do
-    own = tally(%{}, occurrences, own_type)
-
-    fn days, type ->
-      mine = if type == own_type, do: Map.get(own, {days, own_type}, 0), else: 0
-      Map.get(counts, {days, type}, 0) - mine > 0
+  defp materialise_set(holidays, window, options) do
+    with {:ok, occurrences} <- Tempo.to_interval_set(holidays, bound: window),
+         {:ok, coalesced} <- coalesce_by_name(occurrences) do
+      project_day_start(coalesced, Keyword.get(options, :day_start, :midnight))
     end
   end
 
@@ -332,20 +238,49 @@ defmodule Tempo.Holidays do
   # holiday are merged into the single period they describe — while
   # genuinely distinct neighbours (Christmas the 25th, Boxing Day the 26th)
   # keep their own names and stay apart.
-  defp coalesce_by_name(pairs) do
-    pairs
-    |> Enum.group_by(fn {holiday, _interval} -> holiday.name end)
+  defp coalesce_by_name(occurrences) do
+    occurrences
+    |> IntervalSet.to_list()
+    |> Enum.group_by(&Tempo.metadata(&1)[:name])
     |> Enum.flat_map(fn {_name, group} -> coalesce_group(group) end)
+    |> IntervalSet.new(metadata: IntervalSet.metadata(occurrences))
   end
 
-  defp coalesce_group([{holiday, _interval} | _] = group) do
-    intervals = Enum.map(group, fn {_holiday, interval} -> interval end)
-
-    case Tempo.IntervalSet.new(intervals, coalesce: true) do
-      {:ok, set} -> Enum.map(Tempo.IntervalSet.to_list(set), &{holiday, &1})
+  defp coalesce_group(group) do
+    case IntervalSet.new(group, coalesce: true) do
+      {:ok, set} -> IntervalSet.to_list(set)
       {:error, _} -> group
     end
   end
 
-  defp coalesce_group([]), do: []
+  # A day is just a day until it is projected onto the Gregorian timeline. With a
+  # non-midnight `day_start`, each occurrence dated in a sunset-starting calendar
+  # (Islamic, Hebrew) is projected to the datetime interval that begins when its
+  # day begins, keeping its metadata; every other occurrence, and `:midnight`,
+  # is left as the civil day it already is.
+  defp project_day_start(occurrences, :midnight), do: {:ok, occurrences}
+
+  defp project_day_start(occurrences, day_start) do
+    occurrences
+    |> IntervalSet.map(&project_occurrence(&1, day_start))
+    |> IntervalSet.new(metadata: IntervalSet.metadata(occurrences))
+  end
+
+  defp project_occurrence(interval, day_start) do
+    calendar = Tempo.Interval.from(interval).calendar
+
+    with true <- sunset_calendar?(calendar),
+         {:ok, projected} <- DayStart.project(interval, calendar, day_start) do
+      Tempo.put_metadata(projected, Tempo.metadata(interval))
+    else
+      _midnight_calendar_or_error -> interval
+    end
+  end
+
+  defp sunset_calendar?(calendar) when is_atom(calendar) do
+    Code.ensure_loaded?(calendar) and function_exported?(calendar, :cldr_calendar_type, 0) and
+      calendar.cldr_calendar_type() in @sunset_calendar_types
+  end
+
+  defp sunset_calendar?(_calendar), do: false
 end

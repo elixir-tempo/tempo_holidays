@@ -83,15 +83,14 @@ defmodule Tempo.Holidays.MixProject do
         "CHANGELOG.md"
       ],
       groups_for_modules: [
-        Holidays: [
-          Tempo.Holidays.Data,
-          Tempo.Holidays.DayStart,
-          Tempo.Holidays.Holiday,
-          Tempo.Holidays.Locale,
-          Tempo.Holidays.Rule
-        ],
+        Holidays: [Tempo.Holidays.DayStart, Tempo.Holidays.Locale],
         "date-holidays": [Tempo.Holidays.Compiler, Tempo.Holidays.DateHolidays],
-        Internals: [Tempo.Holidays.Build]
+        Internals: [
+          Tempo.Holidays.Build,
+          Tempo.Holidays.Data,
+          Tempo.Holidays.Holiday,
+          Tempo.Holidays.Rule
+        ]
       ]
     ]
   end

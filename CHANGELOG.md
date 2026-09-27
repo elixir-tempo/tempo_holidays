@@ -2,13 +2,13 @@
 
 ## [v0.1.0] — unreleased
 
-First release. Public holidays for every territory in the [date-holidays](https://github.com/commenthol/date-holidays) dataset, as Tempo recurrences projected onto any year.
+First release. Public holidays for every territory in the [date-holidays](https://github.com/commenthol/date-holidays) dataset, as Tempo recurrences projected onto any window.
 
-* Every holiday type, resolved from a CLDR territory code, a BCP 47 locale, or a holiday list, with state/region levels and territory inheritance.
+* Every holiday type, resolved from a CLDR territory code or a BCP 47 locale, with state/region levels and territory inheritance.
 
 * The full date-holidays grammar — fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar, solar-term and equinox/solstice dates, observed-date substitution, occurrence gates, and inter-holiday bridge days.
 
-* `Tempo.Holidays.recurrence_set/2` — a territory's holidays as a re-materialisable `Tempo.RecurrenceSet` that composes with a diary through `Tempo.intersection/2`; 1,824 of the dataset's 1,828 rules are declarative recurrences, gates and observed-date substitution included.
+* `Tempo.Holidays.recurrences/2` — a territory's holidays as a `Tempo.RecurrenceSet`, one member per holiday tagged with its `:id`, `:name` and `:type`, and `materialise/3` their occurrences over any window as a labelled `Tempo.IntervalSet`. All 1,828 of the dataset's rules are declarative recurrences, the bridge and `if`-holiday rules as conditional members.
 
 * `Tempo.Holidays.Rule.materialise/2` evaluates each rule's recurrence, built once per territory (`Rule.prepare/1`); `Rule.materialise_concrete/2` keeps the kind-by-kind computation.
 

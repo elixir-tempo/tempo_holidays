@@ -1,12 +1,13 @@
 defmodule Tempo.Holidays.Holiday do
   @moduledoc """
-  A single holiday: its name, its kind, and the recurrence rule that places
-  it in any year.
+  A single holiday as the compiled data holds it: its name, its type, and the
+  rule that places it in any year.
 
-  A holiday is a *definition* — a name paired with a
-  `t:Tempo.Holidays.Rule.t/0` recurrence, not a date. `Tempo.Holidays.materialise/2`
-  projects the rule onto a concrete year to obtain the interval it occupies
-  there.
+  This is the loader's record (`Tempo.Holidays.Data`), not what the public API
+  returns: `Tempo.Holidays.recurrences/2` gives each holiday as a member of a
+  `t:Tempo.RecurrenceSet.t/0` — its rule's recurrence, tagged with the holiday's
+  `:id` (the rule), `:name` and `:type` — and `Tempo.Holidays.materialise/3` its
+  occurrences, tagged the same way.
 
   """
 

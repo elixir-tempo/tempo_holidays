@@ -34,9 +34,12 @@ defmodule Tempo.Holidays.Rule do
   span over any of these. Its year gates (`since`/`until`, `active` windows,
   every-N-years, even/odd/leap) become the recurrence's `{…}` domain and a weekday
   gate a weekday limit; an observed-date substitution or a `disable`/`enable` move
-  makes it a `%Tempo.RecurrenceSet{}` of several. What stays `:needs_window` is a
-  shifted or non-Chinese-meridian solar term and the inter-holiday bridge /
-  `if`-holiday.
+  makes it a `%Tempo.RecurrenceSet{}` of several. An inter-holiday bridge or
+  `if`-holiday move depends on the year's other holidays, so it is a conditional
+  member (`Tempo.RecurrenceSet.keep_when/2`, `move_when/2`) wrapping the rule's own
+  recurrence, resolved when its holiday set materialises. What stays
+  `:needs_window` is a rule no recurrence expresses exactly — a shifted or
+  non-Chinese-meridian solar term — which none of the stored rules is.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -55,6 +58,7 @@ defmodule Tempo.Holidays.Rule do
   """
 
   alias Tempo.Interval
+  alias Tempo.RecurrenceSet.Conditional
 
   @type kind ::
           :fixed
@@ -110,7 +114,8 @@ defmodule Tempo.Holidays.Rule do
           enable: [Date.t()] | nil,
           conditional: conditional() | nil,
           source: String.t() | nil,
-          recurrence: Interval.t() | Tempo.RecurrenceSet.t() | :needs_window | nil
+          recurrence:
+            Interval.t() | Tempo.RecurrenceSet.t() | Conditional.t() | :needs_window | nil
         }
 
   @typedoc """
@@ -193,7 +198,10 @@ defmodule Tempo.Holidays.Rule do
 
   * `{:ok, [t:Tempo.Interval.t/0]}` — the holiday's spans in that Gregorian
     year, earliest first. Usually one; empty when the rule does not fall in
-    the year, two for a lunar holiday that recurs within it.
+    the year, two for a lunar holiday that recurs within it. A conditional
+    rule (a bridge day, an `if`-holiday move) gives its spans before the
+    condition, which only its holiday set can resolve
+    (`Tempo.Holidays.materialise/3`).
 
   * `{:error, reason}` when the rule cannot be projected.
 
@@ -295,6 +303,11 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
+  # A conditional rule alone is its base: the condition reads the rule's holiday
+  # set, which resolves it (`Tempo.Holidays.materialise/3`).
+  defp materialise_recurrence(%Conditional{member: member}, year),
+    do: materialise_recurrence(member, year)
+
   defp materialise_recurrence(recurrence, year) do
     with {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
       {:ok, Tempo.IntervalSet.to_list(set)}
@@ -302,8 +315,8 @@ defmodule Tempo.Holidays.Rule do
   end
 
   @doc """
-  Returns the rule as a re-materialisable recurrence, for
-  `Tempo.Holidays.recurrence_set/2`.
+  Returns the rule as a re-materialisable recurrence, the member
+  `Tempo.Holidays.recurrences/2` gives its holiday.
 
   A holiday that falls on one date a year — a fixed date, an nth weekday, a
   calendar date, a computed event — is a single `%Tempo.Interval{}` recurrence
@@ -319,10 +332,12 @@ defmodule Tempo.Holidays.Rule do
   move, whose moved date is a member of its own. Both materialise the same way,
   through `Tempo.to_interval/2` with a `:bound`.
 
-  A rule that cannot stand alone as a recurrence returns `:needs_window`, so the
-  caller materialises it concretely against a bound: a bridge or `if`-holiday
-  move (which depends on the year's other holidays), and any gate the
-  recurrence cannot carry exactly.
+  A bridge or `if`-holiday move depends on the year's other holidays, so it is a
+  `t:Tempo.RecurrenceSet.Conditional.t/0` wrapping the rule's own recurrence —
+  `keep_when` with offsets to the named dates, `move_when` to the next target
+  weekday — resolved when its holiday set materialises. A rule no recurrence
+  expresses exactly returns `:needs_window`, and the caller materialises it
+  concretely against a bound.
 
   ### Arguments
 
@@ -330,8 +345,9 @@ defmodule Tempo.Holidays.Rule do
 
   ### Returns
 
-  * `{:ok, recurrence}` with a `t:Tempo.Interval.t/0` recurrence, or a
-    `t:Tempo.RecurrenceSet.t/0` of them.
+  * `{:ok, recurrence}` with a `t:Tempo.Interval.t/0` recurrence, a
+    `t:Tempo.RecurrenceSet.t/0` of them, or a
+    `t:Tempo.RecurrenceSet.Conditional.t/0` for a conditional rule.
 
   * `:needs_window` when the rule needs a bound to materialise.
 
@@ -354,6 +370,11 @@ defmodule Tempo.Holidays.Rule do
       iex> Enum.map(recurrence.members, &Tempo.to_iso8601/1)
       ["R/../P1Y/FL12M25DN", "R/../P1Y/FLLL12M25D{6..7}KN/P8DN1K-1IN"]
 
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
+      iex> {:ok, bridge} = Tempo.Holidays.Rule.recurrence(rule)
+      iex> {Tempo.to_iso8601(bridge.member), Enum.map(bridge.at, &Tempo.to_iso8601/1), bridge.falls_on}
+      {"R/../P1Y/FL9M22DN", ["P-1D", "P1D"], %{type: :public}}
+
   """
   # The kinds whose `count` is a multi-day span (the others use `count` for a
   # weekday, an instance or a solar-term index, so they take no span).
@@ -373,7 +394,9 @@ defmodule Tempo.Holidays.Rule do
   @all_weekdays [1, 2, 3, 4, 5, 6, 7]
 
   @spec recurrence(t()) ::
-          {:ok, Interval.t() | Tempo.RecurrenceSet.t()} | :needs_window | {:error, term()}
+          {:ok, Interval.t() | Tempo.RecurrenceSet.t() | Conditional.t()}
+          | :needs_window
+          | {:error, term()}
   # A prepared rule already carries its recurrence (see `prepare/1`).
   def recurrence(%__MODULE__{recurrence: :needs_window}), do: :needs_window
   def recurrence(%__MODULE__{recurrence: %Interval{} = recurrence}), do: {:ok, recurrence}
@@ -381,10 +404,16 @@ defmodule Tempo.Holidays.Rule do
   def recurrence(%__MODULE__{recurrence: %Tempo.RecurrenceSet{} = recurrence}),
     do: {:ok, recurrence}
 
+  def recurrence(%__MODULE__{recurrence: %Conditional{} = recurrence}), do: {:ok, recurrence}
+
   # A conditional rule (a bridge day, an `if is … holiday then …` move) depends on
-  # the year's other holidays, so it has no standalone recurrence.
-  def recurrence(%__MODULE__{conditional: conditional}) when not is_nil(conditional),
-    do: :needs_window
+  # the year's other holidays: its base recurrence is a conditional member of the
+  # holiday set, resolved against the others when the set materialises.
+  def recurrence(%__MODULE__{conditional: conditional} = rule) when not is_nil(conditional) do
+    with {:ok, base} <- recurrence(%{rule | conditional: nil, recurrence: nil}) do
+      conditional_recurrence(base, conditional, rule)
+    end
+  end
 
   def recurrence(%__MODULE__{} = rule) do
     with {:ok, shapes} <- occurrence_shapes(rule),
@@ -395,6 +424,49 @@ defmodule Tempo.Holidays.Rule do
       {:ok, assemble(Enum.reject(recurrences, &is_nil/1))}
     end
   end
+
+  # ── conditional members ───────────────────────────────────────────────
+
+  # A bridge keeps its day when every named date is a holiday of its type
+  # (`PostRule.bridge`). The dates become offsets from the base date, exact when
+  # each is in the base's own month.
+  defp conditional_recurrence(
+         base,
+         %{kind: :bridge, type: type, on: on},
+         %__MODULE__{kind: :fixed, month: month, day: day}
+       ) do
+    if Enum.all?(on, fn {on_month, _on_day} -> on_month == month end),
+      do: bridge_member(base, on, day, type),
+      else: :needs_window
+  end
+
+  # An if-holiday moves an occurrence that falls on a holiday of its type to the
+  # next target weekday (`PostRule.ruleIfHoliday` with a single `next` step).
+  defp conditional_recurrence(
+         base,
+         %{
+           kind: :if_holiday,
+           type: type,
+           move: %{count: 1, direction: :next, target: weekday, omit: []}
+         },
+         _rule
+       )
+       when weekday in 1..7 do
+    with {:ok, selector} <- Tempo.from_iso8601("#{weekday}K") do
+      {:ok, Tempo.RecurrenceSet.move_when(base, falls_on: %{type: type}, to_next: selector)}
+    end
+  end
+
+  defp conditional_recurrence(_base, _conditional, _rule), do: :needs_window
+
+  defp bridge_member(base, on, day, type) do
+    with {:ok, offsets} <- reduce_ok(on, fn {_month, on_day} -> day_offset(on_day - day) end) do
+      {:ok, Tempo.RecurrenceSet.keep_when(base, at: offsets, falls_on: %{type: type})}
+    end
+  end
+
+  defp day_offset(days) when days < 0, do: Tempo.parse_duration("-P#{-days}D")
+  defp day_offset(days), do: Tempo.parse_duration("P#{days}D")
 
   # ── occurrence shapes ─────────────────────────────────────────────────
   #
@@ -1005,9 +1077,18 @@ defmodule Tempo.Holidays.Rule do
 
   defp member_recurrence(%{role: role} = member, rule) do
     with {:ok, recurrence} <- Tempo.from_iso8601(member_iso(member)) do
-      {:ok, if(role == :base, do: apply_span(recurrence, rule), else: recurrence)}
+      {:ok, role_recurrence(role, recurrence, rule)}
     end
   end
+
+  # The base carries the holiday's span; an observed day is marked, as
+  # date-holidays marks the substitute it reports.
+  defp role_recurrence(:base, recurrence, rule), do: apply_span(recurrence, rule)
+
+  defp role_recurrence(:observed, %Interval{metadata: metadata} = recurrence, _rule),
+    do: %{recurrence | metadata: Map.put(metadata, :substitute, true)}
+
+  defp role_recurrence(_role, recurrence, _rule), do: recurrence
 
   defp member_iso(%{shape: shape, domain: domain}),
     do: "R/#{render_domain(domain)}/P#{domain.cadence}Y/#{shape}"

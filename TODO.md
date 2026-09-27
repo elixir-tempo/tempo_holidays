@@ -9,15 +9,11 @@ the Islamic civil-date `divergent` differences.
 
 ## Open
 
-* [ ] **Holidays as a Tempo grammar** — the core objective: express a holiday as a Tempo interval-set value so it composes with other Tempo values (`free_time ∩ holidays`). Categorisation by rule family and a phased path in [plans/holiday-grammar.md](plans/holiday-grammar.md).
-
-* [ ] **Conditional holidays as a set-level form** — the last 4 of the 1,828 stored rules stay `:needs_window`: a bridge day and three `if is … holiday then …` moves, which depend on the year's other holidays. A plan for a `Tempo.RecurrenceSet` member that depends on other members comes first: Tempo's `plans/recurrence-set-conditions.md`.
-
 * [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: territory-local anchoring (derive a territory's zone/location from the locale) as a follow-up to the current canonical/explicit anchors.
 
-* [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
+* [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
 
 * [ ] **Coverage to 90%** — the CI lint row runs plain `mix test` until coverage reaches the default 90% threshold, then takes the reference workflow's `mix test --cover`. 83% today with the build-time and test-support modules ignored (`Mix.Tasks.*`, `Build`, `Conformance`, `Fixtures`); the gaps are `DayStart` (65%) and `DateHolidays` (74%).
 
@@ -38,6 +34,12 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Holidays as recurrences with metadata** — `recurrences/2` returns a `Tempo.RecurrenceSet`, one member per holiday tagged `:id`/`:name`/`:type` (observed days nested, marked `substitute: true`); `materialise/3` a labelled `Tempo.IntervalSet` over any window; `recurrence_set/2` is gone and `%Holiday{}` is internal. 2026-09-27.
+
+* [x] **Conditional holidays as conditional members** — the bridge and the three `if is … holiday then …` moves are `keep_when`/`move_when` members resolved by Tempo's second pass: all 1,828 rules declarative, conformance 0 mismatched. 2026-09-27.
+
+* [x] **Holidays as a Tempo grammar** — the core objective: every holiday is a Tempo recurrence composing through set algebra ([plans/holiday-grammar.md](plans/holiday-grammar.md)). 2026-09-27.
 
 * [x] **Non-leap years and zoned equinoxes** — the 3 non-leap rules use Tempo's `c` domain filter, and the 5 equinox/solstice rules in a zone a zoned event (`(march-equinox@+09:00)e`, `(june-solstice@America/Santiago)e`); a time zone database is now required. 1,824 of 1,828 rules declarative. 2026-09-27.
 

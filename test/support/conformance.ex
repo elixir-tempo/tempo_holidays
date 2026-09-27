@@ -199,9 +199,9 @@ defmodule Tempo.Holidays.Conformance do
   end
 
   defp check_materialised(compiled, context, acc) do
-    case Rule.materialise(compiled, context.year_tempo) do
+    case materialise_rule(compiled, context) do
       {:ok, intervals} ->
-        ours = compiled |> resolve_if_conditional(intervals, context) |> to_date_set()
+        ours = to_date_set(intervals)
 
         if MapSet.subset?(context.expected, ours) and MapSet.subset?(ours, context.all_dates) do
           %{acc | matched: acc.matched + 1}
@@ -214,17 +214,45 @@ defmodule Tempo.Holidays.Conformance do
     end
   end
 
-  # A bridge / if-holiday rule's base occurrences are resolved against the
-  # year's holidays (`context.present`) in the second pass, mirroring
-  # `Tempo.Holidays.materialise/2`; every other rule stands as materialised.
-  defp resolve_if_conditional(compiled, intervals, context) do
-    if Rule.conditional?(compiled) do
-      case Rule.resolve_conditional(compiled, intervals, context.year_tempo, context.present) do
-        {:ok, resolved} -> resolved
-        {:error, _} -> intervals
-      end
-    else
-      intervals
+  defp materialise_rule(compiled, context) do
+    if Rule.conditional?(compiled),
+      do: resolve_conditional(compiled, context),
+      else: Rule.materialise(compiled, context.year_tempo)
+  end
+
+  # A bridge / if-holiday rule is resolved as `Tempo.Holidays.materialise/3`
+  # resolves it: a conditional member of a recurrence set, here holding the
+  # fixture's other entries — Tempo's second pass against date-holidays' own
+  # output. A conditional no member can express resolves concretely against the
+  # same entries (`context.present`).
+  defp resolve_conditional(compiled, context) do
+    case Rule.recurrence(compiled) do
+      {:ok, %Tempo.RecurrenceSet.Conditional{} = conditional} ->
+        resolve_in_set(conditional, context)
+
+      _no_conditional_member ->
+        with {:ok, base} <- Rule.materialise_concrete(compiled, context.year_tempo) do
+          Rule.resolve_conditional(compiled, base, context.year_tempo, context.present)
+        end
+    end
+  end
+
+  defp resolve_in_set(conditional, context) do
+    under_test = Tempo.put_metadata(conditional, %{under_test: true})
+    holidays = Tempo.RecurrenceSet.new([under_test | fixture_members(context)])
+
+    with {:ok, occurrences} <- Tempo.to_interval_set(holidays, bound: context.year_tempo) do
+      {:ok,
+       occurrences |> Tempo.IntervalSet.to_list() |> Enum.filter(&Tempo.metadata(&1)[:under_test])}
+    end
+  end
+
+  # The fixture's other entries as typed days — what `present_fun/2` tallies.
+  defp fixture_members(%{holidays: holidays, rule: rule}) do
+    for holiday <- holidays,
+        holiday.rule != rule,
+        {:ok, date} <- [Date.from_iso8601(holiday.date)] do
+      Tempo.put_metadata(Tempo.from_elixir(date), %{type: fixture_type(holiday.type)})
     end
   end
 
