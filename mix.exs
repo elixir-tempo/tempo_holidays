@@ -98,8 +98,10 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # Path dep during co-development; becomes {:ex_tempo, "~> 1.6"} before publish.
-      {:ex_tempo, path: "../tempo"},
+      # GitHub `extensions` during co-development, as Localize and Calendrical
+      # are GitHub main: the recurrences need Tempo's unreleased 1.7.0 work.
+      # Becomes {:ex_tempo, "~> 1.7"} before publish.
+      {:ex_tempo, github: "elixir-tempo/tempo", branch: "extensions"},
       # GitHub main during co-development, as in Tempo: the Islamic tier needs
       # Calendrical's dates_in_gregorian_year, unreleased as of 1.3.0. Becomes
       # {:calendrical, "~> 1.4"} before publish.
@@ -124,21 +126,6 @@ defmodule Tempo.Holidays.MixProject do
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
-    ] ++ maybe_json_polyfill()
-  end
-
-  # `mix tempo.holidays.update` parses the downloaded bundle with `:json`.
-  # On OTP 26 that module does not exist, so json_polyfill (the EEP 68
-  # backport) supplies it — for THIS project's own dev/test/CI only, since
-  # `only:` deps never enter the hex package requirements. On OTP 27+ `:json`
-  # is built in and the polyfill's own build fails, so the conditional keeps
-  # it out there. An OTP 26 consumer who wants to run the task adds
-  # `{:json_polyfill, "~> 0.2 or ~> 1.0"}` to their own deps (see README).
-  defp maybe_json_polyfill do
-    if Code.ensure_loaded?(:json) do
-      []
-    else
-      [{:json_polyfill, "~> 0.2 or ~> 1.0", only: [:dev, :test]}]
-    end
+    ]
   end
 end

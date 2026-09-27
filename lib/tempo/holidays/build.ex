@@ -199,7 +199,6 @@ defmodule Tempo.Holidays.Build do
   # immutable CDN artefact that is a build-time fault we want to fail loudly on,
   # so it is not caught.
   defp fetch_bundle do
-    ensure_json!()
     _ = Application.ensure_all_started(:ssl)
     _ = Application.ensure_all_started(:inets)
 
@@ -209,19 +208,6 @@ defmodule Tempo.Holidays.Build do
 
       {:error, reason} ->
         Mix.raise("tempo_holidays: could not download #{@source}: #{inspect(reason)}")
-    end
-  end
-
-  # Parsing the bundle needs Erlang's `:json`, absent on OTP 26. json_polyfill
-  # (a dev/test dep here) supplies it; a consumer refreshing the data on OTP 26
-  # adds it too. Loading the shipped etf needs no JSON on any OTP.
-  defp ensure_json! do
-    if not Code.ensure_loaded?(:json) do
-      Mix.raise(
-        "tempo_holidays: building the data parses the download with Erlang's :json, " <>
-          "which OTP 26 lacks. Add {:json_polyfill, \"~> 0.2 or ~> 1.0\"} to run the " <>
-          "build on OTP 26; on OTP 27+ :json is built in."
-      )
     end
   end
 

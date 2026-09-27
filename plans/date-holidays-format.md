@@ -67,7 +67,7 @@ default; run it with `mix test --include conformance`.
 
 ## Build pipeline
 
-* **Source** (decided): the compiled `holidays.json` bundle from an **exactly pinned** date-holidays version via jsDelivr (`date-holidays@3.37.0`). An exact pin — not the `@3` range — makes the build reproducible, so the source need not be vendored in git. It keeps rule strings as `days` keys, so it parses with stdlib `:json` (json_polyfill supplies it on OTP 26) and fetches with `:httpc` via Localize's hardened HTTP client — **no new dependency**. The per-country YAML path (needing `yaml_elixir`) is rejected on that basis.
+* **Source** (decided): the compiled `holidays.json` bundle from an **exactly pinned** date-holidays version via jsDelivr (`date-holidays@3.37.0`). An exact pin — not the `@3` range — makes the build reproducible, so the source need not be vendored in git. It keeps rule strings as `days` keys, so it parses with stdlib `:json` (built into OTP 27, Tempo's floor) and fetches with `:httpc` via Localize's hardened HTTP client — **no new dependency**. The per-country YAML path (needing `yaml_elixir`) is rejected on that basis.
 * **Generate at build time**: the `:holidays` Mix compiler (`Tempo.Holidays.Build`) runs after the Elixir compiler and, when the pinned data is not already on disk, downloads the bundle and compiles every territory's `days` to `%Holiday{}`, writing `priv/holidays/<CC>.etf`. It is a no-op once built, so warm builds and every consumer build (the etf ships in the package) touch no network.
 * **No seed**: the compiled bundle is the only source; there is no hand-written fallback data.
 

@@ -2,6 +2,10 @@
 
 **TODO: Add description**
 
+## Supported Elixir and OTP versions
+
+tempo_holidays supports **Elixir 1.17** and later on **OTP 27** and later; OTP 26 is not supported, because Tempo requires OTP 27.
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed

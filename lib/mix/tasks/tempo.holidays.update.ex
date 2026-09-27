@@ -11,8 +11,8 @@ defmodule Mix.Tasks.Tempo.Holidays.Update do
   language.
 
   The download is over TLS via Localize's HTTP client and is parsed with
-  Erlang's `:json` (json_polyfill supplies it on OTP 26). The data it writes is
-  ETF, so *loading* it at runtime never needs JSON on any OTP.
+  Erlang's `:json`, built into OTP 27 and later. The data it writes is ETF, so
+  *loading* it at runtime never needs JSON.
 
   ## Usage
 

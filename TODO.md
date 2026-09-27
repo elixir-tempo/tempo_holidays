@@ -19,6 +19,8 @@ the Islamic civil-date `divergent` differences.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution.
 
+* [ ] **Coverage to 90%** — the CI lint row runs plain `mix test` until coverage reaches the default 90% threshold, then takes the reference workflow's `mix test --cover`. 83% today with the build-time and test-support modules ignored (`Mix.Tasks.*`, `Build`, `Conformance`, `Fixtures`); the gaps are `DayStart` (65%) and `DateHolidays` (74%).
+
 ## In progress
 
 * [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2). Then: harness parallelism.
