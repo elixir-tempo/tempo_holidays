@@ -124,7 +124,7 @@ defmodule Tempo.Holidays.DayStart do
   end
 
   defp evening_instant(date, zone) do
-    case DateTime.new(date, @evening_time, zone, Tz.TimeZoneDatabase) do
+    case DateTime.new(date, @evening_time, zone, Tempo.TimeZoneDatabase.database()) do
       {:ok, datetime} -> {:ok, datetime}
       {:ambiguous, _first, second} -> {:ok, second}
       {:gap, _just_before, just_after} -> {:ok, just_after}

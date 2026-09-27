@@ -27,15 +27,16 @@ defmodule Tempo.Holidays.Rule do
   re-materialisable recurrence: a calendar date under `[u-ca=…]`, a lunisolar
   date as a traditional-month `m` selection under `[u-ca=…]`, a moveable feast as
   a §12.10 window off `(easter)e`, a relative or nested weekday as a window off
-  its anchor date, an Islamic day-rollover as the last day of a window off the
+  its anchor date (a weekday after the nth weekday after a date as a window off
+  that window), an Islamic day-rollover as the last day of a window off the
   month's 1st, and a lunisolar eve or day-offset folded into the day (`net_day =
   day + offset`). A multi-day holiday (`count > 1`) adds an `:occurrence_duration`
   span over any of these. Its year gates (`since`/`until`, `active` windows,
   every-N-years, even/odd/leap) become the recurrence's `{…}` domain and a weekday
   gate a weekday limit; an observed-date substitution or a `disable`/`enable` move
   makes it a `%Tempo.RecurrenceSet{}` of several. What stays `:needs_window` is a
-  timezone-specific equinox/solstice, a shifted or non-Chinese-meridian solar
-  term, the inter-holiday bridge / `if`-holiday, and a non-leap-year rule.
+  shifted or non-Chinese-meridian solar term and the inter-holiday bridge /
+  `if`-holiday.
 
   A rule may also carry an observed-date `t:substitute/0` — "if it falls on a
   weekend, observe it the following Monday" — as ordered clauses, each with its
@@ -320,8 +321,8 @@ defmodule Tempo.Holidays.Rule do
 
   A rule that cannot stand alone as a recurrence returns `:needs_window`, so the
   caller materialises it concretely against a bound: a bridge or `if`-holiday
-  move (which depends on the year's other holidays), an equinox or solstice
-  outside UTC, and any gate the recurrence cannot carry exactly.
+  move (which depends on the year's other holidays), and any gate the
+  recurrence cannot carry exactly.
 
   ### Arguments
 
@@ -456,6 +457,22 @@ defmodule Tempo.Holidays.Rule do
     {:ok, "FLLL#{month}M#{inner}K#{count}IN/#{relative_weekday_window(direction, 1, outer)}N"}
   end
 
+  # A weekday relative to the nth weekday after a fixed date — "Thursday after the
+  # 1st Sunday after 09-01" (Jeûne genevois), "Monday after the 3rd Sunday after
+  # 09-01". The inner weekday is a §12.10 window off the date, as for a relative
+  # weekday, and the outer weekday a window off that one.
+  defp base_shape(%__MODULE__{
+         kind: :nested_after_date,
+         month: month,
+         day: day,
+         inner_weekday: inner,
+         weekday: outer,
+         count: count
+       }) do
+    inner_date = "LLL#{month}M#{day}DN/#{relative_weekday_window(:after, count, inner)}N"
+    {:ok, "FLL#{inner_date}/#{relative_weekday_window(:after, 1, outer)}N"}
+  end
+
   # Easter itself, or a moveable feast a fixed offset from it (Ash Wednesday −46,
   # Ascension +39, …) as a §12.10 window off `(easter)e`. A multi-day span
   # (`count > 1`) is added by `apply_span/2`.
@@ -520,12 +537,12 @@ defmodule Tempo.Holidays.Rule do
   # calendar date is a `[u-ca=…]` selection; a lunisolar date is a
   # traditional-month `m` selection (`<month>+m` for a leap month), whose
   # traditional→ordinal step and Gregorian-year attribution resolve per year at
-  # materialisation; a Chinese solar term and a UTC equinox or solstice are
-  # computed events. `:none` for a kind whose date is itself a window off
-  # another, that needs a concrete projection (a shifted or non-Chinese-meridian
-  # solar term, an equinox or solstice in another timezone), or whose calendar
-  # has no faithful `[u-ca=…]` identifier. Easter and its feasts never come
-  # here — their weekday is fixed, so their gates resolve statically.
+  # materialisation; a Chinese solar term, and an equinox or solstice in its
+  # zone, are computed events. `:none` for a kind whose date is itself a window
+  # off another, that needs a concrete projection (a shifted or
+  # non-Chinese-meridian solar term), or whose calendar has no faithful
+  # `[u-ca=…]` identifier. Easter and its feasts never come here — their weekday
+  # is fixed, so their gates resolve statically.
   defp plain_anchor(%__MODULE__{kind: :fixed, month: month, day: day}),
     do: {:ok, "#{month}M#{day}D", ""}
 
@@ -543,11 +560,11 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp plain_anchor(%__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone})
-       when kind in [:equinox, :solstice] and offset in [nil, 0] and
-              timezone in [nil, "GMT", "UTC"] do
-    case solar_event_name(kind, month) do
-      nil -> :none
-      event -> {:ok, "(#{event})e", ""}
+       when kind in [:equinox, :solstice] and offset in [nil, 0] do
+    case {solar_event_name(kind, month), event_zone(timezone)} do
+      {nil, _zone} -> :none
+      {_event, :error} -> :none
+      {event, {:ok, zone}} -> {:ok, "(#{event}#{zone})e", ""}
     end
   end
 
@@ -603,6 +620,21 @@ defmodule Tempo.Holidays.Rule do
   defp solar_event_name(:solstice, 6), do: "june-solstice"
   defp solar_event_name(:solstice, 12), do: "december-solstice"
   defp solar_event_name(_kind, _month), do: nil
+
+  # The `@zone` an equinox or solstice takes its date in: none for UTC, and a
+  # `±HH:MM` offset or an IANA zone as written. An IANA zone resolves through the
+  # application's time zone database, which tempo_holidays requires.
+  defp event_zone(timezone) when timezone in [nil, "GMT", "UTC"], do: {:ok, ""}
+
+  defp event_zone(<<sign, _hours::binary-size(2), ?:, _minutes::binary-size(2)>> = offset)
+       when sign in [?+, ?-],
+       do: {:ok, "@" <> offset}
+
+  defp event_zone(timezone) when is_binary(timezone) do
+    if String.contains?(timezone, "/"), do: {:ok, "@" <> timezone}, else: :error
+  end
+
+  defp event_zone(_timezone), do: :error
 
   defp easter_event(:orthodox), do: "orthodox-easter"
   defp easter_event(:easter), do: "easter"
@@ -758,7 +790,7 @@ defmodule Tempo.Holidays.Rule do
   # The rule's year gates as a recurrence domain: the inclusive year ranges it is
   # active in (`since`/`until`, intersected with any `active` windows), the years
   # a disabled date excludes (added per member by `moved_members/2`), an
-  # even/odd/leap filter, and the cadence of an every-N-years rule.
+  # even/odd/leap/common filter, and the cadence of an every-N-years rule.
   defp year_domain(%__MODULE__{} = rule) do
     with {:ok, filter} <- domain_filter(rule),
          {:ok, ranges} <- active_ranges(rule),
@@ -767,8 +799,8 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  # A domain carries one filter, so a rule both even/odd and leap stays concrete,
-  # as does a non-leap rule, which has no filter spelling.
+  # A domain carries one filter, so a rule both even/odd and leap or non-leap
+  # stays concrete.
   defp domain_filter(%__MODULE__{year_parity: parity, leap: leap})
        when not is_nil(parity) and not is_nil(leap),
        do: :needs_window
@@ -776,7 +808,7 @@ defmodule Tempo.Holidays.Rule do
   defp domain_filter(%__MODULE__{year_parity: :even}), do: {:ok, "e"}
   defp domain_filter(%__MODULE__{year_parity: :odd}), do: {:ok, "o"}
   defp domain_filter(%__MODULE__{leap: :leap}), do: {:ok, "l"}
-  defp domain_filter(%__MODULE__{leap: :non_leap}), do: :needs_window
+  defp domain_filter(%__MODULE__{leap: :non_leap}), do: {:ok, "c"}
   defp domain_filter(%__MODULE__{}), do: {:ok, ""}
 
   # Every N years counts from the `since` year, so the domain must start there.
@@ -1577,9 +1609,9 @@ defmodule Tempo.Holidays.Rule do
 
   # An equinox or solstice, its civil date in the rule's timezone (GMT when
   # none is named). Astro gives the UTC instant; a numeric offset (`+09:00`)
-  # shifts it directly, a named zone (`America/Santiago`) needs the host app's
-  # configured time-zone database and errors cleanly without one. `offset`
-  # carries an `<n> days before/after` adjustment.
+  # shifts it directly, and a named zone (`America/Santiago`) resolves through
+  # the application's time zone database, as Tempo does. `offset` carries an
+  # `<n> days before/after` adjustment.
   defp materialise_base(
          %__MODULE__{kind: kind, month: month, offset: offset, timezone: timezone},
          %Tempo{} = year
@@ -1743,7 +1775,7 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp named_zone_date(%DateTime{} = utc, timezone) do
-    case DateTime.shift_zone(utc, timezone, Tz.TimeZoneDatabase) do
+    case DateTime.shift_zone(utc, timezone, Tempo.TimeZoneDatabase.database()) do
       {:ok, local} -> {:ok, DateTime.to_date(local)}
       {:error, _reason} = error -> error
     end

@@ -31,7 +31,7 @@ defmodule Tempo.Holidays.MixProject do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [mod: {Tempo.Holidays.Application, []}, extra_applications: [:logger]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
@@ -105,9 +105,10 @@ defmodule Tempo.Holidays.MixProject do
       # {:calendrical, "~> 1.4"} before publish.
       {:calendrical, github: "elixir-localize/calendrical", branch: "main", override: true},
       {:astro, "~> 2.7"},
-      # Equinox/solstice holidays computed for a named IANA timezone (Chile's
-      # solstice `in America/Santiago`) need a time-zone database; numeric
-      # offsets and GMT do not. Tz is the one Astro and Calendrical already use.
+      # A time zone database is required, as Tempo needs one for its zone
+      # work: an equinox or solstice in a named IANA zone (Chile's solstice `in
+      # America/Santiago`) resolves through it, and the application refuses to
+      # start without one. Tz is the one Astro and Calendrical already use.
       {:tz, "~> 0.28"},
       # Optional: resolves a `{lng, lat}` location to an IANA zone for the
       # `day_start: :evening` projection. A zone id needs no resolver, and

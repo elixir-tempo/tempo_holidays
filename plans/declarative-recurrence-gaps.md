@@ -2,7 +2,7 @@
 
 **Status:** in progress, 2026-09-27
 
-Current standing (2026-09-27): lunisolar, the Islamic rollover and multi-day spans, solar-term recurrences, every gate and the Vietnamese calendar are done. Of the 1,828 stored rules, **1,814** are declarative recurrences that match `materialise/2` exactly over 2000–2035 and each rule's gate boundary years; **14** stay `:needs_window` — 5 non-UTC equinox/solstice, 4 conditional, 3 non-leap-year (no filter spelling yet) and 2 `nested_after_date`. Multi-day spans shipped as an `:occurrence_duration` directive rather than the `FLL…/P<count>DN` window proposed below. The analysis below is as written on 2026-09-23, except where marked.
+Current standing (2026-09-27): lunisolar, the Islamic rollover and multi-day spans, solar-term recurrences, every gate and the Vietnamese calendar are done. Of the 1,828 stored rules, **1,824** are declarative recurrences that match `materialise/2` exactly over 2000–2035 and each rule's gate boundary years; **4** stay `:needs_window`, all conditional on the year's other holidays (a bridge day and three `if` moves). Multi-day spans shipped as an `:occurrence_duration` directive rather than the `FLL…/P<count>DN` window proposed below. The analysis below is as written on 2026-09-23, except where marked.
 
 `Rule.recurrence/1` now emits a standalone, re-materialisable `%Tempo.Interval{}` recurrence for **1219 of 1478** distinct date-holidays rules (up from 1080 before the "Full" pass, which added islamic, easter/orthodox offsets, and relative/nested weekdays). **80** rules still return `:needs_window`, and a further **194 gate-instances** are dropped from otherwise-faithful recurrences. This document explores options to close each, and reconciles the compiler's emitted forms with the Tempo holiday cookbook.
 
@@ -105,12 +105,14 @@ Reconciliation options (the cookbook is the doc, the compiler is the implementat
 
 ## Tasks
 
-* [ ] **Verify tz equinox/solstice** across 2000–2100; relax the guard for zones that never shift, else scope a tz-aware `(event)e` in Tempo.
-* [ ] **A non-leap-year filter** — a spelling beside `e`/`o`/`l`; closes 3 rules.
+* [ ] **Conditional holidays** — a set-level form for the bridge day and the `if` moves; plan first (user, 2026-09-27).
 * [ ] **Reconcile the cookbook** with the emitted forms — relative/nested weekday (§12.10), calendar (selection-first), easter windows (formula), and now lunisolar `m` and multi-day spans.
 
 ### Done
 
+* [x] **Zoned equinox/solstice** — Tempo's `(event@zone)e` takes the event's date in a `±HH:MM` offset or IANA zone and keeps it floating; the 5 rules match over 2000–2040. A time zone database is required. 2026-09-27.
+* [x] **Non-leap years** — Tempo's `c` domain filter (common years); the 3 rules match. 2026-09-27.
+* [x] **`nested_after_date`** — a window off the inner weekday's window (`FLLLLL9M1DN/P7DN7K-1IN/P7DN4K-1IN`); both rules match the concrete computation over 1900–2100. 2026-09-27.
 * [x] **Name the Vietnamese calendar** — Calendrical registers `vietnamese` in `additional_calendars/0`, so the 10 Vietnamese rules are `[u-ca=vietnamese]` recurrences, matching `materialise/2` over 2000–2035. 2026-09-27.
 * [x] **Gates** — exact or `:needs_window`, never lossy; every gate has a form (above). 1,804 of 1,828 rules exact. 2026-09-24.
 * [x] **Lunisolar** — (b) the traditional-month `m` selection, with the offset folded into the day and the eve as a backward window; 58/58. 2026-09-24.

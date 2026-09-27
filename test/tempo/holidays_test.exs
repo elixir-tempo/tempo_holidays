@@ -207,6 +207,19 @@ defmodule Tempo.HolidaysTest do
       assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
     end
 
+    test "a weekday after the nth weekday after a date is a window off a window" do
+      # Jeûne genevois: the Thursday after the first Sunday of September
+      geneva = compiled("thursday after 1st sunday after 09-01")
+      assert members_iso(geneva) == ["R/../P1Y/FLLLLL9M1DN/P7DN7K-1IN/P7DN4K-1IN"]
+      assert recurrence_dates(geneva, ~o"2026") == ["2026-09-10"]
+      assert_matches_materialise(geneva, 2020..2035)
+
+      # Valais: the Monday after the third Sunday of September
+      valais = compiled("monday after 3rd sunday after 09-01")
+      assert recurrence_dates(valais, ~o"2026") == ["2026-09-21"]
+      assert_matches_materialise(valais, 2020..2035)
+    end
+
     test "an Islamic single day within the month is a direct selection" do
       rule = %Rule{kind: :islamic, month: 9, day: 15, calendar: Calendrical.Islamic.Observational}
       {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
@@ -411,8 +424,22 @@ defmodule Tempo.HolidaysTest do
       assert_matches_materialise(rule, 2014..2016)
     end
 
-    test "a non-leap-year rule has no domain filter yet, so it needs a window" do
-      assert Rule.recurrence(compiled("09-11 in non-leap years")) == :needs_window
+    test "a non-leap-year rule keeps the common years" do
+      rule = compiled("09-11 in non-leap years")
+      assert members_iso(rule) == ["R/..c/P1Y/FL9M11DN"]
+      assert_matches_materialise(rule, 2020..2029)
+    end
+
+    test "an equinox or solstice in a zone takes its date there" do
+      # The 2002 March equinox was on the 20th in UTC and the 21st in Tokyo
+      tokyo = compiled("march equinox in +09:00")
+      assert members_iso(tokyo) == ["R/../P1Y/FL(march-equinox@+09:00)eN"]
+      assert recurrence_dates(tokyo, ~o"2002") == ["2002-03-21"]
+      assert_matches_materialise(tokyo, 2000..2030)
+
+      santiago = compiled("june solstice in America/Santiago since 2022")
+      assert members_iso(santiago) == ["R/{2022Y..}/P1Y/FL(june-solstice@America/Santiago)eN"]
+      assert_matches_materialise(santiago, 2020..2040)
     end
   end
 

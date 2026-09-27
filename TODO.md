@@ -11,9 +11,7 @@ the Islamic civil-date `divergent` differences.
 
 * [ ] **Holidays as a Tempo grammar** — the core objective: express a holiday as a Tempo interval-set value so it composes with other Tempo values (`free_time ∩ holidays`). Categorisation by rule family and a phased path in [plans/holiday-grammar.md](plans/holiday-grammar.md).
 
-* [ ] **Close the last declarative gaps** — of the 1,828 stored rules, 11 stay `:needs_window` for want of a form: 4 equinox and 1 solstice in a non-UTC timezone, 2 `nested_after_date`, and 4 conditional (bridge and `if` moves). Options in [plans/declarative-recurrence-gaps.md](plans/declarative-recurrence-gaps.md).
-
-* [ ] **Non-leap-year rules** — `09-11 in non-leap years` and two more need a domain filter for non-leap years, which Tempo has no spelling for (`l` keeps leap years). Awaiting the choice of spelling.
+* [ ] **Conditional holidays as a set-level form** — the last 4 of the 1,828 stored rules stay `:needs_window`: a bridge day and three `if is … holiday then …` moves, which depend on the year's other holidays. A plan for a `Tempo.RecurrenceSet` member that depends on other members comes first: Tempo's `plans/recurrence-set-conditions.md`.
 
 * [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
@@ -38,6 +36,10 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Non-leap years and zoned equinoxes** — the 3 non-leap rules use Tempo's `c` domain filter, and the 5 equinox/solstice rules in a zone a zoned event (`(march-equinox@+09:00)e`, `(june-solstice@America/Santiago)e`); a time zone database is now required. 1,824 of 1,828 rules declarative. 2026-09-27.
+
+* [x] **Nested weekday after a date** — `thursday after 1st sunday after 09-01` (Jeûne genevois) and `monday after 3rd sunday after 09-01` (Valais) are a §12.10 window off a window, matching the concrete computation over 1900–2100. 2026-09-27.
 
 * [x] **Vietnamese recurrences** — the 10 Vietnamese lunisolar rules are `[u-ca=vietnamese]` recurrences now that Calendrical registers the calendar, matching `materialise/2` over 2000–2035. 2026-09-27.
 
