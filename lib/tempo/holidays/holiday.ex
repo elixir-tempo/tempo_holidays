@@ -4,7 +4,7 @@ defmodule Tempo.Holidays.Holiday do
   rule that places it in any year.
 
   This is the loader's record (`Tempo.Holidays.Data`), not what the public API
-  returns: `Tempo.Holidays.recurrences/2` gives each holiday as a member of a
+  returns: `Tempo.Holidays.holidays/2` gives each holiday as a member of a
   `t:Tempo.RecurrenceSet.t/0` — its rule's recurrence, tagged with the holiday's
   `:id` (the rule), `:name` and `:type` — and `Tempo.Holidays.materialise/3` its
   occurrences, tagged the same way.

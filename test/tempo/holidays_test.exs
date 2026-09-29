@@ -33,7 +33,7 @@ defmodule Tempo.HolidaysTest do
   end
 
   # A recurrence set of hand-written holidays, each member tagged as
-  # `Tempo.Holidays.recurrences/2` tags one.
+  # `Tempo.Holidays.holidays/2` tags one.
   defp holiday_set(holidays) do
     holidays
     |> Enum.map(fn {rule_string, name, type} ->
@@ -137,9 +137,9 @@ defmodule Tempo.HolidaysTest do
   doctest Tempo.Holidays.Rule
   doctest Tempo.Holidays.DayStart
 
-  describe "recurrences/1" do
+  describe "holidays/2" do
     test "returns the AU holidays as a recurrence set, one member per holiday" do
-      assert {:ok, %RecurrenceSet{} = holidays} = Holidays.recurrences(:AU)
+      assert {:ok, %RecurrenceSet{} = holidays} = Holidays.holidays(:AU)
 
       assert "New Year's Day" in member_names(holidays)
       assert "Christmas Day" in member_names(holidays)
@@ -154,20 +154,88 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "an unknown territory is an error, not a crash" do
-      assert {:error, {:unknown_territory, "ZZ"}} = Holidays.recurrences(:ZZ)
+      assert {:error, {:unknown_territory, "ZZ"}} = Holidays.holidays(:ZZ)
     end
 
     test "a territory code string is accepted, case-insensitively" do
-      assert {:ok, holidays} = Holidays.recurrences("au")
+      assert {:ok, holidays} = Holidays.holidays("au")
       assert "New Year's Day" in member_names(holidays)
     end
 
     test "a value that is neither atom nor string is an invalid locale, not a crash" do
-      assert {:error, {:invalid_locale, 123}} = Holidays.recurrences(123)
+      assert {:error, {:invalid_locale, 123}} = Holidays.holidays(123)
     end
   end
 
-  describe "recurrences/1 members" do
+  describe "selecting holiday types (:include / :exclude)" do
+    defp member_types(holidays),
+      do:
+        holidays |> RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1)[:type]) |> Enum.uniq()
+
+    test "every type is kept by default" do
+      {:ok, holidays} = Holidays.holidays(:GB)
+      assert length(RecurrenceSet.members(holidays)) == length(territory_holidays(:GB))
+    end
+
+    test "include keeps the types it names, a type or a list" do
+      {:ok, bank} = Holidays.holidays(:AT, include: :bank)
+      assert member_types(bank) == [:bank]
+
+      {:ok, public_and_bank} = Holidays.holidays(:DE, include: [:public, :bank])
+      assert Enum.sort(member_types(public_and_bank)) -- [:bank, :public] == []
+    end
+
+    test "exclude wins over include" do
+      {:ok, holidays} =
+        Holidays.holidays(:US, include: [:public, :observance], exclude: :observance)
+
+      assert member_types(holidays) == [:public]
+    end
+
+    test "an empty include selects nothing" do
+      {:ok, holidays} = Holidays.holidays(:AU, include: [])
+      assert RecurrenceSet.members(holidays) == []
+    end
+
+    test "materialise selects the same way, from a territory or a set" do
+      {:ok, all} = Holidays.holidays(:US)
+
+      for {:ok, occurrences} <- [
+            Holidays.materialise(:US, ~o"2026", exclude: :observance),
+            Holidays.materialise(all, ~o"2026", exclude: :observance)
+          ] do
+        refute :observance in (occurrences
+                               |> IntervalSet.to_list()
+                               |> Enum.map(&Tempo.metadata(&1)[:type]))
+
+        assert ~o"2026Y7M3D" in dates_of(occurrences, "Independence Day")
+      end
+    end
+
+    test "a selection never changes a date: Näfelser Fahrt still moves off Maundy Thursday" do
+      name = "Thursday after 04-02 if is observance holiday then next Thursday"
+      {:ok, public} = Holidays.materialise(:CH, ~o"2026", division: "GL", include: :public)
+
+      assert dates_of(public, name) == [~o"2026Y4M9D"]
+      assert dates_of(public, "Maundy Thursday") == []
+    end
+
+    test "an unknown type, or a value that is not a type, is an error, not a crash" do
+      for selection <- [
+            [include: :holiday],
+            [exclude: [:public, :festive]],
+            [include: "public"],
+            [include: nil]
+          ] do
+        assert {:error, {:invalid_holiday_type, _}} = Holidays.holidays(:AU, selection)
+
+        assert {:error, {:invalid_holiday_type, _}} =
+                 Holidays.materialise(:AU, ~o"2026", selection)
+      end
+    end
+  end
+
+  describe "holidays/2 members" do
     # A multi-day holiday keeps its span (an `:occurrence_duration` directive on
     # its recurrence) alongside its name, and the directive does not leak onto
     # the materialised occurrence.
@@ -177,7 +245,7 @@ defmodule Tempo.HolidaysTest do
           {:KR, "Korean New Year"}
         ] do
       test "#{territory} #{name} keeps its multi-day span and its name" do
-        {:ok, holidays} = Holidays.recurrences(unquote(territory))
+        {:ok, holidays} = Holidays.holidays(unquote(territory))
 
         holiday =
           Enum.find(territory_holidays(unquote(territory)), fn holiday ->
@@ -198,7 +266,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "a holiday with observed days is one nested member, the observed ones marked" do
-      {:ok, holidays} = Holidays.recurrences(:AU)
+      {:ok, holidays} = Holidays.holidays(:AU)
 
       christmas =
         Enum.find(
@@ -211,7 +279,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "a bridge day is a conditional member kept by the public holidays either side" do
-      {:ok, holidays} = Holidays.recurrences(:JP)
+      {:ok, holidays} = Holidays.holidays(:JP)
       bridge = Enum.find(RecurrenceSet.members(holidays), &match?(%Conditional{}, &1))
 
       assert Tempo.metadata(bridge)[:id] == "09-22 if 09-21 and 09-23 is public holiday"
@@ -229,7 +297,7 @@ defmodule Tempo.HolidaysTest do
             {:NZ, "OTA",
              "03-23 if Tuesday,Wednesday,Thursday then previous Monday if Friday,Saturday,Sunday then next Monday if is public holiday then next Monday"}
           ] do
-        {:ok, holidays} = Holidays.recurrences(territory, division: division)
+        {:ok, holidays} = Holidays.holidays(territory, division: division)
 
         assert Enum.any?(RecurrenceSet.members(holidays), fn member ->
                  match?(%Conditional{}, member) and Tempo.metadata(member)[:id] == id
@@ -570,7 +638,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "a diary's clashes with the holidays are labelled with the holiday hit" do
-      {:ok, holidays} = Holidays.recurrences(:AU)
+      {:ok, holidays} = Holidays.holidays(:AU)
       {:ok, diary} = IntervalSet.new([Tempo.to_interval!(~o"2026-12-25T10/2026-12-25T11")])
 
       {:ok, clashes} = Tempo.intersection(diary, holidays, metadata: :merge)
@@ -1326,8 +1394,8 @@ defmodule Tempo.HolidaysTest do
 
   describe "locale and state resolution" do
     test "a locale with a subdivision loads the state's holidays" do
-      {:ok, national} = Holidays.recurrences(:US)
-      {:ok, california} = Holidays.recurrences(locale: "en-US-u-sd-usca")
+      {:ok, national} = Holidays.holidays(:US)
+      {:ok, california} = Holidays.holidays(locale: "en-US-u-sd-usca")
 
       refute "Presidents' Day" in member_names(national)
       assert "Presidents' Day" in member_names(california)
@@ -1340,7 +1408,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "an unknown state falls back to the country" do
-      {:ok, holidays} = Holidays.recurrences(:US, division: "ZZ")
+      {:ok, holidays} = Holidays.holidays(:US, division: "ZZ")
       assert "New Year's Day" in member_names(holidays)
     end
   end

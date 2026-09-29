@@ -35,7 +35,9 @@ the Islamic civil-date `divergent` differences.
 
 ## Done
 
-* [x] **Holidays as recurrences with metadata** — `recurrences/2` returns a `Tempo.RecurrenceSet`, one member per holiday tagged `:id`/`:name`/`:type` (observed days nested, marked `substitute: true`); `materialise/3` a labelled `Tempo.IntervalSet` over any window; `recurrence_set/2` is gone and `%Holiday{}` is internal. 2026-09-27.
+* [x] **`holidays/2`, selected by type** — `recurrences/2` renamed `holidays/2`; `:include` / `:exclude` keep and leave out holiday types (a type or a list, `:exclude` winning), on `materialise/3` too; a kept conditional carries the holidays it depends on, so a selection never changes a date. 2026-09-28.
+
+* [x] **Holidays as recurrences with metadata** — `holidays/2` returns a `Tempo.RecurrenceSet`, one member per holiday tagged `:id`/`:name`/`:type` (observed days nested, marked `substitute: true`); `materialise/3` a labelled `Tempo.IntervalSet` over any window; `recurrence_set/2` is gone and `%Holiday{}` is internal. 2026-09-27.
 
 * [x] **Conditional holidays as conditional members** — the bridge and the three `if is … holiday then …` moves are `keep_when`/`move_when` members resolved by Tempo's second pass: all 1,828 rules declarative, conformance 0 mismatched. 2026-09-27.
 
@@ -85,7 +87,7 @@ the Islamic civil-date `divergent` differences.
 
 * [x] **Occurrence-level metadata gates** — `active` windows (`[from, to)`), `disable`d and `enable`d dates from date-holidays metadata, applied to the computed dates in `Tempo.Holidays.Rule`; a `disable`+`enable` pair moves an occurrence (UK 2022 Jubilee). The conformance harness enriches each compiled rule with the built data's gates so the metric reflects them. Localize bumped to `~> 1.3`. 2026-09-22.
 
-* [x] **Locale / LanguageTag requests + state/region data** — `recurrences/2`, `materialise/3` accept a territory code, a validated BCP 47 locale (string/atom/`Localize.LanguageTag`), or a holiday list, deriving territory + state (division) + region (subdivision), overridable by option. The build compiles country + state + region holidays (state `days` merged over the country's), and the loader picks the most specific level, falling back to the country. `en-US-u-sd-usca` → California; AU-NSW carries King's Birthday. 2026-09-21.
+* [x] **Locale / LanguageTag requests + state/region data** — `holidays/2`, `materialise/3` accept a territory code, a validated BCP 47 locale (string/atom/`Localize.LanguageTag`), or a holiday list, deriving territory + state (division) + region (subdivision), overridable by option. The build compiles country + state + region holidays (state `days` merged over the country's), and the loader picks the most specific level, falling back to the country. `en-US-u-sd-usca` → California; AU-NSW carries King's Birthday. 2026-09-21.
 
 * [x] **Conformance harness** — `Tempo.Holidays.Fixtures` + `Conformance` run every compiled rule against the full date-holidays fixture corpus (9,695 files) as an opt-in `:conformance` test; ~96% of rules match. 2026-09-21.
 

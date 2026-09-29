@@ -316,7 +316,7 @@ defmodule Tempo.Holidays.Rule do
 
   @doc """
   Returns the rule as a re-materialisable recurrence, the member
-  `Tempo.Holidays.recurrences/2` gives its holiday.
+  `Tempo.Holidays.holidays/2` gives its holiday.
 
   A holiday that falls on one date a year — a fixed date, an nth weekday, a
   calendar date, a computed event — is a single `%Tempo.Interval{}` recurrence

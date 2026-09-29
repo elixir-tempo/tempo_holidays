@@ -8,7 +8,7 @@ First release. Public holidays for every territory in the [date-holidays](https:
 
 * The full date-holidays grammar — fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar, solar-term and equinox/solstice dates, observed-date substitution, occurrence gates, and inter-holiday bridge days.
 
-* `Tempo.Holidays.recurrences/2` — a territory's holidays as a `Tempo.RecurrenceSet`, one member per holiday tagged with its `:id`, `:name` and `:type`, and `materialise/3` their occurrences over any window as a labelled `Tempo.IntervalSet`. All 1,828 of the dataset's rules are declarative recurrences, the bridge and `if`-holiday rules as conditional members.
+* `Tempo.Holidays.holidays/2` — a territory's holidays as a `Tempo.RecurrenceSet`, one member per holiday tagged with its `:id`, `:name` and `:type`, selected by type with `:include` and `:exclude`; `materialise/3` gives their occurrences over any window as a labelled `Tempo.IntervalSet`. All 1,828 of the dataset's rules are declarative recurrences, the bridge and `if`-holiday rules as conditional members.
 
 * `Tempo.Holidays.Rule.materialise/2` evaluates each rule's recurrence, built once per territory (`Rule.prepare/1`); `Rule.materialise_concrete/2` keeps the kind-by-kind computation.
 

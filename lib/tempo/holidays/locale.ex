@@ -84,7 +84,7 @@ defmodule Tempo.Holidays.Locale do
   end
 
   # A bare positional target is a territory (a `LanguageTag` is a locale); this is
-  # the sugar for `recurrences(:AU)` / `materialise(:AU, year)`. A territory code
+  # the sugar for `holidays(:AU)` / `materialise(:AU, year)`. A territory code
   # is never parsed as a language, so `:SA` is Saudi Arabia, not Sanskrit.
   defp from_positional(%Localize.LanguageTag{} = tag, options) do
     {:ok, apply_overrides(from_tag(tag), options)}
