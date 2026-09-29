@@ -6,8 +6,8 @@ defmodule Tempo.Holidays.Holiday do
   This is the loader's record (`Tempo.Holidays.Data`), not what the public API
   returns: `Tempo.Holidays.holidays/2` gives each holiday as a member of a
   `t:Tempo.RecurrenceSet.t/0` — its rule's recurrence, tagged with the holiday's
-  `:id` (the rule), `:name` and `:type` — and `Tempo.Holidays.materialise/3` its
-  occurrences, tagged the same way.
+  `:id` (the rule), `:name` and `:type` — and `Tempo.to_interval_set/2` converts
+  that set to occurrences tagged the same way.
 
   """
 

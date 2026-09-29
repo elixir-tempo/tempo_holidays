@@ -1,6 +1,6 @@
 # Holidays as a Tempo grammar
 
-**Status:** implemented (v0.1.0), 2026-09-27
+**Status:** implemented (v0.1.0), 2026-09-29
 
 Every phase landed, some in a different form than proposed here: year gates fold into the recurrence's `{…}` domain rather than set operations, and the cross-holiday rules are conditional members of the holiday `Tempo.RecurrenceSet` rather than predicates over a supplied set.
 
@@ -14,11 +14,11 @@ Four foundations are already in place:
 
 * **Recurrences are first-class.** `%Tempo.Interval{}` carries a `recurrence` (`:infinity`, a count, or until) and a `repeat_rule` holding a `{:selection, …}`. A year-free "floating" holiday *is* a recurrence: `~o"R/../P1Y/FL11M4K4IN"` is "the 4th Thursday of November, every year" (US Thanksgiving); `~o"R/../P1Y/FL12M25DN"` is a recurring 25 December. Tempo also ships an **RRULE** parser (`Tempo.RRule.parse/2`, full `BYDAY`/`BYMONTH`/`BYSETPOS`/`WKST`/`INTERVAL`/`COUNT`/`UNTIL`), a **Cron** parser, and **iCal** round-trip (`Tempo.ICal`), all compiling to the same selection AST — and `Tempo.to_rrule/1` / `to_iso8601/1` encode back. This resolves what looked like the first blocker: the year-free recurring-selection form already exists.
 
-* **Materialisation yields interval sets.** `Tempo.to_interval/2` with `bound:` expands a recurrence onto a span; `Tempo.select/2` returns a `%Tempo.IntervalSet{}`. `Tempo.Holidays.materialise/3` already returns half-open `[from, to)` intervals and coalesces a holiday's occurrences.
+* **Materialisation yields interval sets.** `Tempo.to_interval/2` with `within:` gives a recurrence's occurrences in a window; `Tempo.select/2` returns a `%Tempo.IntervalSet{}`. A holiday's occurrences are half-open `[from, to)` intervals.
 
-* **The set algebra is rich and complete for the query.** `Tempo.union/intersection/difference/symmetric_difference/complement`, the set predicates `disjoint?/overlaps?/subset?/contains?/equal?`, and on `IntervalSet` itself `to_list/filter/map/duration` — and crucially **`IntervalSet.slots/3`**, which chops a set into fixed-duration bookable slots. The motivating query is `Tempo.difference(work, busy) |> … |> IntervalSet.slots(~o"PT1H")` today, once holidays are a set.
+* **The set algebra is rich and complete for the query.** `Tempo.union/intersection/difference/symmetric_difference/complement`, the set predicates `disjoint?/overlaps?/subset?/contains?/equal?`, and on `IntervalSet` itself `members/filter/map/duration` — and crucially **`IntervalSet.slots/3`**, which chops a set into fixed-duration bookable slots. The motivating query is `Tempo.difference(work, busy) |> … |> IntervalSet.slots(~o"PT1H")` today, once holidays are a set.
 
-* **The observance and calendar machinery exists imperatively.** `Tempo.next_working_day/2`, `previous_working_day/2`, `nearest_working_day/2`, `add_working_days/3`, `workday?/2`, `weekend?/2` (territory-driven via `Tempo.Territory`), and `Tempo.shift/3` with a `skipping:` option, are exactly the primitives observed-date substitution needs. Calendars wired include gregorian, julian, hebrew, persian, indian, buddhist, roc, chinese, korean/dangi, an islamic family, coptic/ethiopic, and — notably — **ecclesiastical** and **nrf**.
+* **The observance and calendar machinery exists imperatively.** `Tempo.next_workday/2`, `previous_workday/2`, `nearest_workday/2`, `add_workdays/3`, `workday?/2`, the `weekends/1` selector (territory-driven via `Tempo.Territory`), and `Tempo.shift/3` with a `skipping:` option, are exactly the primitives observed-date substitution needs. Calendars wired include gregorian, julian, hebrew, persian, indian, buddhist, roc, chinese, korean/dangi, an islamic family, coptic/ethiopic, and — notably — **ecclesiastical** and **nrf**.
 
 So the gap is narrower than "build a grammar": it is (1) a declarative *surface* for a few operators, (2) wiring existing internal helpers (Easter, working-day) into that surface, and (3) packaging holidays as sets so the algebra applies.
 
@@ -88,7 +88,7 @@ The `active`/`disable`/`enable` trio needs **no new algebra** — a gated holida
 
 IXDTF is the compatibility lever, and Tempo already parses **arbitrary `[key=value]` tags** into `extended.tags`, with the critical `!` flag failing the parse on an unrecognised critical suffix. Its roles here:
 
-* **Calendar and zone** — already used (`[u-ca=islamic-umalqura]`; the `:day_start` projection emits a zone).
+* **Calendar and zone** — already used (`[u-ca=islamic-umalqura]`; `day_start/2` emits a zone).
 
 * **Named events** — a computed recurrence (C) can be carried as `[event=march-equinox]`, keeping the string a valid annotated Tempo value.
 

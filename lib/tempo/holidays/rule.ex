@@ -90,6 +90,23 @@ defmodule Tempo.Holidays.Rule do
   """
   @type substitute :: [{[1..7], :next | :previous, 1..7, :shift | :add | :substitute_only}]
 
+  @typedoc """
+  A substitute entry that stands in for a holiday's own date: date-holidays'
+  `substitutes 12-26 if saturday then next monday` beside the `12-26` it
+  substitutes. Under `dates: :substitute` the holiday is not observed on its
+  own date where the entry gives a substitute day instead — on the `triggers`
+  weekdays, in the years the entry's `from_year`/`to_year` and `active` gates
+  allow — `years`, the inclusive year ranges `prepare/1` found them to be, or
+  `nil` when the entry was not prepared.
+  """
+  @type replacement :: %{
+          triggers: [1..7],
+          years: [{integer() | nil, integer() | nil}] | nil,
+          from_year: integer() | nil,
+          to_year: integer() | nil,
+          active: [{Date.t() | nil, Date.t() | nil}] | nil
+        }
+
   @type t :: %__MODULE__{
           kind: kind(),
           month: pos_integer() | nil,
@@ -103,6 +120,7 @@ defmodule Tempo.Holidays.Rule do
           leap_month: boolean() | nil,
           timezone: String.t() | nil,
           substitute: substitute() | nil,
+          replaced_by: [replacement()] | nil,
           from_year: integer() | nil,
           to_year: integer() | nil,
           year_parity: :even | :odd | nil,
@@ -115,7 +133,14 @@ defmodule Tempo.Holidays.Rule do
           conditional: conditional() | nil,
           source: String.t() | nil,
           recurrence:
-            Interval.t() | Tempo.RecurrenceSet.t() | Conditional.t() | :needs_window | nil
+            Interval.t() | Tempo.RecurrenceSet.t() | Conditional.t() | :needs_window | nil,
+          observed:
+            %{
+              optional(:substitute | :gazetted) =>
+                Interval.t() | Tempo.RecurrenceSet.t() | Conditional.t() | :needs_window
+            }
+            | nil,
+          years: [{integer() | nil, integer() | nil}] | nil
         }
 
   @typedoc """
@@ -158,6 +183,9 @@ defmodule Tempo.Holidays.Rule do
     :leap_month,
     :timezone,
     :substitute,
+    # The substitute entries that stand in for the holiday's own date, set by
+    # `observe/3`; never stored with the data.
+    :replaced_by,
     :from_year,
     :to_year,
     :year_parity,
@@ -171,7 +199,13 @@ defmodule Tempo.Holidays.Rule do
     :source,
     # The rule's recurrence once `prepare/1` has built it (or `:needs_window`
     # when it has none); `nil` until then.
-    :recurrence
+    :recurrence,
+    # The recurrences of the rule as `observe/3` observes it under `dates:
+    # :substitute` and `:gazetted`, where they differ, built by `prepare/1`.
+    :observed,
+    # A substitute entry's years, the inclusive ranges its gates allow, found by
+    # `prepare/1`.
+    :years
   ]
 
   @doc """
@@ -200,8 +234,8 @@ defmodule Tempo.Holidays.Rule do
     year, earliest first. Usually one; empty when the rule does not fall in
     the year, two for a lunar holiday that recurs within it. A conditional
     rule (a bridge day, an `if`-holiday move) gives its spans before the
-    condition, which only its holiday set can resolve
-    (`Tempo.Holidays.materialise/3`).
+    condition, which only its holiday set can resolve, when it converts to its
+    occurrences.
 
   * `{:error, reason}` when the rule cannot be projected.
 
@@ -286,9 +320,47 @@ defmodule Tempo.Holidays.Rule do
   """
   @spec prepare(t()) :: t()
   def prepare(%__MODULE__{recurrence: nil} = rule),
-    do: %{rule | recurrence: build_recurrence(rule)}
+    do: %{
+      rule
+      | recurrence: build_recurrence(rule),
+        observed: observed_forms(rule),
+        years: entry_years(rule)
+    }
 
   def prepare(%__MODULE__{} = rule), do: rule
+
+  # The recurrences a substitution rule has under `dates: :substitute` and
+  # `:gazetted`, where they differ from its own: an `and if …` rule moves to its
+  # substitute day under the first, and any substitution is dropped under the
+  # second, whose caller leaves out a substitute entry.
+  defp observed_forms(%__MODULE__{substitute: [_ | _] = clauses} = rule) do
+    gazetted =
+      if substitute_only?(clauses),
+        do: %{},
+        else: %{gazetted: build_recurrence(%{rule | substitute: nil})}
+
+    substitute =
+      if Enum.any?(clauses, &(elem(&1, 3) == :add)),
+        do: %{
+          substitute: build_recurrence(%{rule | substitute: Enum.map(clauses, &move_added/1)})
+        },
+        else: %{}
+
+    Map.merge(gazetted, substitute)
+  end
+
+  defp observed_forms(_rule), do: nil
+
+  # The years a substitute entry is in force, which each holiday it stands in
+  # for reads (`replacement_pieces/1`).
+  defp entry_years(rule) do
+    with true <- substitute_entry?(rule),
+         {:ok, ranges} <- active_ranges(rule) do
+      ranges
+    else
+      _not_an_entry_or_no_ranges -> nil
+    end
+  end
 
   # A prepared rule carries its recurrence; an unprepared one builds it here.
   defp built_recurrence(%__MODULE__{recurrence: nil} = rule), do: build_recurrence(rule)
@@ -304,13 +376,19 @@ defmodule Tempo.Holidays.Rule do
   end
 
   # A conditional rule alone is its base: the condition reads the rule's holiday
-  # set, which resolves it (`Tempo.Holidays.materialise/3`).
+  # set, which resolves it when the set converts to its occurrences.
   defp materialise_recurrence(%Conditional{member: member}, year),
     do: materialise_recurrence(member, year)
 
+  # The `:within` window keeps every occurrence that overlaps it, so a span still
+  # running from December is in January's window too. A holiday belongs to the
+  # year it starts in, as date-holidays counts it.
   defp materialise_recurrence(recurrence, year) do
-    with {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
-      {:ok, Tempo.IntervalSet.to_list(set)}
+    with {:ok, set} <- Tempo.to_interval(recurrence, within: year) do
+      target = Tempo.year(year)
+
+      {:ok,
+       Enum.filter(Tempo.IntervalSet.members(set), &(gregorian_year(Interval.from(&1)) == target))}
     end
   end
 
@@ -330,14 +408,14 @@ defmodule Tempo.Holidays.Rule do
   (`FLLL12M25D{6..7}KN/P8DN1K-1IN`, "the following Monday when Christmas falls on a
   weekend") — so it is a `%Tempo.RecurrenceSet{}`, as is a `disable`/`enable`
   move, whose moved date is a member of its own. Both materialise the same way,
-  through `Tempo.to_interval/2` with a `:bound`.
+  through `Tempo.to_interval/2` with a `:within` window.
 
   A bridge or `if`-holiday move depends on the year's other holidays, so it is a
   `t:Tempo.RecurrenceSet.Conditional.t/0` wrapping the rule's own recurrence —
   `keep_when` with offsets to the named dates, `move_when` to the next target
   weekday — resolved when its holiday set materialises. A rule no recurrence
   expresses exactly returns `:needs_window`, and the caller materialises it
-  concretely against a bound.
+  concretely against a window.
 
   ### Arguments
 
@@ -349,7 +427,7 @@ defmodule Tempo.Holidays.Rule do
     `t:Tempo.RecurrenceSet.t/0` of them, or a
     `t:Tempo.RecurrenceSet.Conditional.t/0` for a conditional rule.
 
-  * `:needs_window` when the rule needs a bound to materialise.
+  * `:needs_window` when the rule needs a window to materialise.
 
   * `{:error, reason}` when the recurrence cannot be constructed.
 
@@ -418,7 +496,7 @@ defmodule Tempo.Holidays.Rule do
   def recurrence(%__MODULE__{} = rule) do
     with {:ok, shapes} <- occurrence_shapes(rule),
          {:ok, domain} <- year_domain(rule),
-         members = Enum.map(shapes, fn {role, shape} -> member(role, shape, domain) end),
+         members = Enum.map(shapes, &shape_member(&1, domain)),
          {:ok, members} <- moved_members(members, rule),
          {:ok, recurrences} <- reduce_ok(members, &member_recurrence(&1, rule)) do
       {:ok, assemble(Enum.reject(recurrences, &is_nil/1))}
@@ -476,8 +554,10 @@ defmodule Tempo.Holidays.Rule do
   # each when the members are built.
 
   # An ungated rule is its base alone.
-  defp occurrence_shapes(%__MODULE__{substitute: substitute, weekday_gate: nil} = rule)
-       when substitute in [nil, []] do
+  defp occurrence_shapes(
+         %__MODULE__{substitute: substitute, weekday_gate: nil, replaced_by: replaced} = rule
+       )
+       when substitute in [nil, []] and replaced in [nil, []] do
     with {:ok, shape} <- base_shape(rule), do: {:ok, [{:base, shape}]}
   end
 
@@ -487,12 +567,18 @@ defmodule Tempo.Holidays.Rule do
     {:ok, easter_gated_shapes(rule)}
   end
 
-  # A weekday gate or a substitution limits the plain date the holiday falls on
-  # to weekdays, and opens each observed-day window from it.
+  # A weekday gate, a substitution or a substitute entry limits the plain date
+  # the holiday falls on to weekdays, and opens each observed-day window from it.
   defp occurrence_shapes(%__MODULE__{} = rule) do
     case plain_anchor(rule) do
-      {:ok, anchor, suffix} -> {:ok, gated_shapes(rule, anchor, suffix)}
+      {:ok, anchor, suffix} -> gated(rule, anchor, suffix)
       :none -> :needs_window
+    end
+  end
+
+  defp gated(rule, anchor, suffix) do
+    with {:ok, pieces} <- replacement_pieces(rule) do
+      {:ok, gated_shapes(rule, anchor, suffix, pieces)}
     end
   end
 
@@ -741,11 +827,17 @@ defmodule Tempo.Holidays.Rule do
   # The date itself is kept on the weekdays that keep it — the gate's, less those
   # a clause moves (unless the clause adds the observed day rather than moving
   # to it), and none when a `substitutes` clause did not fire — and each clause
-  # that fires is a §12.10 window off the date, limited to its weekdays.
-  defp gated_shapes(rule, anchor, suffix) do
+  # that fires is a §12.10 window off the date, limited to its weekdays. A
+  # substitute entry standing in for the date takes its weekdays away in the
+  # years it is in force, so the date is a member for each run of years that
+  # keeps the same weekdays.
+  defp gated_shapes(rule, anchor, suffix, pieces) do
     {kept, observed} = substitution_plan(rule.substitute || [], gate_weekdays(rule.weekday_gate))
 
-    base = if kept == [], do: [], else: [{:base, limited_shape(anchor, suffix, kept)}]
+    base =
+      for {ranges, replaced} <- pieces, weekdays = kept -- replaced, weekdays != [] do
+        {:base, limited_shape(anchor, suffix, weekdays), ranges}
+      end
 
     windows =
       for {weekdays, direction, target} <- observed, weekdays != [] do
@@ -857,6 +949,96 @@ defmodule Tempo.Holidays.Rule do
   defp observed_shift(weekday, :previous, target),
     do: nonzero_shift(-Integer.mod(weekday - target, 7), -7)
 
+  # ── substitute entries ───────────────────────────────────────────────
+
+  # The runs of years a rule's date keeps different weekdays in, each with the
+  # weekdays taken from it: a substitute entry takes its trigger weekdays in the
+  # years its own gates allow, decided on this rule's date as `active_ranges/1`
+  # decides any window. With no entry, every year keeps every weekday.
+  defp replacement_pieces(%__MODULE__{replaced_by: replaced}) when replaced in [nil, []],
+    do: {:ok, [{[{nil, nil}], []}]}
+
+  defp replacement_pieces(%__MODULE__{replaced_by: replaced} = rule) do
+    with {:ok, spans} <- reduce_ok(replaced, &replacement_span(rule, &1)) do
+      pieces =
+        spans
+        |> year_runs()
+        |> Enum.map(&{&1, replaced_in(&1, spans)})
+        |> Enum.chunk_by(&elem(&1, 1))
+        |> Enum.map(&join_runs/1)
+
+      {:ok, pieces}
+    end
+  end
+
+  defp replacement_span(_rule, %{triggers: triggers, years: years}) when is_list(years),
+    do: {:ok, {years, triggers}}
+
+  defp replacement_span(rule, %{triggers: triggers} = entry) do
+    gated = %{rule | from_year: entry.from_year, to_year: entry.to_year, active: entry.active}
+
+    with {:ok, ranges} <- active_ranges(gated), do: {:ok, {ranges, triggers}}
+  end
+
+  # The runs of years between every bound the entries' ranges name.
+  defp year_runs(spans) do
+    bounds =
+      spans
+      |> Enum.flat_map(fn {ranges, _triggers} -> Enum.flat_map(ranges, &range_bounds/1) end)
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    Enum.zip([nil | bounds], Enum.map(bounds, &(&1 - 1)) ++ [nil])
+  end
+
+  defp range_bounds({from, to}), do: Enum.reject([from, to && to + 1], &is_nil/1)
+
+  # The weekdays taken from a run by the entries in force through it. The runs
+  # split at every range's bounds, so each lies wholly inside a range or wholly
+  # outside it.
+  defp replaced_in(run, spans) do
+    spans
+    |> Enum.filter(fn {ranges, _triggers} -> Enum.any?(ranges, &covers?(&1, run)) end)
+    |> Enum.flat_map(fn {_ranges, triggers} -> triggers end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  # Consecutive runs that keep the same weekdays are one run of years.
+  defp join_runs([{{from, _to}, weekdays} | _rest] = runs) do
+    {{_from, to}, _weekdays} = List.last(runs)
+    {[{from, to}], weekdays}
+  end
+
+  defp covers?({from, to}, {run_from, run_to}),
+    do: not_before?(run_from, from) and not_after?(run_to, to)
+
+  defp not_before?(_year, nil), do: true
+  defp not_before?(nil, _from), do: false
+  defp not_before?(year, from), do: year >= from
+
+  defp not_after?(_year, nil), do: true
+  defp not_after?(nil, _to), do: false
+  defp not_after?(year, to), do: year <= to
+
+  # The weekdays a substitute entry takes from the date in `year`, as a weekday
+  # gate for the concrete path.
+  defp replaced_gate(%__MODULE__{replaced_by: replaced}, _year) when replaced in [nil, []],
+    do: {:ok, nil}
+
+  defp replaced_gate(rule, year) do
+    with {:ok, pieces} <- replacement_pieces(rule) do
+      {:ok, {:except, replaced_in_year(pieces, year)}}
+    end
+  end
+
+  defp replaced_in_year(pieces, year) do
+    for {ranges, weekdays} <- pieces,
+        Enum.any?(ranges, &covers?(&1, {year, year})),
+        weekday <- weekdays,
+        do: weekday
+  end
+
   # ── the year domain ───────────────────────────────────────────────────
 
   # The rule's year gates as a recurrence domain: the inclusive year ranges it is
@@ -902,13 +1084,22 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp active_ranges(%__MODULE__{active: active} = rule) do
-    with {:ok, windows} <- reduce_ok(active, &active_year_range(rule, &1)) do
+    with {:ok, windows} <- reduce_ok(active, &window_year_range(rule, &1)) do
       {:ok, Enum.flat_map(windows, &List.wrap(intersect_ranges(&1, since_until_range(rule))))}
     end
   end
 
   defp since_until_range(%__MODULE__{from_year: from, to_year: nil}), do: {from, nil}
   defp since_until_range(%__MODULE__{from_year: from, to_year: to}), do: {from, to - 1}
+
+  # A window whose first or last year cannot be decided leaves the rule without a
+  # recurrence, so it is computed concretely instead.
+  defp window_year_range(rule, window) do
+    case active_year_range(rule, window) do
+      :needs_window -> {:error, :needs_window}
+      decided -> decided
+    end
+  end
 
   defp active_year_range(rule, {from_date, to_date}) do
     with {:ok, first} <- first_active_year(rule, from_date),
@@ -1050,9 +1241,9 @@ defmodule Tempo.Holidays.Rule do
 
   defp member_days_in(member, year) do
     with {:ok, recurrence} <- Tempo.from_iso8601(member_iso(member)),
-         {:ok, bound} <- Tempo.from_iso8601("#{year}Y"),
-         {:ok, set} <- Tempo.to_interval(recurrence, bound: bound) do
-      set |> Tempo.IntervalSet.to_list() |> reduce_ok(&occurrence_day_count/1)
+         {:ok, window} <- Tempo.from_iso8601("#{year}Y"),
+         {:ok, set} <- Tempo.to_interval(recurrence, within: window) do
+      set |> Tempo.IntervalSet.members() |> reduce_ok(&occurrence_day_count/1)
     end
   end
 
@@ -1071,6 +1262,20 @@ defmodule Tempo.Holidays.Rule do
   # ── members ───────────────────────────────────────────────────────────
 
   defp member(role, shape, domain), do: %{role: role, shape: shape, domain: domain}
+
+  # A shape limited to runs of years takes only those years of the domain.
+  defp shape_member({role, shape}, domain), do: member(role, shape, domain)
+
+  defp shape_member({role, shape, ranges}, domain),
+    do: member(role, shape, %{domain | ranges: intersect_range_lists(domain.ranges, ranges)})
+
+  defp intersect_range_lists(ranges, others) do
+    for range <- ranges,
+        other <- others,
+        overlap = intersect_ranges(range, other),
+        overlap != nil,
+        do: overlap
+  end
 
   # A member whose domain admits no year never occurs, so it is dropped.
   defp member_recurrence(%{domain: %{ranges: []}}, _rule), do: {:ok, nil}
@@ -1095,7 +1300,7 @@ defmodule Tempo.Holidays.Rule do
 
   # One member is the recurrence itself; several are a recurrence set.
   defp assemble([recurrence]), do: recurrence
-  defp assemble(recurrences), do: Tempo.RecurrenceSet.new(recurrences)
+  defp assemble(recurrences), do: Tempo.RecurrenceSet.new!(recurrences)
 
   # A domain as ISO 8601-2 set syntax: `..` when open, `{2017Y..}` or
   # `{2020Y..2024Y,^2022Y}` otherwise, with any even/odd/leap filter after it. A
@@ -1140,6 +1345,238 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp apply_span(recurrence, _rule), do: recurrence
+
+  @doc """
+  Whether a rule is a substitute entry: date-holidays' `substitutes …`, which
+  gives a holiday's substitute day and nothing on the holiday's own date.
+
+  ### Arguments
+
+  * `rule` is a `t:t/0`.
+
+  ### Returns
+
+  * `true` when the rule is a substitute entry, `false` otherwise.
+
+  ### Examples
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("substitutes 12-26 if saturday then next monday")
+      iex> Tempo.Holidays.Rule.substitute_entry?(rule)
+      true
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-26 and if saturday then next monday")
+      iex> Tempo.Holidays.Rule.substitute_entry?(rule)
+      false
+
+  """
+  @spec substitute_entry?(t()) :: boolean()
+  def substitute_entry?(%__MODULE__{substitute: [_ | _] = clauses}), do: substitute_only?(clauses)
+  def substitute_entry?(%__MODULE__{}), do: false
+
+  @doc """
+  Whether a substitute entry stands in for a rule's own date.
+
+  It does when both name the same single day in the same way — a fixed date, a
+  calendar date, a weekday in a month — and the rule has no substitution of its
+  own. An entry dated in one named year (Korea's Seollal and Chuseok overlaps)
+  names no recurring holiday's date, so its substitute day is an extra one.
+
+  ### Arguments
+
+  * `entry` is a substitute entry, a `t:t/0`.
+
+  * `rule` is the `t:t/0` it may stand in for.
+
+  ### Returns
+
+  * `true` when `entry` stands in for `rule`'s date, `false` otherwise.
+
+  ### Examples
+
+      iex> {:ok, entry} = Tempo.Holidays.Compiler.compile("substitutes 12-26 if saturday then next monday")
+      iex> {:ok, boxing_day} = Tempo.Holidays.Compiler.compile("12-26")
+      iex> Tempo.Holidays.Rule.substitutes?(entry, boxing_day)
+      true
+
+  """
+  @spec substitutes?(t(), t()) :: boolean()
+  def substitutes?(%__MODULE__{} = entry, %__MODULE__{} = rule) do
+    substitute_entry?(entry) and plain_date?(rule) and year_gated_only?(entry) and
+      date_rule(entry) == date_rule(rule)
+  end
+
+  def substitutes?(_entry, _rule), do: false
+
+  # The fields that name the date a rule falls on before any gate or
+  # substitution, and whether it is the date of one named year.
+  @date_fields [
+    :kind,
+    :month,
+    :day,
+    :count,
+    :weekday,
+    :inner_weekday,
+    :direction,
+    :offset,
+    :calendar,
+    :leap_month,
+    :timezone
+  ]
+
+  defp date_rule(rule), do: {Map.take(rule, @date_fields), one_year?(rule)}
+
+  defp one_year?(%__MODULE__{from_year: from, to_year: to}),
+    do: is_integer(from) and to == from + 1
+
+  # A single day with no substitution or condition of its own. Easter's feasts
+  # fall on fixed weekdays, so their substitutions resolve statically instead.
+  defp plain_date?(%__MODULE__{kind: kind, count: count, substitute: clauses, conditional: nil})
+       when kind not in [:easter, :orthodox] and count in [nil, 1] and clauses in [nil, []],
+       do: true
+
+  defp plain_date?(_rule), do: false
+
+  # An entry's years are its `since`/`until` and `active` windows alone.
+  defp year_gated_only?(%__MODULE__{} = entry) do
+    is_nil(entry.every_years) and is_nil(entry.year_parity) and is_nil(entry.leap) and
+      is_nil(entry.weekday_gate) and entry.disable in [nil, []] and entry.enable in [nil, []] and
+      is_nil(entry.conditional)
+  end
+
+  @doc """
+  Returns the rule as `Tempo.Holidays.holidays/2`'s `:dates` option observes it.
+
+  `:both` is the rule as date-holidays gives it. `:gazetted` keeps the holiday on
+  its own date alone, with no substitution. `:substitute` observes it on its
+  substitute day where there is one: an `and if …` rule, which gives both days,
+  moves to its substitute day instead, and each substitute entry standing in
+  for its date (`substitutes?/2`) takes the date away on the weekdays and in
+  the years it gives a substitute day. A substitute entry itself is left to the
+  caller, which drops it under `:gazetted`.
+
+  ### Arguments
+
+  * `rule` is a `t:t/0`.
+
+  * `dates` is `:substitute`, `:gazetted` or `:both`.
+
+  * `entries` are the substitute entries of the rule's holiday list.
+
+  ### Returns
+
+  * The `t:t/0`, its recurrence rebuilt when anything changed.
+
+  ### Examples
+
+      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25 and if saturday, sunday then next monday")
+      iex> {:ok, recurrence} = rule |> Tempo.Holidays.Rule.observe(:substitute, []) |> Tempo.Holidays.Rule.recurrence()
+      iex> Enum.map(recurrence.members, &Tempo.to_iso8601/1)
+      ["R/../P1Y/FL12M25D{1..5}KN", "R/../P1Y/FLLL12M25D{6..7}KN/P8DN1K-1IN"]
+
+  """
+  @spec observe(t(), :substitute | :gazetted | :both, [t()]) :: t()
+  def observe(%__MODULE__{} = rule, :both, _entries), do: rule
+
+  def observe(%__MODULE__{substitute: clauses} = rule, :gazetted, _entries)
+      when clauses in [nil, []],
+      do: rule
+
+  def observe(%__MODULE__{} = rule, :gazetted, _entries),
+    do: %{rule | substitute: nil, recurrence: observed_recurrence(rule, :gazetted)}
+
+  def observe(%__MODULE__{} = rule, :substitute, entries) do
+    rule
+    |> moved_not_added()
+    |> with_replacements(Enum.filter(entries, &substitutes?(&1, rule)))
+  end
+
+  # `and if …` observes a holiday on its date and on the substitute day; the
+  # substitute day standing in for the date is a move.
+  defp moved_not_added(%__MODULE__{substitute: [_ | _] = clauses} = rule) do
+    if Enum.any?(clauses, &(elem(&1, 3) == :add)) do
+      moved = Enum.map(clauses, &move_added/1)
+      %{rule | substitute: moved, recurrence: observed_recurrence(rule, :substitute)}
+    else
+      rule
+    end
+  end
+
+  defp moved_not_added(rule), do: rule
+
+  # The recurrence `prepare/1` built for the observed rule, or `nil` for one it
+  # did not prepare, which `recurrence/1` then builds.
+  defp observed_recurrence(%__MODULE__{observed: %{} = observed}, dates),
+    do: Map.get(observed, dates)
+
+  defp observed_recurrence(_rule, _dates), do: nil
+
+  defp move_added({triggers, direction, target, :add}), do: {triggers, direction, target, :shift}
+  defp move_added(clause), do: clause
+
+  defp with_replacements(rule, []), do: rule
+
+  defp with_replacements(rule, entries),
+    do: %{rule | replaced_by: Enum.map(entries, &replacement/1), recurrence: nil}
+
+  defp replacement(%__MODULE__{substitute: clauses} = entry) do
+    triggers = clauses |> Enum.flat_map(&elem(&1, 0)) |> Enum.uniq() |> Enum.sort()
+
+    %{
+      triggers: triggers,
+      years: entry.years,
+      from_year: entry.from_year,
+      to_year: entry.to_year,
+      active: entry.active
+    }
+  end
+
+  @doc """
+  Joins a period date-holidays splits over the year end.
+
+  date-holidays cannot run a period past the year end, so it writes one as two
+  dated entries under one name: a December part that ends as the year does, or
+  a day before it, and a January part from the 1st. Victoria's summer school
+  holidays are written this way.
+
+  ### Arguments
+
+  * `december` is the December part, a `t:t/0`.
+
+  * `january` is the `t:t/0` that may continue it.
+
+  ### Returns
+
+  * `{:ok, rule}` — the December part spanning both, 31 December included.
+
+  * `:error` when `january` does not continue `december`.
+
+  ### Examples
+
+      iex> {:ok, december} = Tempo.Holidays.Compiler.compile("2026-12-19 P12D")
+      iex> {:ok, january} = Tempo.Holidays.Compiler.compile("2027-01-01 P27D")
+      iex> {:ok, summer} = Tempo.Holidays.Rule.join_year_end(december, january)
+      iex> summer.count
+      40
+
+  """
+  @spec join_year_end(t(), t()) :: {:ok, t()} | :error
+  def join_year_end(
+        %__MODULE__{kind: :fixed, month: 12} = december,
+        %__MODULE__{kind: :fixed, month: 1, day: 1} = january
+      ) do
+    with true <- one_year?(december) and one_year?(january),
+         true <- january.from_year == december.from_year + 1,
+         {:ok, first} <- Date.new(december.from_year, 12, december.day),
+         {:ok, new_year} <- Date.new(january.from_year, 1, 1),
+         true <- (Date.diff(new_year, first) - (december.count || 1)) in [0, 1] do
+      {:ok,
+       %{december | count: Date.diff(new_year, first) + (january.count || 1), recurrence: nil}}
+    else
+      _other -> :error
+    end
+  end
+
+  def join_year_end(_december, _january), do: :error
 
   @doc """
   Whether a rule carries an inter-holiday `t:conditional/0`.
@@ -1358,10 +1795,12 @@ defmodule Tempo.Holidays.Rule do
   # `move_disabled/3`) applied once to the gathered occurrences.
   defp occurrences_for_year(rule, year) do
     if active_in_year?(rule, Tempo.year(year)) do
-      with {:ok, base} <- materialise_base(rule, year) do
+      with {:ok, base} <- materialise_base(rule, year),
+           {:ok, replaced} <- replaced_gate(rule, Tempo.year(year)) do
         base
         |> filter_active(rule.active)
         |> gate_by_weekday(rule.weekday_gate)
+        |> gate_by_weekday(replaced)
         |> substitute_all(rule.substitute)
       end
     else
@@ -1532,7 +1971,7 @@ defmodule Tempo.Holidays.Rule do
 
   defp materialise_base(%__MODULE__{kind: :weekday} = rule, %Tempo{} = year) do
     with {:ok, recurrence} <- Tempo.from_iso8601(weekday_iso(rule)),
-         {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
+         {:ok, set} <- Tempo.to_interval(recurrence, within: year) do
       case first_interval(set) do
         {:ok, interval} -> {:ok, [interval]}
         {:error, :no_occurrence} -> {:ok, []}
@@ -1567,7 +2006,7 @@ defmodule Tempo.Holidays.Rule do
     inner_iso = "R/../P1Y/FL#{rule.month}M#{inner}K#{rule.count}IN"
 
     with {:ok, recurrence} <- Tempo.from_iso8601(inner_iso),
-         {:ok, set} <- Tempo.to_interval(recurrence, bound: year),
+         {:ok, set} <- Tempo.to_interval(recurrence, within: year),
          {:ok, inner_interval} <- first_interval(set) do
       anchor = Interval.from(inner_interval)
       shift = relative_shift(rule.direction, Tempo.day_of_week(anchor, :monday), outer, 1)
@@ -1737,10 +2176,10 @@ defmodule Tempo.Holidays.Rule do
   defp calendar_date_holiday(tag, month_selector, day, count, %Tempo{} = year) do
     with {:ok, recurrence} <-
            Tempo.from_iso8601("R/../P1Y/FL#{month_selector}#{day}DN[u-ca=#{tag}]"),
-         {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
+         {:ok, set} <- Tempo.to_interval(recurrence, within: year) do
       intervals =
         set
-        |> Tempo.IntervalSet.to_list()
+        |> Tempo.IntervalSet.members()
         |> Enum.map(fn interval -> span_days(interval, Interval.from(interval), count) end)
 
       {:ok, intervals}
@@ -1759,9 +2198,9 @@ defmodule Tempo.Holidays.Rule do
 
     with {:ok, window} <- Tempo.from_iso8601("#{target - 1}Y/#{target + 1}Y"),
          {:ok, recurrence} <- Tempo.from_iso8601("R/../P1Y/FL#{month}M1DN[u-ca=#{tag}]"),
-         {:ok, set} <- Tempo.to_interval(recurrence, bound: window) do
+         {:ok, set} <- Tempo.to_interval(recurrence, within: window) do
       set
-      |> Tempo.IntervalSet.to_list()
+      |> Tempo.IntervalSet.members()
       |> Enum.map(fn interval -> Tempo.shift(Interval.from(interval), day: offset) end)
       |> Enum.filter(fn start -> gregorian_year(start) == target end)
       |> Enum.uniq()
@@ -1776,9 +2215,9 @@ defmodule Tempo.Holidays.Rule do
   # extends the span. Nothing here computes a date.
   defp computed_event_holiday(event, offset, count, %Tempo{} = year) do
     with {:ok, recurrence} <- Tempo.from_iso8601("R/../P1Y/FL(#{event})eN"),
-         {:ok, set} <- Tempo.to_interval(recurrence, bound: year) do
+         {:ok, set} <- Tempo.to_interval(recurrence, within: year) do
       set
-      |> Tempo.IntervalSet.to_list()
+      |> Tempo.IntervalSet.members()
       |> Enum.map(fn interval -> Tempo.shift(Interval.from(interval), day: offset || 0) end)
       |> reduce_ok(&day_interval(&1, count))
     end

@@ -97,10 +97,10 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # GitHub `extensions` during co-development, as Localize and Calendrical
-      # are GitHub main: the recurrences need Tempo's unreleased 1.7.0 work.
-      # Becomes {:ex_tempo, "~> 1.7"} before publish.
-      {:ex_tempo, github: "elixir-tempo/tempo", branch: "extensions"},
+      # GitHub main during co-development, as Localize and Calendrical are:
+      # the recurrences need Tempo's unreleased 2.0.0 work. Becomes
+      # {:ex_tempo, "~> 2.0"} before publish.
+      {:ex_tempo, github: "elixir-tempo/tempo", branch: "main"},
       # GitHub main during co-development, as in Tempo: the Islamic tier needs
       # Calendrical's dates_in_gregorian_year, unreleased as of 1.3.0. Becomes
       # {:calendrical, "~> 1.4"} before publish.

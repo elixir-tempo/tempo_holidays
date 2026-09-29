@@ -4,16 +4,15 @@ defmodule Tempo.Holidays.Locale do
 
   A request names its target as a positional CLDR territory code (`:US`, `"US"`)
   or `t:Localize.LanguageTag.t/0`, or through a `:territory` or `:locale` option.
-  `resolve/2` turns any of these into the three levels date-holidays keys its data
-  by — matching its `country → state → region` shape:
+  `resolve/2` turns any of these into the territory and the subdivision within
+  it:
 
   * `:territory` — the country (`"US"`).
 
-  * `:division` — the state/province (`"CA"`), derived from a locale's subdivision
-    (`u-sd`, e.g. `usca`).
-
-  * `:subdivision` — a region within a state (`"LA"`), rarely present in a locale
-    and usually given explicitly.
+  * `:subdivision` — a subdivision code (`"CA"`), from a locale's `u-sd`
+    subdivision (`usca`) or the `:subdivision` option, which
+    `Tempo.Holidays.Data.subdivision/2` finds at whichever level the data holds
+    it.
 
   A **positional** code and the `:territory` option are validated as territories
   through `Localize.validate_territory/1`, so `:SA` is Saudi Arabia — never parsed
@@ -23,11 +22,7 @@ defmodule Tempo.Holidays.Locale do
 
   """
 
-  @type resolved :: %{
-          territory: String.t(),
-          division: String.t() | nil,
-          subdivision: String.t() | nil
-        }
+  @type resolved :: %{territory: String.t() | nil, subdivision: term()}
 
   @doc """
   Resolve a target to `{:ok, t:resolved/0}`.
@@ -44,33 +39,34 @@ defmodule Tempo.Holidays.Locale do
   * `:locale` — a BCP 47 locale identifier (atom or string) or a
     `t:Localize.LanguageTag.t/0`, whose territory is derived.
 
-  * `:division`, `:subdivision` — override the state / region level.
+  * `:subdivision` — a subdivision code, in place of a locale's own.
 
   ### Returns
 
-  * `{:ok, t:resolved/0}` with upper-cased string codes, `nil` where a level
-    is absent.
+  * `{:ok, t:resolved/0}` with the territory upper-cased, and the subdivision
+    as a locale names it or as the option gives it, `nil` for none.
 
-  * `{:error, {:unknown_territory, code}}` for an unrecognised territory, or
-    `{:error, {:invalid_locale, target}}` for a target that is neither.
+  * `{:error, {:unknown_territory, code}}` for an unrecognised territory,
+    `{:error, {:invalid_locale, target}}` for a target that is neither, or
+    `{:error, {:invalid_option, options}}` when `options` is not a list.
 
   ### Examples
 
       iex> Tempo.Holidays.Locale.resolve(:AU)
-      {:ok, %{territory: "AU", division: nil, subdivision: nil}}
+      {:ok, %{territory: "AU", subdivision: nil}}
 
       iex> Tempo.Holidays.Locale.resolve(nil, locale: "en-US-u-sd-usca")
-      {:ok, %{territory: "US", division: "CA", subdivision: nil}}
+      {:ok, %{territory: "US", subdivision: "CA"}}
 
       iex> Tempo.Holidays.Locale.resolve(nil, territory: :SA)
-      {:ok, %{territory: "SA", division: nil, subdivision: nil}}
+      {:ok, %{territory: "SA", subdivision: nil}}
 
   """
   @spec resolve(Localize.LanguageTag.t() | atom() | String.t() | nil, keyword()) ::
           {:ok, resolved()} | {:error, {atom(), term()}}
   def resolve(target, options \\ [])
 
-  def resolve(target, options) do
+  def resolve(target, options) when is_list(options) do
     cond do
       Keyword.has_key?(options, :territory) ->
         from_territory(Keyword.get(options, :territory), options)
@@ -82,6 +78,8 @@ defmodule Tempo.Holidays.Locale do
         from_positional(target, options)
     end
   end
+
+  def resolve(_target, options), do: {:error, {:invalid_option, options}}
 
   # A bare positional target is a territory (a `LanguageTag` is a locale); this is
   # the sugar for `holidays(:AU)` / `materialise(:AU, year)`. A territory code
@@ -101,11 +99,7 @@ defmodule Tempo.Holidays.Locale do
   defp from_tag(tag) do
     territory = territory_of(tag)
 
-    %{
-      territory: territory,
-      division: division_of(tag, territory),
-      subdivision: nil
-    }
+    %{territory: territory, subdivision: subdivision_of(tag, territory)}
   end
 
   defp territory_of(tag) do
@@ -115,12 +109,11 @@ defmodule Tempo.Holidays.Locale do
     end
   end
 
-  # The `u-sd` subdivision encodes its region then the state suffix
-  # (`usca` = US + CA); strip the territory prefix to get date-holidays' state
-  # key.
-  defp division_of(_tag, nil), do: nil
+  # The `u-sd` subdivision encodes its territory then the subdivision's own code
+  # (`usca` = US + CA); strip the territory prefix to get the subdivision code.
+  defp subdivision_of(_tag, nil), do: nil
 
-  defp division_of(tag, territory) do
+  defp subdivision_of(tag, territory) do
     case Map.get(tag.locale, :sd) do
       nil ->
         nil
@@ -143,11 +136,7 @@ defmodule Tempo.Holidays.Locale do
   defp from_territory(code, options) do
     case Localize.validate_territory(code) do
       {:ok, territory} ->
-        {:ok,
-         apply_overrides(
-           %{territory: upcase(territory), division: nil, subdivision: nil},
-           options
-         )}
+        {:ok, apply_overrides(%{territory: upcase(territory), subdivision: nil}, options)}
 
       {:error, _} ->
         {:error, {:unknown_territory, to_string(code)}}
@@ -173,19 +162,12 @@ defmodule Tempo.Holidays.Locale do
   # ── overrides ───────────────────────────────────────────────────────
 
   # `:territory` and `:locale` select the territory (see `resolve/2`); only the
-  # `:division` and `:subdivision` level overrides are applied here.
+  # `:subdivision` override is applied here, as given, for
+  # `Tempo.Holidays.Data.subdivision/2` to find or refuse.
   defp apply_overrides(resolved, options) do
-    %{
-      territory: resolved.territory,
-      division: override(options, :division, resolved.division),
-      subdivision: override(options, :subdivision, resolved.subdivision)
-    }
-  end
-
-  defp override(options, key, default) do
-    case Keyword.get(options, key) do
-      nil -> default
-      value -> upcase(value)
+    case Keyword.get(options, :subdivision) do
+      nil -> resolved
+      subdivision -> %{resolved | subdivision: subdivision}
     end
   end
 

@@ -7,7 +7,7 @@ defmodule Tempo.Holidays.LocaleTest do
 
   test "a LanguageTag struct resolves to its territory and subdivision" do
     {:ok, tag} = Localize.validate_locale("en-US-u-sd-usca")
-    assert {:ok, %{territory: "US", division: "CA", subdivision: nil}} = Locale.resolve(tag)
+    assert {:ok, %{territory: "US", subdivision: "CA"}} = Locale.resolve(tag)
   end
 
   test "a :locale region override (u-rg) wins over the language's territory" do
@@ -24,9 +24,9 @@ defmodule Tempo.Holidays.LocaleTest do
     assert {:error, {:unknown_territory, "en-US"}} = Locale.resolve(nil, territory: "en-US")
   end
 
-  test "options override the derived levels" do
-    assert {:ok, %{territory: "US", division: "NY"}} =
-             Locale.resolve(nil, locale: "en-US-u-sd-usca", division: "NY")
+  test "the :subdivision option overrides a locale's own, as given" do
+    assert {:ok, %{territory: "US", subdivision: "ny"}} =
+             Locale.resolve(nil, locale: "en-US-u-sd-usca", subdivision: "ny")
 
     assert {:ok, %{territory: "GB", subdivision: "LA"}} =
              Locale.resolve(nil, locale: "en-GB", subdivision: "LA")
@@ -35,5 +35,9 @@ defmodule Tempo.Holidays.LocaleTest do
   test "an invalid, non-territory input is an invalid locale" do
     assert {:error, {:invalid_locale, 123}} = Locale.resolve(123)
     assert {:error, {:invalid_locale, %{}}} = Locale.resolve(%{})
+  end
+
+  test "options that are not a list are an error" do
+    assert {:error, {:invalid_option, :none}} = Locale.resolve(:AU, :none)
   end
 end

@@ -11,7 +11,8 @@ defmodule Tempo.Holidays.DayStart do
   becomes `[sunset(D − 1), sunset(D))`; a multi-day holiday keeps its half-open
   span, `[sunset of the first evening, sunset that starts the day after the last)`.
 
-  `project/3` performs that projection. It is deliberately self-contained — the
+  `project/3` performs that projection, and `Tempo.Holidays.day_start/2` applies
+  it to a set of holiday occurrences. It is deliberately self-contained — the
   day-start-aware projection of a calendar day belongs in Tempo, and this module
   is written to lift there with little change.
 
@@ -24,18 +25,18 @@ defmodule Tempo.Holidays.DayStart do
   * `:evening` / `:sunset` — the 18:00 proxy, or true sunset, at the calendar's
     canonical reference (Mecca for Islamic dates, Jerusalem for Hebrew).
 
-  * `{:evening, anchor}` / `{:sunset, anchor}` — the same, at an explicit anchor:
-    an IANA zone id (`"Asia/Kuala_Lumpur"`) or a `{longitude, latitude}` location
-    (also a `t:Geo.Point.t/0` / `t:Geo.PointZ.t/0`). A location resolves to a zone
-    through `tz_world` (an optional dependency) for the evening proxy; `:sunset`
-    computes from the location directly and returns a UTC instant, so it needs no
-    zone database.
+  * `{:evening, location}` / `{:sunset, location}` — the same, at a location of
+    your own: an IANA zone id (`"Asia/Kuala_Lumpur"`) or a `{longitude,
+    latitude}` point (also a `t:Geo.Point.t/0` / `t:Geo.PointZ.t/0`). A point
+    resolves to a zone through `tz_world` (an optional dependency) for the
+    evening proxy; `:sunset` computes from the point directly and returns a UTC
+    instant, so it needs no zone database.
 
   """
 
   alias Tempo.Interval
 
-  # The canonical references: Islamic dates are anchored where Umm al-Qura is
+  # The canonical references: Islamic dates are taken where Umm al-Qura is
   # defined (Mecca), Hebrew dates at Jerusalem. `{longitude, latitude}`.
   @mecca {39.8262, 21.4225}
   @riyadh_zone "Asia/Riyadh"
@@ -44,11 +45,58 @@ defmodule Tempo.Holidays.DayStart do
 
   @evening_time ~T[18:00:00]
 
-  @typedoc "An anchor for a day-start boundary: a zone id or a location."
-  @type anchor :: String.t() | {number(), number()} | struct()
+  @typedoc "Where a day-start boundary is taken: an IANA zone id or a `{longitude, latitude}` point."
+  @type location :: String.t() | {number(), number()} | struct()
 
   @typedoc "How a calendar day begins when projected onto the Gregorian timeline."
-  @type t :: :midnight | :evening | :sunset | {:evening | :sunset, anchor()}
+  @type t :: :midnight | :evening | :sunset | {:evening | :sunset, location()}
+
+  @doc """
+  Validate a day start.
+
+  ### Arguments
+
+  * `day_start` is the value to check.
+
+  ### Returns
+
+  * `{:ok, day_start}` for a `t:t/0`: a boundary, or a boundary and a location
+    that is a non-empty zone id or a point with a longitude from -180 to 180
+    and a latitude from -90 to 90.
+
+  * `{:error, {:invalid_day_start, day_start}}` otherwise.
+
+  ### Examples
+
+      iex> Tempo.Holidays.DayStart.validate({:sunset, {101.69, 3.14}})
+      {:ok, {:sunset, {101.69, 3.14}}}
+
+      iex> Tempo.Holidays.DayStart.validate(:dusk)
+      {:error, {:invalid_day_start, :dusk}}
+
+  """
+  @spec validate(term()) :: {:ok, t()} | {:error, {:invalid_day_start, term()}}
+  def validate(boundary) when boundary in [:midnight, :evening, :sunset], do: {:ok, boundary}
+
+  def validate({boundary, location} = day_start) when boundary in [:evening, :sunset] do
+    if location?(location), do: {:ok, day_start}, else: {:error, {:invalid_day_start, day_start}}
+  end
+
+  def validate(other), do: {:error, {:invalid_day_start, other}}
+
+  defp location?(zone) when is_binary(zone), do: zone != ""
+  defp location?({longitude, latitude}), do: point?(longitude, latitude)
+  defp location?(%{coordinates: {longitude, latitude}}), do: point?(longitude, latitude)
+
+  defp location?(%{coordinates: {longitude, latitude, _elevation}}),
+    do: point?(longitude, latitude)
+
+  defp location?(_other), do: false
+
+  defp point?(longitude, latitude) do
+    is_number(longitude) and is_number(latitude) and abs(longitude) <= 180 and
+      abs(latitude) <= 90
+  end
 
   @doc """
   Project an in-calendar day interval onto the Gregorian timeline per `day_start`.
@@ -59,17 +107,20 @@ defmodule Tempo.Holidays.DayStart do
     (an Islamic or Hebrew day, possibly spanning several days).
 
   * `calendar` is the occurrence's Calendrical calendar module, used to choose the
-    canonical reference when no anchor is given.
+    canonical reference when no location is given.
 
-  * `day_start` is a `t:t/0` — `:midnight` (the default, returns `interval`
-    unchanged), `:evening`/`:sunset`, or a `{boundary, anchor}` pair.
+  * `day_start` is a `t:t/0` — `:midnight` (returns `interval` unchanged),
+    `:evening`/`:sunset`, or a `{boundary, location}` pair.
 
   ### Returns
 
   * `{:ok, interval}` — the projected Gregorian datetime interval, or `interval`
     unchanged for `:midnight`.
 
-  * `{:error, reason}` — a location was given for an evening projection but no
+  * `{:error, {:invalid_day_start, day_start}}` for a value that is not a
+    `t:t/0`.
+
+  * `{:error, reason}` — a point was given for an evening projection but no
     zone could be resolved (`tz_world` absent or the point is over open water), or
     the sunset/boundary could not be computed.
 
@@ -93,31 +144,38 @@ defmodule Tempo.Holidays.DayStart do
   def project(interval, _calendar, :midnight), do: {:ok, interval}
 
   def project(interval, calendar, day_start) do
-    {boundary, anchor} = normalise(day_start)
+    with {:ok, day_start} <- validate(day_start) do
+      projected(interval, calendar, normalise(day_start))
+    end
+  end
 
+  defp projected(interval, _calendar, :midnight), do: {:ok, interval}
+
+  defp projected(interval, calendar, {boundary, location}) do
     with {:ok, from_date} <- gregorian_date(Interval.from(interval)),
          {:ok, to_date} <- gregorian_date(Interval.to(interval)),
-         {:ok, from_instant} <- instant(boundary, Date.add(from_date, -1), anchor, calendar),
-         {:ok, to_instant} <- instant(boundary, Date.add(to_date, -1), anchor, calendar) do
+         {:ok, from_instant} <- instant(boundary, Date.add(from_date, -1), location, calendar),
+         {:ok, to_instant} <- instant(boundary, Date.add(to_date, -1), location, calendar) do
       Interval.new(Tempo.from_elixir(from_instant), Tempo.from_elixir(to_instant))
     end
   end
 
-  # `:evening` / `:sunset` use the canonical anchor; a pair names its own.
+  # `:evening` / `:sunset` use the canonical location; a pair names its own.
+  defp normalise(:midnight), do: :midnight
   defp normalise(boundary) when boundary in [:evening, :sunset], do: {boundary, :canonical}
-  defp normalise({boundary, anchor}) when boundary in [:evening, :sunset], do: {boundary, anchor}
+  defp normalise({boundary, location}), do: {boundary, location}
 
   # True sunset is a location fact, returned as a UTC instant — it resolves only a
   # location, never a zone, so it needs neither a zone database nor tz_world.
-  defp instant(:sunset, %Date{} = date, anchor, calendar) do
-    Astro.sunset(location_for(anchor, calendar), date, time_zone: :utc)
+  defp instant(:sunset, %Date{} = date, location, calendar) do
+    Astro.sunset(location_for(location, calendar), date, time_zone: :utc)
   end
 
   # The 18:00 proxy is a wall-clock time in a zone, so it resolves a zone (a zone
   # id directly, a location through tz_world, or the calendar's canonical zone); a
   # location whose zone cannot be resolved is refused rather than guessed.
-  defp instant(:evening, %Date{} = date, anchor, calendar) do
-    case zone_for(anchor, calendar) do
+  defp instant(:evening, %Date{} = date, location, calendar) do
+    case zone_for(location, calendar) do
       nil -> {:error, :zone_unresolved}
       zone -> evening_instant(date, zone)
     end
@@ -132,8 +190,8 @@ defmodule Tempo.Holidays.DayStart do
     end
   end
 
-  # A `{longitude, latitude}` for sunset: the anchor's own location, or the
-  # calendar's canonical one when the anchor is a zone id or `:canonical`.
+  # A `{longitude, latitude}` for sunset: the location's own point, or the
+  # calendar's canonical one when the location is a zone id or `:canonical`.
   defp location_for(:canonical, calendar), do: elem(canonical(calendar), 0)
   defp location_for(zone, calendar) when is_binary(zone), do: elem(canonical(calendar), 0)
   defp location_for(location, _calendar), do: coordinates(location)

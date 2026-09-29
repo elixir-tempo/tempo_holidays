@@ -246,10 +246,11 @@ defmodule Tempo.Holidays.Compiler do
   end
 
   # A specific `YYYY-MM-DD` is a one-off holiday: a fixed date active only in
-  # that year.
+  # that year. An optional `P<n>D` span carries into `count`, as it does for a
+  # recurring date, so a dated school-holiday period keeps its length.
   defp compile_specific_date(rule) do
-    case Regex.run(~r/^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+P\d+D)?\s*$/, rule) do
-      [_, year, month, day] ->
+    case Regex.run(~r/^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+P(\d+)DT?)?\s*$/, rule) do
+      [_, year, month, day | rest] ->
         active = String.to_integer(year)
 
         {:ok,
@@ -257,6 +258,7 @@ defmodule Tempo.Holidays.Compiler do
            kind: :fixed,
            month: String.to_integer(month),
            day: String.to_integer(day),
+           count: rest |> List.first() |> parse_span(),
            from_year: active,
            to_year: active + 1,
            source: rule

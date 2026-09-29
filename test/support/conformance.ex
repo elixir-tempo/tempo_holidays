@@ -57,21 +57,31 @@ defmodule Tempo.Holidays.Conformance do
   end
 
   defp gate_index(territory) do
-    {code, division, subdivision} = split_territory(territory)
+    {code, subdivision} = split_territory(territory)
 
-    case Data.for_territory(code, division, subdivision) do
+    case holidays_for(code, subdivision) do
       {:ok, holidays} -> Enum.group_by(holidays, & &1.rule.source, & &1.rule)
       {:error, _absent} -> %{}
     end
   end
 
+  # date-holidays gives a subdivision it holds no data for the country's
+  # holidays, and its fixtures for such a subdivision (Mauritius' districts)
+  # are the country's. The library refuses an unknown subdivision; the harness
+  # reads the country's gates for it, as date-holidays does.
+  defp holidays_for(code, subdivision) do
+    case Data.for_territory(code, subdivision) do
+      {:error, {:unknown_subdivision, _subdivision}} -> Data.for_territory(code)
+      result -> result
+    end
+  end
+
   # A fixture territory is `<country>[-<state>[-<region>]]`, e.g. `US-CA` or
-  # `BR-SP-SP`.
+  # `BR-SP-SP`: the country, and the subdivision's path within it.
   defp split_territory(territory) do
-    case String.split(territory, "-", parts: 3) do
-      [code] -> {code, nil, nil}
-      [code, division] -> {code, division, nil}
-      [code, division, subdivision] -> {code, division, subdivision}
+    case String.split(territory, "-", parts: 2) do
+      [code] -> {code, nil}
+      [code, subdivision] -> {code, subdivision}
     end
   end
 
@@ -220,8 +230,8 @@ defmodule Tempo.Holidays.Conformance do
       else: Rule.materialise(compiled, context.year_tempo)
   end
 
-  # A bridge / if-holiday rule is resolved as `Tempo.Holidays.materialise/3`
-  # resolves it: a conditional member of a recurrence set, here holding the
+  # A bridge / if-holiday rule is resolved as its holiday set resolves it when
+  # the set converts: a conditional member of a recurrence set, here holding the
   # fixture's other entries — Tempo's second pass against date-holidays' own
   # output. A conditional no member can express resolves concretely against the
   # same entries (`context.present`).
@@ -239,11 +249,13 @@ defmodule Tempo.Holidays.Conformance do
 
   defp resolve_in_set(conditional, context) do
     under_test = Tempo.put_metadata(conditional, %{under_test: true})
-    holidays = Tempo.RecurrenceSet.new([under_test | fixture_members(context)])
+    holidays = Tempo.RecurrenceSet.new!([under_test | fixture_members(context)])
 
-    with {:ok, occurrences} <- Tempo.to_interval_set(holidays, bound: context.year_tempo) do
+    with {:ok, occurrences} <- Tempo.to_interval_set(holidays, within: context.year_tempo) do
       {:ok,
-       occurrences |> Tempo.IntervalSet.to_list() |> Enum.filter(&Tempo.metadata(&1)[:under_test])}
+       occurrences
+       |> Tempo.IntervalSet.members()
+       |> Enum.filter(&(Tempo.metadata(&1)[:under_test] && starts_in?(&1, context.year)))}
     end
   end
 
@@ -257,6 +269,10 @@ defmodule Tempo.Holidays.Conformance do
   end
 
   defp to_date_set(intervals), do: intervals |> Enum.map(&gregorian/1) |> MapSet.new()
+
+  # The window keeps every occurrence that overlaps it; date-holidays lists a
+  # holiday in the year it starts in.
+  defp starts_in?(interval, year), do: String.starts_with?(gregorian(interval), "#{year}-")
 
   defp record(acc, context, detail) do
     feature = feature(context.rule)

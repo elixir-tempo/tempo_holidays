@@ -1,6 +1,6 @@
 # Conformance
 
-`tempo_holidays` is validated against [date-holidays](https://github.com/commenthol/date-holidays) itself. The upstream project ships a fixture corpus — the dates it computes for every territory across a range of years — and the conformance test checks that our compiled-and-materialised rules produce the same Gregorian dates.
+`tempo_holidays` is validated against [date-holidays](https://github.com/commenthol/date-holidays) itself. The upstream project ships a fixture corpus — the dates it computes for every territory across a range of years — and the conformance test checks that our compiled rules produce the same Gregorian dates.
 
 ## Running it
 
@@ -10,7 +10,7 @@ The corpus is large, so the test is opt-in:
 mix test --include conformance
 ```
 
-It downloads and caches the pinned date-holidays tarball, then, for each fixture rule, checks that our dates sit inside the fixture's date-set for that territory-year. Results are grouped into four buckets.
+It downloads and caches the pinned date-holidays tarball, then, for each fixture rule, checks that our dates sit inside the fixture's date-set for that territory-year. A holiday is counted in the year it starts in, as date-holidays counts it, though a year's window also holds one still running from December. A fixture for a subdivision the data holds no holidays of its own for, as date-holidays gives Mauritius' districts, is compared with the country's. Results are grouped into four buckets.
 
 ## The buckets
 

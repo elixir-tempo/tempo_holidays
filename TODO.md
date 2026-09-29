@@ -1,17 +1,14 @@
 # TODO
 
-Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs
-more than a line here. Conformance against the full date-holidays fixture
-corpus (`mix test --include conformance`) drives the tiers: every rule that
-compiles computes correct dates (zero mismatched), with a small set of accepted
-`known_unsupported` gaps (the Bengali calendar and two rare shapes, below) and
-the Islamic civil-date `divergent` differences.
+Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more than a line here. Conformance against the full date-holidays fixture corpus (`mix test --include conformance`) drives the tiers: every rule that compiles computes correct dates (zero mismatched), with a small set of accepted `known_unsupported` gaps (the Bengali calendar and two rare shapes, below) and the Islamic civil-date `divergent` differences.
 
 ## Open
 
-* [ ] **Guides** — a User guide (getting holidays, locales, the interval model, calendars, the `:day_start` projection) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
+* [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
-* [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: territory-local anchoring (derive a territory's zone/location from the locale) as a follow-up to the current canonical/explicit anchors.
+* [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
+
+* [ ] **Substitute entries paired per call** — `holidays/2` rebuilds, on each call, the recurrences of the holidays a `substitutes …` entry stands in for (Japan's four take about 12 ms, Britain's three 2 ms), where every rule's own `dates:` forms are prepared at load. The pairing reads the subdivision's merged list, so preparing it means preparing each subdivision's.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
 
@@ -34,6 +31,8 @@ the Islamic civil-date `divergent` differences.
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Tempo 2.0 vocabulary** — on Tempo `main`: `materialise/3` gone for `holidays/2` then `Tempo.to_interval_set/2`; `day_start/2` over occurrences; one `:subdivision`; `dates: :substitute | :gazetted | :both`; a period split over the year end is one member; a dated period keeps its length. 2026-09-29.
 
 * [x] **`holidays/2`, selected by type** — `recurrences/2` renamed `holidays/2`; `:include` / `:exclude` keep and leave out holiday types (a type or a list, `:exclude` winning), on `materialise/3` too; a kept conditional carries the holidays it depends on, so a selection never changes a date. 2026-09-28.
 

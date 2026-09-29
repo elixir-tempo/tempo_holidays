@@ -13,22 +13,36 @@ defmodule Tempo.HolidaysTest do
   # holiday keeps its actual date *and* adds the observed one, so a name maps to
   # one or more dates.
   defp dates_of(occurrences, name) do
-    for interval <- IntervalSet.to_list(occurrences),
+    for interval <- IntervalSet.members(occurrences),
         Tempo.metadata(interval)[:name] == name,
         do: Tempo.Interval.from(interval)
   end
 
   defp occurrence_names(occurrences),
-    do: occurrences |> IntervalSet.to_list() |> Enum.map(&Tempo.metadata(&1)[:name])
+    do: occurrences |> IntervalSet.members() |> Enum.map(&Tempo.metadata(&1)[:name])
 
   defp member_names(holidays),
     do: holidays |> RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1)[:name])
 
-  # The single interval a one-holiday set materialises to that year, under a
+  # A territory's holidays in a window, as a reader asks for them: the holiday
+  # set `Tempo.Holidays.holidays/2` returns, converted over the window.
+  defp holidays_in(target, window, options \\ [])
+
+  defp holidays_in(%RecurrenceSet{} = holidays, window, _options),
+    do: Tempo.to_interval_set(holidays, within: window)
+
+  defp holidays_in(target, window, options) do
+    with {:ok, holidays} <- Holidays.holidays(target, options) do
+      Tempo.to_interval_set(holidays, within: window)
+    end
+  end
+
+  # The single interval a one-holiday set converts to that year, under a
   # `day_start` projection.
   defp single_interval(holidays, year, day_start) do
-    {:ok, occurrences} = Holidays.materialise(holidays, year, day_start: day_start)
-    [interval] = IntervalSet.to_list(occurrences)
+    {:ok, occurrences} = holidays_in(holidays, year)
+    {:ok, projected} = Holidays.day_start(occurrences, day_start)
+    [interval] = IntervalSet.members(projected)
     interval
   end
 
@@ -42,15 +56,15 @@ defmodule Tempo.HolidaysTest do
       metadata = %{id: rule_string, name: name, type: type}
       Tempo.put_metadata(recurrence, Map.merge(Tempo.metadata(recurrence), metadata))
     end)
-    |> RecurrenceSet.new()
+    |> RecurrenceSet.new!()
   end
 
   defp holiday_set(rule_string, name), do: holiday_set([{rule_string, name, :public}])
 
   # A territory's holidays with their prepared rules, to compare a member with
   # the concrete computation of its rule.
-  defp territory_holidays(territory, division \\ nil) do
-    {:ok, holidays} = Data.for_territory(territory, division)
+  defp territory_holidays(territory, subdivision \\ nil) do
+    {:ok, holidays} = Data.for_territory(territory, subdivision)
     holidays
   end
 
@@ -77,12 +91,27 @@ defmodule Tempo.HolidaysTest do
     |> Enum.sort()
   end
 
-  # The Gregorian dates a rule's `recurrence/1` materialises to in `year`.
-  defp recurrence_dates(rule, year) do
+  # The occurrences a rule's `recurrence/1` has that start in `year`: the window
+  # keeps every occurrence that overlaps it, and a holiday belongs to the year
+  # it starts in, as date-holidays counts it.
+  defp recurrence_occurrences(rule, year) do
     {:ok, recurrence} = Rule.recurrence(rule)
-    {:ok, set} = Tempo.to_interval(recurrence, bound: year)
-    greg_dates(Tempo.IntervalSet.to_list(set))
+    starting_in(recurrence, year)
   end
+
+  defp starting_in(recurrence, year) do
+    {:ok, set} = Tempo.to_interval(recurrence, within: year)
+    target = Tempo.year(year)
+
+    Enum.filter(IntervalSet.members(set), fn interval ->
+      {:ok, date} = Tempo.to_date(Tempo.Interval.from(interval))
+      {:ok, iso} = Date.convert(date, Calendar.ISO)
+      iso.year == target
+    end)
+  end
+
+  # The Gregorian dates a rule's `recurrence/1` has in `year`.
+  defp recurrence_dates(rule, year), do: greg_dates(recurrence_occurrences(rule, year))
 
   # The sorted `from..to` Gregorian spans of a list of intervals — so a
   # multi-day holiday is compared by its whole extent, not just its start.
@@ -94,11 +123,7 @@ defmodule Tempo.HolidaysTest do
     |> Enum.sort()
   end
 
-  defp recurrence_spans(rule, year) do
-    {:ok, recurrence} = Rule.recurrence(rule)
-    {:ok, set} = Tempo.to_interval(recurrence, bound: year)
-    material_spans(Tempo.IntervalSet.to_list(set))
-  end
+  defp recurrence_spans(rule, year), do: material_spans(recurrence_occurrences(rule, year))
 
   # A rule's recurrence as ISO 8601 — one string per member.
   defp members_iso(rule) do
@@ -197,24 +222,17 @@ defmodule Tempo.HolidaysTest do
       assert RecurrenceSet.members(holidays) == []
     end
 
-    test "materialise selects the same way, from a territory or a set" do
-      {:ok, all} = Holidays.holidays(:US)
+    test "a selection's occurrences are of the kept types alone" do
+      {:ok, occurrences} = holidays_in(:US, ~o"2026", exclude: :observance)
+      types = occurrences |> IntervalSet.members() |> Enum.map(&Tempo.metadata(&1)[:type])
 
-      for {:ok, occurrences} <- [
-            Holidays.materialise(:US, ~o"2026", exclude: :observance),
-            Holidays.materialise(all, ~o"2026", exclude: :observance)
-          ] do
-        refute :observance in (occurrences
-                               |> IntervalSet.to_list()
-                               |> Enum.map(&Tempo.metadata(&1)[:type]))
-
-        assert ~o"2026Y7M3D" in dates_of(occurrences, "Independence Day")
-      end
+      refute :observance in types
+      assert ~o"2026Y7M3D" in dates_of(occurrences, "Independence Day")
     end
 
     test "a selection never changes a date: Näfelser Fahrt still moves off Maundy Thursday" do
       name = "Thursday after 04-02 if is observance holiday then next Thursday"
-      {:ok, public} = Holidays.materialise(:CH, ~o"2026", division: "GL", include: :public)
+      {:ok, public} = holidays_in(:CH, ~o"2026", subdivision: "GL", include: :public)
 
       assert dates_of(public, name) == [~o"2026Y4M9D"]
       assert dates_of(public, "Maundy Thursday") == []
@@ -230,7 +248,7 @@ defmodule Tempo.HolidaysTest do
         assert {:error, {:invalid_holiday_type, _}} = Holidays.holidays(:AU, selection)
 
         assert {:error, {:invalid_holiday_type, _}} =
-                 Holidays.materialise(:AU, ~o"2026", selection)
+                 holidays_in(:AU, ~o"2026", selection)
       end
     end
   end
@@ -254,8 +272,7 @@ defmodule Tempo.HolidaysTest do
           end)
 
         member = member_of(holidays, holiday)
-        {:ok, occurrences} = Tempo.to_interval(RecurrenceSet.new([member]), bound: ~o"2026")
-        occurrences = IntervalSet.to_list(occurrences)
+        occurrences = starting_in(RecurrenceSet.new!([member]), ~o"2026")
         {:ok, expected} = Rule.materialise_concrete(holiday.rule, ~o"2026")
 
         assert occurrences != []
@@ -289,7 +306,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "every conditional rule in the data is a conditional member" do
-      for {territory, division, id} <- [
+      for {territory, subdivision, id} <- [
             {:JP, nil, "09-22 if 09-21 and 09-23 is public holiday"},
             {:CH, "GL", "Thursday after 04-02 if is observance holiday then next Thursday"},
             {:NF, nil,
@@ -297,12 +314,12 @@ defmodule Tempo.HolidaysTest do
             {:NZ, "OTA",
              "03-23 if Tuesday,Wednesday,Thursday then previous Monday if Friday,Saturday,Sunday then next Monday if is public holiday then next Monday"}
           ] do
-        {:ok, holidays} = Holidays.holidays(territory, division: division)
+        {:ok, holidays} = Holidays.holidays(territory, subdivision: subdivision)
 
         assert Enum.any?(RecurrenceSet.members(holidays), fn member ->
                  match?(%Conditional{}, member) and Tempo.metadata(member)[:id] == id
                end),
-               "#{territory} #{division}: #{id}"
+               "#{territory} #{subdivision}: #{id}"
       end
     end
   end
@@ -602,21 +619,21 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  describe "materialise/2" do
-    test "projects every AU holiday onto 2026" do
-      assert {:ok, holidays} = Holidays.materialise(:AU, ~o"2026")
+  describe "holidays in a window" do
+    test "every AU holiday in 2026" do
+      assert {:ok, holidays} = holidays_in(:AU, ~o"2026")
 
       assert ~o"2026Y1M1D" in dates_of(holidays, "New Year's Day")
       assert ~o"2026Y1M26D" in dates_of(holidays, "Australia Day")
       assert ~o"2026Y4M3D" in dates_of(holidays, "Good Friday")
       assert ~o"2026Y4M25D" in dates_of(holidays, "Anzac Day")
       assert ~o"2026Y12M25D" in dates_of(holidays, "Christmas Day")
-      # Boxing Day 2026 is Saturday the 26th; the observed Monday the 28th is added.
-      assert ~o"2026Y12M28D" in dates_of(holidays, "Boxing Day")
+      # Boxing Day 2026 is Saturday the 26th, observed on Monday the 28th.
+      assert dates_of(holidays, "Boxing Day") == [~o"2026Y12M28D"]
     end
 
     test "returns the holidays earliest first, each tagged with its holiday" do
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2026")
+      {:ok, holidays} = holidays_in(:AU, ~o"2026")
       names = occurrence_names(holidays)
 
       assert hd(names) == "New Year's Day"
@@ -627,10 +644,10 @@ defmodule Tempo.HolidaysTest do
       assert Tempo.metadata(IntervalSet.first(holidays))[:id] == new_year.rule.source
     end
 
-    test "materialises over any window, not only a year" do
+    test "converts over any window, not only a year" do
       # A July-to-June financial year crosses the year end: it holds Christmas
       # 2026 and New Year's Day 2027.
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2026-07/2027-07")
+      {:ok, holidays} = holidays_in(:AU, ~o"2026-07/2027-07")
 
       assert ~o"2026Y12M25D" in dates_of(holidays, "Christmas Day")
       assert ~o"2027Y1M1D" in dates_of(holidays, "New Year's Day")
@@ -645,38 +662,62 @@ defmodule Tempo.HolidaysTest do
       assert occurrence_names(clashes) == ["Christmas Day"]
     end
 
-    test "the recurrence re-projects onto a different year" do
+    test "the same recurrences give another year's dates" do
       # Easter moves year to year: in 2027 Easter Sunday is 28 March, so Good
       # Friday is the 26th and Easter Monday the 29th.
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2027")
+      {:ok, holidays} = holidays_in(:AU, ~o"2027")
 
       assert ~o"2027Y3M26D" in dates_of(holidays, "Good Friday")
       assert ~o"2027Y3M29D" in dates_of(holidays, "Easter Monday")
     end
 
     test "an unknown territory is an error, not a crash" do
-      assert {:error, {:unknown_territory, "ZZ"}} = Holidays.materialise(:ZZ, ~o"2026")
+      assert {:error, {:unknown_territory, "ZZ"}} = holidays_in(:ZZ, ~o"2026")
     end
   end
 
-  describe "coalescing back-to-back entries" do
-    test "two same-name abutting entries merge into one period" do
-      # date-holidays splits a period it cannot express across a year
-      # boundary into two entries under one name. Materialised, the two
-      # abutting days are coalesced into the single span they describe.
+  describe "a period split over the year end" do
+    test "is one member: Victoria's summer school holidays run through 31 December" do
+      # date-holidays cannot run a period past the year end, so it writes the
+      # summer holidays as two entries, the December one ending on the 30th.
+      {:ok, school} = holidays_in(:AU, ~o"2026", subdivision: "VIC", include: :school)
+
+      assert [summer] =
+               for(
+                 term <- IntervalSet.members(school),
+                 Tempo.metadata(term).name == "Term 4 holidays",
+                 do: term
+               )
+
+      assert Tempo.Interval.from(summer) == ~o"2026Y12M19D"
+      assert Tempo.Interval.to(summer) == ~o"2027Y1M28D"
+    end
+
+    test "is in the window of each year it overlaps" do
+      {:ok, school} = holidays_in(:AU, ~o"2027", subdivision: "VIC", include: :school)
+      assert dates_of(school, "Term 4 holidays") == [~o"2026Y12M19D", ~o"2027Y12M18D"]
+    end
+
+    test "a dated period keeps its length" do
+      {:ok, school} = holidays_in(:AU, ~o"2026", subdivision: "VIC", include: :school)
+      assert dates_of(school, "Term 3 holidays") == [~o"2026Y9M19D"]
+
+      assert Enum.all?(IntervalSet.members(school), fn term ->
+               Tempo.metadata(term).name != "Term 3 holidays" or Tempo.exactly?(term, ~o"P16D")
+             end)
+    end
+
+    test "same-name holidays on neighbouring days stay separate" do
+      # Only a period split over the year end is joined: two day rules that share
+      # a name, as Eid al-Fitr's first and second days do, stay two occurrences.
       holidays = holiday_set([{"12-25", "Festival", :school}, {"12-26", "Festival", :school}])
 
-      assert {:ok, occurrences} = Holidays.materialise(holidays, ~o"2026")
-      assert [interval] = IntervalSet.to_list(occurrences)
-      assert Tempo.metadata(interval)[:name] == "Festival"
-      assert Tempo.Interval.from(interval) == ~o"2026Y12M25D"
-      assert Tempo.Interval.to(interval) == ~o"2026Y12M27D"
+      assert {:ok, occurrences} = holidays_in(holidays, ~o"2026")
+      assert length(IntervalSet.members(occurrences)) == 2
     end
 
     test "adjacent holidays with different names stay separate" do
-      # Christmas and Boxing Day are different holidays, so name-aware
-      # coalescing leaves them as separate entries rather than merging.
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2026")
+      {:ok, holidays} = holidays_in(:AU, ~o"2026")
 
       assert "Christmas Day" in occurrence_names(holidays)
       assert "Boxing Day" in occurrence_names(holidays)
@@ -685,21 +726,21 @@ defmodule Tempo.HolidaysTest do
 
   describe "observed-date substitution" do
     test "a holiday on a Sunday is observed the following Monday" do
-      # Australia Day 2025 falls on Sunday the 26th, so Monday the 27th is
-      # observed alongside it.
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2025")
-      assert ~o"2025Y1M27D" in dates_of(holidays, "Australia Day")
+      # Australia Day 2025 falls on Sunday the 26th, so it is observed on Monday
+      # the 27th.
+      {:ok, holidays} = holidays_in(:AU, ~o"2025")
+      assert dates_of(holidays, "Australia Day") == [~o"2025Y1M27D"]
     end
 
     test "a holiday on a Saturday is observed the following Monday" do
       # New Year's Day 2028 falls on Saturday the 1st; Monday the 3rd observed.
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2028")
-      assert ~o"2028Y1M3D" in dates_of(holidays, "New Year's Day")
+      {:ok, holidays} = holidays_in(:AU, ~o"2028")
+      assert dates_of(holidays, "New Year's Day") == [~o"2028Y1M3D"]
     end
 
     test "a weekday holiday is not shifted" do
       # 26 January 2026 is a Monday — no substitution, one date only.
-      {:ok, holidays} = Holidays.materialise(:AU, ~o"2026")
+      {:ok, holidays} = holidays_in(:AU, ~o"2026")
       assert dates_of(holidays, "Australia Day") == [~o"2026Y1M26D"]
     end
 
@@ -709,13 +750,84 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
+  describe "dates: the day a holiday is observed on" do
+    test "England's 2026 holidays count Boxing Day once, on the day it is observed" do
+      for {dates, count, boxing_day} <- [
+            {:substitute, 8, [~o"2026Y12M28D"]},
+            {:gazetted, 8, [~o"2026Y12M26D"]},
+            {:both, 9, [~o"2026Y12M26D", ~o"2026Y12M28D"]}
+          ] do
+        {:ok, england} =
+          holidays_in(:GB, ~o"2026", subdivision: "ENG", exclude: :observance, dates: dates)
+
+        assert {dates, IntervalSet.count(england)} == {dates, count}
+        assert {dates, dates_of(england, "Boxing Day")} == {dates, boxing_day}
+      end
+    end
+
+    test "an and-if holiday is on its substitute day in place of its own date" do
+      # Christmas 2021 falls on a Saturday, and Australia observes it on Monday
+      # the 27th as well.
+      {:ok, substitute} = holidays_in(:AU, ~o"2021")
+      {:ok, gazetted} = holidays_in(:AU, ~o"2021", dates: :gazetted)
+      {:ok, both} = holidays_in(:AU, ~o"2021", dates: :both)
+
+      assert dates_of(substitute, "Christmas Day") == [~o"2021Y12M27D"]
+      assert dates_of(gazetted, "Christmas Day") == [~o"2021Y12M25D"]
+      assert dates_of(both, "Christmas Day") == [~o"2021Y12M25D", ~o"2021Y12M27D"]
+    end
+
+    test "a substitute entry takes the holiday's own date in the years it is in force" do
+      # Japan's Constitution Day falls on Sunday 3 May 2026 and is
+      # observed on Wednesday the 6th, as it has been since 2007. In 1970, before
+      # Japan observed substitute days, the Sunday was the holiday.
+      {:ok, japan_2026} = holidays_in(:JP, ~o"2026")
+      {:ok, japan_1970} = holidays_in(:JP, ~o"1970")
+
+      assert dates_of(japan_2026, "Constitution Day") == [~o"2026Y5M6D"]
+      assert dates_of(japan_1970, "Constitution Day") == [~o"1970Y5M3D"]
+    end
+
+    test "a replaced holiday's recurrence matches its concrete computation" do
+      holidays = territory_holidays(:JP)
+      entries = for holiday <- holidays, Rule.substitute_entry?(holiday.rule), do: holiday.rule
+      constitution = Enum.find(holidays, &(&1.rule.source == "05-03"))
+
+      rule = Rule.observe(constitution.rule, :substitute, entries)
+      assert length(rule.replaced_by) == 2
+      assert_matches_materialise(rule, 1965..2030)
+    end
+
+    test "a substitute day for one named year is an extra day beside its holiday" do
+      # Children's Day and Buddha's Birthday share Monday 5 May 2025; the
+      # substitute day, Tuesday the 6th, is a day off beside them.
+      {:ok, korea} = holidays_in(:KR, ~o"2025")
+      assert dates_of(korea, "Children's Day") == [~o"2025Y5M5D", ~o"2025Y5M6D"]
+    end
+
+    test "a moved holiday is on its own date only when gazetted dates are asked for" do
+      # The Northern Territory moves Christmas off a Saturday to the Monday.
+      {:ok, moved} = holidays_in(:AU, ~o"2021", subdivision: "NT")
+      {:ok, both} = holidays_in(:AU, ~o"2021", subdivision: "NT", dates: :both)
+      {:ok, gazetted} = holidays_in(:AU, ~o"2021", subdivision: "NT", dates: :gazetted)
+
+      assert dates_of(moved, "Christmas Day") == [~o"2021Y12M27D"]
+      assert dates_of(both, "Christmas Day") == [~o"2021Y12M27D"]
+      assert dates_of(gazetted, "Christmas Day") == [~o"2021Y12M25D"]
+    end
+
+    test "an unknown dates value is an error" do
+      assert {:error, {:invalid_dates, :observed}} = Holidays.holidays(:GB, dates: :observed)
+    end
+  end
+
   describe "US federal holidays" do
     test "projects the 2026 federal holidays" do
       # date-holidays carries all types, so the US set includes observances
       # (Valentine's Day, Tax Day, …) alongside the federal public holidays
       # asserted here. It spells Labor "Labour"; Juneteenth is honoured through
       # its `since 2021` filter.
-      assert {:ok, holidays} = Holidays.materialise(:US, ~o"2026")
+      assert {:ok, holidays} = holidays_in(:US, ~o"2026")
 
       assert ~o"2026Y1M1D" in dates_of(holidays, "New Year's Day")
       assert ~o"2026Y6M19D" in dates_of(holidays, "Juneteenth")
@@ -732,31 +844,25 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "Memorial Day is the last Monday in May" do
-      {:ok, holidays} = Holidays.materialise(:US, ~o"2026")
+      {:ok, holidays} = holidays_in(:US, ~o"2026")
       assert dates_of(holidays, "Memorial Day") == [~o"2026Y5M25D"]
     end
 
     test "a Saturday holiday is observed the prior Friday" do
-      # Independence Day 2026 is Saturday 4 July; the US observes Friday the
-      # 3rd alongside it — the opposite direction to the AU weekend rule.
-      {:ok, holidays} = Holidays.materialise(:US, ~o"2026")
-      assert ~o"2026Y7M3D" in dates_of(holidays, "Independence Day")
+      # Independence Day 2026 is Saturday 4 July; the US observes it on Friday
+      # the 3rd — the opposite direction to the AU weekend rule.
+      {:ok, holidays} = holidays_in(:US, ~o"2026")
+      assert dates_of(holidays, "Independence Day") == [~o"2026Y7M3D"]
     end
 
     test "a Sunday holiday is observed the next Monday" do
-      # New Year's Day 2023 is Sunday 1 January; the observed Monday the 2nd
-      # abuts it, so the two coalesce into a single Jan 1–2 span.
-      {:ok, holidays} = Holidays.materialise(:US, ~o"2023")
+      # New Year's Day 2023 is Sunday 1 January, observed on Monday the 2nd; both
+      # days are separate occurrences when both are asked for.
+      {:ok, holidays} = holidays_in(:US, ~o"2023")
+      assert dates_of(holidays, "New Year's Day") == [~o"2023Y1M2D"]
 
-      assert [interval] =
-               for(
-                 iv <- IntervalSet.to_list(holidays),
-                 Tempo.metadata(iv)[:name] == "New Year's Day",
-                 do: iv
-               )
-
-      assert Tempo.Interval.from(interval) == ~o"2023Y1M1D"
-      assert Tempo.Interval.to(interval) == ~o"2023Y1M3D"
+      {:ok, both} = holidays_in(:US, ~o"2023", dates: :both)
+      assert dates_of(both, "New Year's Day") == [~o"2023Y1M1D", ~o"2023Y1M2D"]
     end
   end
 
@@ -818,22 +924,22 @@ defmodule Tempo.HolidaysTest do
       # In 2022 the Spring bank holiday was moved off the last-Monday-of-May
       # (30 May) to Thursday 2 June for the Platinum Jubilee, expressed in the
       # data as disable 2022-05-30 + enable 2022-06-02.
-      {:ok, holidays} = Holidays.materialise(:GB, ~o"2022")
+      {:ok, holidays} = holidays_in(:GB, ~o"2022")
 
       assert ~o"2022Y6M2D" in dates_of(holidays, "Spring bank holiday")
       refute ~o"2022Y5M30D" in dates_of(holidays, "Spring bank holiday")
 
       # A year the move does not touch keeps the computed last Monday of May.
-      {:ok, holidays_2021} = Holidays.materialise(:GB, ~o"2021")
+      {:ok, holidays_2021} = holidays_in(:GB, ~o"2021")
       assert ~o"2021Y5M31D" in dates_of(holidays_2021, "Spring bank holiday")
     end
 
     test "a disabled occurrence is dropped — GB Early May bank holiday, 2020" do
       # The 2020 Early May bank holiday was disabled (moved to VE Day, 8 May).
-      {:ok, holidays_2020} = Holidays.materialise(:GB, ~o"2020")
+      {:ok, holidays_2020} = holidays_in(:GB, ~o"2020")
       refute ~o"2020Y5M4D" in dates_of(holidays_2020, "Early May bank holiday")
 
-      {:ok, holidays_2021} = Holidays.materialise(:GB, ~o"2021")
+      {:ok, holidays_2021} = holidays_in(:GB, ~o"2021")
       assert ~o"2021Y5M3D" in dates_of(holidays_2021, "Early May bank holiday")
     end
 
@@ -1120,19 +1226,19 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  describe "day_start projection (a day is just a day until projected)" do
-    test "the default :midnight leaves the in-calendar day untouched" do
+  describe "day_start/2 (a day is just a day until projected)" do
+    test ":midnight leaves the in-calendar day untouched" do
       eid = holiday_set("1 Shawwal", "Eid al-Fitr")
       interval = single_interval(eid, ~o"2025", :midnight)
 
       assert Tempo.Interval.from(interval) == ~o"1446Y10M1D[u-ca=islamic-umalqura]"
-      # identical to passing no option at all
-      {:ok, occurrences} = Holidays.materialise(eid, ~o"2025")
-      assert [plain] = IntervalSet.to_list(occurrences)
+      # identical to the occurrence as it converts
+      {:ok, occurrences} = holidays_in(eid, ~o"2025")
+      assert [plain] = IntervalSet.members(occurrences)
       assert plain == interval
     end
 
-    test "a zone-anchored evening begins at 18:00 the evening before" do
+    test "an evening in a zone begins at 18:00 the evening before" do
       # 1 Shawwal 1446 is 30 March 2025; its evening begins 18:00 the 29th.
       interval =
         single_interval(
@@ -1160,7 +1266,7 @@ defmodule Tempo.HolidaysTest do
       assert from.time_zone == "Etc/UTC"
     end
 
-    test "a location-anchored sunset resolves from coordinates alone (no tz_world)" do
+    test "a sunset at a point resolves from its coordinates alone (no tz_world)" do
       interval =
         single_interval(
           holiday_set("1 Shawwal", "Eid al-Fitr"),
@@ -1192,6 +1298,31 @@ defmodule Tempo.HolidaysTest do
       interval = single_interval(holiday_set("12-25", "Christmas"), ~o"2025", :sunset)
 
       assert Tempo.Interval.from(interval) == ~o"2025Y12M25D"
+    end
+
+    test "a lazy set stays lazy" do
+      {:ok, holidays} = Holidays.holidays(:SA, include: :public)
+      {:ok, from_2026} = Tempo.to_interval_set(holidays, within: ~o"2026/..")
+      {:ok, evenings} = Holidays.day_start(from_2026, {:evening, "Asia/Riyadh"})
+
+      refute IntervalSet.bounded?(evenings)
+      assert [_founding_day, eid | _rest] = evenings |> IntervalSet.walk() |> Enum.take(3)
+
+      {:ok, expected} =
+        DateTime.new(~D[2026-03-18], ~T[18:00:00], "Asia/Riyadh", Tz.TimeZoneDatabase)
+
+      assert Tempo.Interval.from(eid) == Tempo.from_elixir(expected)
+    end
+
+    test "an unknown day start, or a value that is not occurrences, is an error" do
+      {:ok, occurrences} = holidays_in(:SA, ~o"2026")
+
+      for day_start <- [:dusk, nil, {:sunset, {200, 0}}, {:evening, ""}, {:sunset, :mecca}] do
+        assert {:error, {:invalid_day_start, ^day_start}} =
+                 Holidays.day_start(occurrences, day_start)
+      end
+
+      assert {:error, {:invalid_occurrences, :nope}} = Holidays.day_start(:nope, :sunset)
     end
   end
 
@@ -1274,7 +1405,7 @@ defmodule Tempo.HolidaysTest do
       {:ok, recurrence} = Rule.recurrence(rule)
       assert Tempo.to_iso8601(recurrence) =~ "[u-ca=vietnamese]"
 
-      {:ok, tet} = Tempo.to_interval(recurrence, bound: ~o"2007")
+      {:ok, tet} = Tempo.to_interval(recurrence, within: ~o"2007")
       assert Tempo.relation(tet, ~o"2007-02-17") == :equals
     end
   end
@@ -1308,12 +1439,12 @@ defmodule Tempo.HolidaysTest do
       # 2026: Respect-for-the-Aged Day (the 21st, 3rd Monday) and the Autumnal
       # Equinox (the 23rd) flank the 22nd, so the Citizens' Holiday falls between
       # them — date-holidays' bridge.
-      {:ok, holidays_2026} = Holidays.materialise(:JP, ~o"2026")
+      {:ok, holidays_2026} = holidays_in(:JP, ~o"2026")
       assert ~o"2026Y9M22D" in dates_of(holidays_2026, "Citizens' Holiday")
 
       # 2025: Respect-for-the-Aged Day is the 15th, so the 22nd is not flanked
       # and the bridge does not occur.
-      {:ok, holidays_2025} = Holidays.materialise(:JP, ~o"2025")
+      {:ok, holidays_2025} = holidays_in(:JP, ~o"2025")
       assert dates_of(holidays_2025, "Citizens' Holiday") == []
     end
 
@@ -1322,23 +1453,23 @@ defmodule Tempo.HolidaysTest do
       # its rule.
       name = "Thursday after 04-02 if is observance holiday then next Thursday"
 
-      {:ok, holidays_2026} = Holidays.materialise(:CH, ~o"2026", division: "GL")
+      {:ok, holidays_2026} = holidays_in(:CH, ~o"2026", subdivision: "GL")
       assert ~o"2026Y4M2D" in dates_of(holidays_2026, "Maundy Thursday")
       assert dates_of(holidays_2026, name) == [~o"2026Y4M9D"]
 
-      {:ok, holidays_2023} = Holidays.materialise(:CH, ~o"2023", division: "GL")
+      {:ok, holidays_2023} = holidays_in(:CH, ~o"2023", subdivision: "GL")
       assert dates_of(holidays_2023, name) == [~o"2023Y4M13D"]
 
-      {:ok, holidays_2025} = Holidays.materialise(:CH, ~o"2025", division: "GL")
+      {:ok, holidays_2025} = holidays_in(:CH, ~o"2025", subdivision: "GL")
       assert dates_of(holidays_2025, name) == [~o"2025Y4M3D"]
     end
 
     test "Otago's anniversary day moves off Easter Monday to the next Monday" do
-      {:ok, holidays_2008} = Holidays.materialise(:NZ, ~o"2008", division: "OTA")
+      {:ok, holidays_2008} = holidays_in(:NZ, ~o"2008", subdivision: "OTA")
       assert ~o"2008Y3M24D" in dates_of(holidays_2008, "Easter Monday")
       assert dates_of(holidays_2008, "Provincial anniversary day") == [~o"2008Y3M31D"]
 
-      {:ok, holidays_2026} = Holidays.materialise(:NZ, ~o"2026", division: "OTA")
+      {:ok, holidays_2026} = holidays_in(:NZ, ~o"2026", subdivision: "OTA")
       assert dates_of(holidays_2026, "Provincial anniversary day") == [~o"2026Y3M23D"]
     end
 
@@ -1392,7 +1523,7 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  describe "locale and state resolution" do
+  describe "locale and subdivision resolution" do
     test "a locale with a subdivision loads the state's holidays" do
       {:ok, national} = Holidays.holidays(:US)
       {:ok, california} = Holidays.holidays(locale: "en-US-u-sd-usca")
@@ -1401,15 +1532,53 @@ defmodule Tempo.HolidaysTest do
       assert "Presidents' Day" in member_names(california)
     end
 
-    test "the division option selects a state — NSW carries King's Birthday" do
-      {:ok, nsw} = Holidays.materialise(:AU, ~o"2026", division: "NSW")
+    test "the subdivision option selects a state — NSW carries King's Birthday" do
+      {:ok, nsw} = holidays_in(:AU, ~o"2026", subdivision: "NSW")
       assert "King's Birthday" in occurrence_names(nsw)
-      assert IntervalSet.metadata(nsw) == %{territory: "AU", division: "NSW"}
+      assert IntervalSet.metadata(nsw) == %{territory: "AU", subdivision: "NSW"}
     end
 
-    test "an unknown state falls back to the country" do
-      {:ok, holidays} = Holidays.holidays(:US, division: "ZZ")
-      assert "New Year's Day" in member_names(holidays)
+    test "a subdivision is found at whichever level the data holds it" do
+      for {territory, code, subdivision} <- [
+            {:GB, "ENG", "ENG"},
+            {:GB, "gb-eng", "ENG"},
+            {:GB, :eng, "ENG"},
+            {:US, "LA", "LA"},
+            {:US, "CA-LA", "CA-LA"},
+            {:DE, "A", "BY-A"},
+            {:NZ, "timaru", "CAN-Timaru"}
+          ] do
+        {:ok, holidays} = Holidays.holidays(territory, subdivision: code)
+
+        assert RecurrenceSet.metadata(holidays) ==
+                 %{territory: Atom.to_string(territory), subdivision: subdivision}
+      end
+    end
+
+    test "England's holidays are England's, not the United Kingdom's" do
+      {:ok, england} = holidays_in(:GB, ~o"2026", subdivision: "ENG")
+      {:ok, scotland} = holidays_in(:GB, ~o"2026", subdivision: "SCT")
+
+      refute "St Andrew’s Day" in occurrence_names(england)
+      assert "St Andrew’s Day" in occurrence_names(scotland)
+    end
+
+    test "an unknown subdivision is an error, not the country's holidays" do
+      for code <- ["ZZ", "", :"", "CA-ZZ", %{}, 12] do
+        assert {:error, {:unknown_subdivision, ^code}} =
+                 Holidays.holidays(:US, subdivision: code)
+      end
+    end
+
+    test "a region code two states share is ambiguous; its path names it" do
+      assert {:error, {:ambiguous_subdivision, "CH"}} = Holidays.holidays(:CL, subdivision: "CH")
+      assert {:ok, _holidays} = Holidays.holidays(:CL, subdivision: "NU-CH")
+    end
+
+    test "an option holidays/2 does not take is an error" do
+      assert {:error, {:invalid_option, :division}} = Holidays.holidays(:GB, division: "ENG")
+      assert {:error, {:invalid_option, :day_start}} = Holidays.holidays(:SA, day_start: :sunset)
+      assert {:error, {:invalid_option, :not_options}} = Holidays.holidays(:GB, :not_options)
     end
   end
 end
