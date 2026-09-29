@@ -4,12 +4,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
-* [ ] **NSW Term 1 of 2031** — the 2030 calendar implies Term 1 of 2031 starts after Australia Day, on Tuesday 28 January, where the rules keep the six-week start, Thursday 30 January, with 199 school days. Revisit when 2031's calendar is published ([plans/nsw-school-holiday-rules.md](plans/nsw-school-holiday-rules.md)).
-
-* [ ] **NSW Anzac Day listed twice** — `holidays(:AU, subdivision: "NSW")` lists Anzac Day twice on 25 April in every year it falls on a weekday: the rules active before and from 2026-04-25 both produce it.
-
-* [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Report it upstream to date-holidays.
-
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
@@ -31,6 +25,12 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
 ## Deferred
+
+* [ ] **NSW Term 1 of 2031** — the 2030 calendar implies Term 1 of 2031 starts after Australia Day, on Tuesday 28 January, where the rules keep the six-week start, Thursday 30 January, with 199 school days. Left as is (user, 2026-09-30): the NSW module is not in good shape for its purpose as a showcase.
+
+* [ ] **NSW Anzac Day listed twice** — `holidays(:AU, subdivision: "NSW")` lists Anzac Day twice on 25 April in every year it falls on a weekday: the rules active before and from 2026-04-25 both produce it. Not reported or fixed (user, 2026-09-30).
+
+* [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 * [ ] **`Thursday before easter -46`** — a weekday relative to a computed Easter *offset* (not to Easter itself); one rule, no compiler tier for it. Accepted `known_unsupported`. Would revive if a second such rule appears.
 
