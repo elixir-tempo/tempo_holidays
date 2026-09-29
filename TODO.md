@@ -4,6 +4,12 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
+* [ ] **NSW school terms and holidays** — a module generating NSW public school terms, holidays and development days for both divisions from the seven rules in [plans/nsw-school-holiday-rules.md](plans/nsw-school-holiday-rules.md), tested against every published calendar (2016–2030), and written as a Tempo showcase that reports each Tempo API gap it meets.
+
+* [ ] **NSW Anzac Day listed twice** — `holidays(:AU, subdivision: "NSW")` lists Anzac Day twice on 25 April in every year it falls on a weekday: the rules active before and from 2026-04-25 both produce it.
+
+* [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Report it upstream to date-holidays.
+
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
