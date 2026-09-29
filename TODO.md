@@ -4,7 +4,7 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
-* [ ] **NSW school terms and holidays** — a module generating NSW public school terms, holidays and development days for both divisions from the seven rules in [plans/nsw-school-holiday-rules.md](plans/nsw-school-holiday-rules.md), tested against every published calendar (2016–2030), and written as a Tempo showcase that reports each Tempo API gap it meets.
+* [ ] **NSW Term 1 of 2031** — the 2030 calendar implies Term 1 of 2031 starts after Australia Day, on Tuesday 28 January, where the rules keep the six-week start, Thursday 30 January, with 199 school days. Revisit when 2031's calendar is published ([plans/nsw-school-holiday-rules.md](plans/nsw-school-holiday-rules.md)).
 
 * [ ] **NSW Anzac Day listed twice** — `holidays(:AU, subdivision: "NSW")` lists Anzac Day twice on 25 April in every year it falls on a weekday: the rules active before and from 2026-04-25 both produce it.
 
@@ -37,6 +37,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **NSW school terms and holidays** — `Tempo.Holidays.SchoolTerms.NSW`: terms, holidays and development days for both divisions from seven rules, matching every published calendar 2016–2030. 2026-09-29.
 
 * [x] **Everyday-questions livebook** — `livebook/everyday-holidays.livemd`: the next Victorian school holidays, the days until Illinois' Election Day, England's holidays this year and those it shares with Australia, through `holidays/2`; Tempo carries the same livebook with the rules written out. 2026-09-29.
 
