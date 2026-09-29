@@ -314,7 +314,7 @@ defmodule Tempo.Holidays.Rule do
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
       iex> prepared = Tempo.Holidays.Rule.prepare(rule)
-      iex> Tempo.to_iso8601(prepared.recurrence)
+      iex> Tempo.to_iso8601!(prepared.recurrence)
       "R/../P1Y/FL12M25DN"
 
   """
@@ -435,22 +435,22 @@ defmodule Tempo.Holidays.Rule do
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25")
       iex> {:ok, recurrence} = Tempo.Holidays.Rule.recurrence(rule)
-      iex> Tempo.to_iso8601(recurrence)
+      iex> Tempo.to_iso8601!(recurrence)
       "R/../P1Y/FL12M25DN"
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25 since 2020 until 2025")
       iex> {:ok, recurrence} = Tempo.Holidays.Rule.recurrence(rule)
-      iex> Tempo.to_iso8601(recurrence)
+      iex> Tempo.to_iso8601!(recurrence)
       "R/{2020Y..2024Y}/P1Y/FL12M25DN"
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25 and if saturday, sunday then next monday")
       iex> {:ok, recurrence} = Tempo.Holidays.Rule.recurrence(rule)
-      iex> Enum.map(recurrence.members, &Tempo.to_iso8601/1)
+      iex> Enum.map(recurrence.members, &Tempo.to_iso8601!/1)
       ["R/../P1Y/FL12M25DN", "R/../P1Y/FLLL12M25D{6..7}KN/P8DN1K-1IN"]
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
       iex> {:ok, bridge} = Tempo.Holidays.Rule.recurrence(rule)
-      iex> {Tempo.to_iso8601(bridge.member), Enum.map(bridge.at, &Tempo.to_iso8601/1), bridge.falls_on}
+      iex> {Tempo.to_iso8601!(bridge.member), Enum.map(bridge.at, &Tempo.to_iso8601!/1), bridge.falls_on}
       {"R/../P1Y/FL9M22DN", ["P-1D", "P1D"], %{type: :public}}
 
   """
@@ -1470,7 +1470,7 @@ defmodule Tempo.Holidays.Rule do
 
       iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("12-25 and if saturday, sunday then next monday")
       iex> {:ok, recurrence} = rule |> Tempo.Holidays.Rule.observe(:substitute, []) |> Tempo.Holidays.Rule.recurrence()
-      iex> Enum.map(recurrence.members, &Tempo.to_iso8601/1)
+      iex> Enum.map(recurrence.members, &Tempo.to_iso8601!/1)
       ["R/../P1Y/FL12M25D{1..5}KN", "R/../P1Y/FLLL12M25D{6..7}KN/P8DN1K-1IN"]
 
   """

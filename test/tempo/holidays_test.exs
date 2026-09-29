@@ -128,8 +128,8 @@ defmodule Tempo.HolidaysTest do
   # A rule's recurrence as ISO 8601 — one string per member.
   defp members_iso(rule) do
     case Rule.recurrence(rule) do
-      {:ok, %Tempo.RecurrenceSet{members: members}} -> Enum.map(members, &Tempo.to_iso8601/1)
-      {:ok, recurrence} -> [Tempo.to_iso8601(recurrence)]
+      {:ok, %Tempo.RecurrenceSet{members: members}} -> Enum.map(members, &Tempo.to_iso8601!/1)
+      {:ok, recurrence} -> [Tempo.to_iso8601!(recurrence)]
     end
   end
 
@@ -301,8 +301,8 @@ defmodule Tempo.HolidaysTest do
 
       assert Tempo.metadata(bridge)[:id] == "09-22 if 09-21 and 09-23 is public holiday"
       assert %Conditional{falls_on: %{type: :public}, at: [day_before, day_after]} = bridge
-      assert {Tempo.to_iso8601(day_before), Tempo.to_iso8601(day_after)} == {"P-1D", "P1D"}
-      assert Tempo.to_iso8601(bridge.member) == "R/../P1Y/FL9M22DN"
+      assert {Tempo.to_iso8601!(day_before), Tempo.to_iso8601!(day_after)} == {"P-1D", "P1D"}
+      assert Tempo.to_iso8601!(bridge.member) == "R/../P1Y/FL9M22DN"
     end
 
     test "every conditional rule in the data is a conditional member" do
@@ -1403,7 +1403,7 @@ defmodule Tempo.HolidaysTest do
       # Chinese calendar, so it is named by Calendrical's own identifier.
       {:ok, rule} = Compiler.compile("vietnamese 1-0-1")
       {:ok, recurrence} = Rule.recurrence(rule)
-      assert Tempo.to_iso8601(recurrence) =~ "[u-ca=vietnamese]"
+      assert Tempo.to_iso8601!(recurrence) =~ "[u-ca=vietnamese]"
 
       {:ok, tet} = Tempo.to_interval(recurrence, within: ~o"2007")
       assert Tempo.relation(tet, ~o"2007-02-17") == :equals
