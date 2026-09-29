@@ -32,6 +32,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Done
 
+* [x] **Everyday-questions livebook** — `livebook/everyday-holidays.livemd`: the next Victorian school holidays, the days until Illinois' Election Day, England's holidays this year and those it shares with Australia, through `holidays/2`; Tempo carries the same livebook with the rules written out. 2026-09-29.
+
 * [x] **Tempo 2.0 vocabulary** — on Tempo `main`: `materialise/3` gone for `holidays/2` then `Tempo.to_interval_set/2`; `day_start/2` over occurrences; one `:subdivision`; `dates: :substitute | :gazetted | :both`; a period split over the year end is one member; a dated period keeps its length. 2026-09-29.
 
 * [x] **`holidays/2`, selected by type** — `recurrences/2` renamed `holidays/2`; `:include` / `:exclude` keep and leave out holiday types (a type or a list, `:exclude` winning), on `materialise/3` too; a kept conditional carries the holidays it depends on, so a selection never changes a date. 2026-09-28.

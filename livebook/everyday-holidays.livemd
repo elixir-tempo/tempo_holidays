@@ -1,0 +1,123 @@
+# Everyday holiday questions
+
+```elixir
+Mix.install(
+  [
+    {:tempo_holidays, "~> 0.1"},
+    {:kino, "~> 0.14"}
+  ],
+  config: [elixir: [time_zone_database: Tz.TimeZoneDatabase]]
+)
+
+import Tempo.Sigils
+```
+
+## The questions
+
+A calendar is asked the same everyday questions again and again: when are the next school holidays, how many days until Election Day, how many public holidays does England have this year, and which of them does it share with Australia. Each answer here is a short sentence of Tempo — a window, a set operation, a count — over a territory's holidays, which `tempo_holidays` gives for every territory in the [date-holidays](https://github.com/commenthol/date-holidays) dataset.
+
+Tempo's own copy of this notebook asks the same questions of holidays written out by hand, each as its ISO 8601 rule beside a description of the holiday. Here the rules come from the data.
+
+## Today
+
+Every question starts from today, and today depends on where it is asked: at breakfast in Melbourne it is still yesterday in London. `Tempo.today/1` gives the date in a zone, as a date with no zone of its own, so it compares with a holiday — which has none either.
+
+```elixir
+today = Tempo.today("Australia/Melbourne")
+```
+
+The holidays ahead of today are those that overlap the window from today on — an open-ended window, which has a start and no end.
+
+```elixir
+from_today = Tempo.Interval.new!(from: today)
+```
+
+## When are the next Victorian school holidays?
+
+Victoria's school holidays are a subdivision's holidays of the `:school` type: the breaks between its four school terms, the summer break running over the new year as one period.
+
+```elixir
+{:ok, victoria} = Tempo.Holidays.holidays(:AU, subdivision: "VIC", include: :school)
+
+{:ok, holidays_ahead} = Tempo.to_interval_set(victoria, within: from_today)
+next_break = Tempo.IntervalSet.first(holidays_ahead)
+```
+
+> *"Victoria's school holidays **ahead** are those in the window from today on; the **next break** is the first of them — the one under way, when today falls in one."*
+
+```elixir
+Tempo.metadata(next_break).name
+```
+
+## How many days until the next US Election Day?
+
+US federal elections are held on Election Day, the Tuesday after the first Monday in November in even-numbered years, and several states make it a public holiday — Illinois among them.
+
+```elixir
+{:ok, illinois} = Tempo.Holidays.holidays(:US, subdivision: "IL", include: :public)
+{:ok, holidays_ahead} = Tempo.to_interval_set(illinois, within: from_today)
+
+next_election =
+  holidays_ahead
+  |> Tempo.IntervalSet.walk()
+  |> Enum.find(&(Tempo.metadata(&1).name == "Election Day"))
+
+{:ok, days_to_go} = Tempo.duration(today, Tempo.Interval.from(next_election))
+```
+
+> *"The **next election** is the first of Illinois' holidays ahead named Election Day, and **days to go** is how long it is from today until then — counted in days, because both are days."*
+
+## How many public holidays does England have this year?
+
+England is a subdivision of the United Kingdom's data, with holidays of its own. A holiday whose date falls on a weekend is observed on a substitute day, and it is given on that day, in place of its own date, unless the `:dates` option asks otherwise.
+
+```elixir
+this_year = Tempo.trunc(today, :year)
+
+{:ok, england} = Tempo.Holidays.holidays(:GB, subdivision: "ENG", include: :public)
+{:ok, england_this_year} = Tempo.to_interval_set(england, within: this_year)
+Tempo.IntervalSet.count(england_this_year)
+```
+
+> *"England's **holidays this year** are its public holidays within this year, and there are this many of them: a holiday on a weekend is counted once, on the day it is observed."*
+
+```elixir
+Kino.DataTable.new(england_this_year)
+```
+
+Asked for both dates — its own and its substitute day — a holiday on a weekend is there twice.
+
+```elixir
+{:ok, both_dates} =
+  Tempo.Holidays.holidays(:GB, subdivision: "ENG", include: :public, dates: :both)
+
+{:ok, both_dates_this_year} = Tempo.to_interval_set(both_dates, within: this_year)
+Tempo.IntervalSet.count(both_dates_this_year)
+```
+
+## Which of them does England share with Australia?
+
+Australia's national public holidays are the country's without a subdivision; most states add their own.
+
+```elixir
+{:ok, australia} = Tempo.Holidays.holidays(:AU, include: :public)
+{:ok, australia_this_year} = Tempo.to_interval_set(australia, within: this_year)
+
+{:ok, shared} = Tempo.intersection(england_this_year, australia_this_year, metadata: :merge)
+
+Kino.DataTable.new(shared)
+```
+
+> *"The holidays England **shares** with Australia are the days both have off: the **intersection** of England's holidays this year and Australia's."*
+
+## Any other year
+
+The holidays are rules, not a list of dates, so the same questions answer for any other year: England's holidays in 2027 are its rules within 2027, and the days it shares with Australia then are the intersection of the two. In 2027 Christmas falls on a Saturday, so both countries observe it on the Monday and Boxing Day on the Tuesday.
+
+```elixir
+{:ok, england_2027} = Tempo.to_interval_set(england, within: ~o"2027")
+{:ok, australia_2027} = Tempo.to_interval_set(australia, within: ~o"2027")
+{:ok, shared_2027} = Tempo.intersection(england_2027, australia_2027, metadata: :merge)
+
+Kino.DataTable.new(shared_2027)
+```

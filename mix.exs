@@ -80,6 +80,7 @@ defmodule Tempo.Holidays.MixProject do
         "README.md",
         "guides/user-guide.md",
         "guides/conformance.md",
+        "livebook/everyday-holidays.livemd",
         "CHANGELOG.md"
       ],
       groups_for_modules: [

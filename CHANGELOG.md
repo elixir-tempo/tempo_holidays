@@ -16,6 +16,8 @@ First release. Public holidays for every territory in the [date-holidays](https:
 
 * `Tempo.Holidays.day_start/2` projects the occurrences of a holiday whose day begins at sunset onto the evening before, at sunset or 18:00, at the calendar's reference place or a location of your own.
 
+* The livebook `everyday-holidays.livemd` answers everyday holiday questions — the next school holidays, the days until Election Day, a year's holidays and those two countries share — through `holidays/2`.
+
 * Requires a time zone database, as Tempo does for its zone work (`config :elixir, :time_zone_database, Tz.TimeZoneDatabase`); the application refuses to start without one.
 
 * Over 99% conformant with the date-holidays fixture corpus (`mix test --include conformance`).
