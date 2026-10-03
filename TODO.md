@@ -6,6 +6,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
+* [ ] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list, exact for 2001–2099, plus two `:public` `Election Day` members no type selection leaves out; they are always Sundays, so business-day counts are right and only a listing differs. `holidays/2` has no way to leave a holiday out by its `:id` or `:name`. Analysis in Tempo's [plans/anbima-calendar.md](https://github.com/elixir-tempo/tempo/blob/main/plans/anbima-calendar.md).
+
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
 
 * [ ] **Substitute entries paired per call** — `holidays/2` rebuilds, on each call, the recurrences of the holidays a `substitutes …` entry stands in for (Japan's four take about 12 ms, Britain's three 2 ms), where every rule's own `dates:` forms are prepared at load. The pairing reads the subdivision's merged list, so preparing it means preparing each subdivision's.
