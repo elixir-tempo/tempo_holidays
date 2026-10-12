@@ -4,6 +4,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
+* [ ] **`day_start/2` no longer tells a holiday whose day begins at sunset inside a set** — `Tempo.to_interval_set/2` now answers a set in one calendar (Tempo 2.0: a set's members are brought to its first member's), so an Islamic or Hebrew holiday beside Gregorian ones arrives as a Gregorian day and `project_occurrence/2`, which reads the day's calendar, leaves it at midnight. Two tests fail on it: the `day_start/2` doctest and "a lazy set stays lazy". It needs the user's decision on what tells such a day once its calendar is gone, the rule's calendar carried in the occurrence's metadata being one way. Found 2026-10-12.
+
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list, exact for 2001–2099, plus two `:public` `Election Day` members no type selection leaves out; they are always Sundays, so business-day counts are right and only a listing differs. `holidays/2` has no way to leave a holiday out by its `:id` or `:name`. Analysis in Tempo's [plans/anbima-calendar.md](https://github.com/elixir-tempo/tempo/blob/main/plans/anbima-calendar.md).
@@ -39,6 +41,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Year gates in the calendar of the rule** — Tempo 2.0 reads a recurrence's domain in the recurrence's calendar, so the Gregorian year gates of the 16 rules of another calendar (`since`, `prior to`, `active`, `disable`) are converted when each member is built, to the years of the rule's calendar whose occurrence falls in them; a parity, leap or every-N gate beside such a rule has no recurrence. A solar term is asked of `[u-ca=gregory]`, Tempo's default calendar having none, and `Tempo.bounded?/1` replaces the removed `Tempo.IntervalSet.bounded?/1`. Conformance unchanged: 168,186 matched, 0 mismatched. 2026-10-12.
 
 * [x] **NSW school terms and holidays** — `Tempo.Holidays.SchoolTerms.NSW`: terms, holidays and development days for both divisions from seven rules, matching every published calendar 2016–2030. 2026-09-29.
 

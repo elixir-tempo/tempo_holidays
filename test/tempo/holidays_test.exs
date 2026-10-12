@@ -553,6 +553,63 @@ defmodule Tempo.HolidaysTest do
       assert_matches_materialise(rule, 2014..2016)
     end
 
+    test "a `since` year beside a rule of another calendar is a year of that calendar" do
+      # A domain is in its recurrence's calendar, so the gate is the Hebrew
+      # year whose 12 Cheshvan falls in the Gregorian 1997: 5758.
+      rule = compiled("12 Cheshvan if Friday,Saturday then previous Thursday since 1997")
+
+      assert members_iso(rule) == [
+               "R/{5758Y..}/P1Y/FL2m12D{1..4,7}KN[u-ca=hebrew]",
+               "R/{5758Y..}/P1Y/FLLL2m12D{5..6}KN/P-7DN4K1IN[u-ca=hebrew]"
+             ]
+
+      assert_matches_materialise(rule, 1994..2000)
+    end
+
+    test "a `prior to` year beside a rule of another calendar is a year of that calendar" do
+      # 25 December of the Julian 2022 is 7 January 2023, a year the rule is
+      # not in, so the last year it is in is the Julian 2021.
+      rule = compiled("julian 12-25 prior to 2023")
+      assert members_iso(rule) == ["R/{..2021Y}/P1Y/FL12M25DN[u-ca=julian]"]
+      assert_matches_materialise(rule, 2019..2025)
+    end
+
+    test "a disabled date beside a rule of another calendar excludes the years that fall in its year" do
+      # 12 Rabi al-awwal of 1436 and of 1437 both fall in 2015. The year 2015
+      # is excluded as both, the first is kept as the date it is, and the
+      # second is moved.
+      rule = compiled("12 Rabi al-awwal", disable: [~D[2015-12-23]], enable: [~D[2015-12-24]])
+
+      assert members_iso(rule) == [
+               "R/{..1435Y,1438Y..}/P1Y/FL3M12DN[u-ca=islamic-umalqura]",
+               "R/{2015Y}/P1Y/FL1M3DN",
+               "R/{2015Y}/P1Y/FL12M24DN"
+             ]
+
+      assert_matches_materialise(rule, 2012..2018)
+    end
+
+    test "an active window beside a rule of another calendar is the years of that calendar" do
+      # The 8th of the 4th Korean month of 4356 is 27 May 2023.
+      rule = compiled("korean 4-0-8", active: [{~D[2023-01-01], nil}])
+      assert [member] = members_iso(rule)
+      assert member =~ ~r/^R\/\{4356Y\.\.\}\/P1Y\//
+      assert_matches_materialise(rule, 2020..2026)
+    end
+
+    test "a year filter beside a rule of another calendar has no recurrence" do
+      # Even years are even Gregorian years, and no years of another calendar,
+      # so the rule is computed a year at a time.
+      rule = compiled("12 Cheshvan in even years")
+
+      assert Rule.recurrence(rule) == {:error, :needs_window}
+      assert Rule.prepare(rule).recurrence == :needs_window
+
+      assert {:ok, [in_2024]} = Rule.materialise(rule, ~o"2024")
+      assert greg(Tempo.Interval.from(in_2024)) == "2024-11-13"
+      assert {:ok, []} = Rule.materialise(rule, ~o"2025")
+    end
+
     test "a non-leap-year rule keeps the common years" do
       rule = compiled("09-11 in non-leap years")
       assert members_iso(rule) == ["R/..c/P1Y/FL9M11DN"]
@@ -1071,12 +1128,14 @@ defmodule Tempo.HolidaysTest do
     test "Qingming is the day the sun reaches 15° ecliptic longitude, in China time" do
       {:ok, rule} = Compiler.compile("chinese 5-01 solarterm")
 
-      # Qingming is 4 April in 2025, 5 April in 2023.
+      # Qingming is 4 April in 2025, 5 April in 2023. A solar term is asked
+      # of a calendar that has them, which Tempo's default calendar does not,
+      # so the day is a day of the Gregorian calendar `[u-ca=gregory]` names.
       assert {:ok, [y2025]} = Rule.materialise(rule, ~o"2025")
-      assert Tempo.Interval.from(y2025) == ~o"2025Y4M4D"
+      assert Tempo.Interval.from(y2025) == Tempo.from_iso8601!("2025Y4M4D[u-ca=gregory]")
 
       assert {:ok, [y2023]} = Rule.materialise(rule, ~o"2023")
-      assert Tempo.Interval.from(y2023) == ~o"2023Y4M5D"
+      assert Tempo.Interval.from(y2023) == Tempo.from_iso8601!("2023Y4M5D[u-ca=gregory]")
     end
   end
 
@@ -1305,7 +1364,7 @@ defmodule Tempo.HolidaysTest do
       {:ok, from_2026} = Tempo.to_interval_set(holidays, within: ~o"2026/..")
       {:ok, evenings} = Holidays.day_start(from_2026, {:evening, "Asia/Riyadh"})
 
-      refute IntervalSet.bounded?(evenings)
+      refute Tempo.bounded?(evenings)
       assert [_founding_day, eid | _rest] = evenings |> IntervalSet.walk() |> Enum.take(3)
 
       {:ok, expected} =

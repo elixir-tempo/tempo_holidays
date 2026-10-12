@@ -408,7 +408,7 @@ defmodule Tempo.Holidays do
   defp project_day_start(occurrences, day_start) do
     metadata = IntervalSet.metadata(occurrences)
 
-    if IntervalSet.bounded?(occurrences) do
+    if Tempo.bounded?(occurrences) do
       occurrences
       |> IntervalSet.members()
       |> Enum.map(&project_occurrence(&1, day_start))

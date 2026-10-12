@@ -33,7 +33,10 @@ defmodule Tempo.Holidays.Rule do
   day + offset`). A multi-day holiday (`count > 1`) adds an `:occurrence_duration`
   span over any of these. Its year gates (`since`/`until`, `active` windows,
   every-N-years, even/odd/leap) become the recurrence's `{…}` domain and a weekday
-  gate a weekday limit; an observed-date substitution or a `disable`/`enable` move
+  gate a weekday limit. The gates are Gregorian years and a domain is in its
+  recurrence's calendar, so beside a rule of another calendar each is written as
+  the years of that calendar whose occurrence falls in it (`12 Cheshvan … since
+  1997` is `{5758Y..}`). An observed-date substitution or a `disable`/`enable` move
   makes it a `%Tempo.RecurrenceSet{}` of several. An inter-holiday bridge or
   `if`-holiday move depends on the year's other holidays, so it is a conditional
   member (`Tempo.RecurrenceSet.keep_when/2`, `move_when/2`) wrapping the rule's own
@@ -402,7 +405,10 @@ defmodule Tempo.Holidays.Rule do
   `since`/`until` range, an `active` window and an every-N-years cadence fold into
   the `{…}` year domain (`to_year` is exclusive, the half-open `[from, to)`
   convention), an even/odd/leap rule into the domain's filter, and a weekday gate
-  into a weekday limit (`FL5M4D{2..6}KN`). A holiday with an observed-date
+  into a weekday limit (`FL5M4D{2..6}KN`). A domain is in its recurrence's
+  calendar, so the gates of a rule of another calendar are written in that
+  calendar's years, and one with an even/odd/leap rule or an every-N-years
+  cadence, which count Gregorian years, has no recurrence. A holiday with an observed-date
   substitution is several recurrences at once — the date itself on the weekdays
   that keep it, and a §12.10 window off the date for each clause that moves it
   (`FLLL12M25D{6..7}KN/P8DN1K-1IN`, "the following Monday when Christmas falls on a
@@ -728,8 +734,11 @@ defmodule Tempo.Holidays.Rule do
 
   defp plain_anchor(%__MODULE__{kind: :solar_term, calendar: calendar, count: term, day: day})
        when calendar in [nil, Calendrical.Chinese] and day in [nil, 1] do
+    # A solar term is asked of a calendar that has them. Tempo's default
+    # calendar has none, so the event is named in the Gregorian calendar of
+    # `[u-ca=gregory]`, whose years and days are the ones the term is a date of.
     case Calendrical.Lunisolar.solar_term_name(term) do
-      {:ok, name} -> {:ok, "(#{name})e", ""}
+      {:ok, name} -> {:ok, "(#{name})e", "[u-ca=gregory]"}
       {:error, _reason} -> :none
     end
   end
@@ -1237,13 +1246,20 @@ defmodule Tempo.Holidays.Rule do
     end
   end
 
-  defp member_days_in(%{domain: %{ranges: []}}, _year), do: {:ok, []}
-
   defp member_days_in(member, year) do
-    with {:ok, recurrence} <- Tempo.from_iso8601(member_iso(member)),
+    case member_iso(member) do
+      {:ok, iso} -> days_in(iso, year)
+      :never -> {:ok, []}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp days_in(iso, year) do
+    with {:ok, recurrence} <- Tempo.from_iso8601(iso),
          {:ok, window} <- Tempo.from_iso8601("#{year}Y"),
          {:ok, set} <- Tempo.to_interval(recurrence, within: window) do
-      set |> Tempo.IntervalSet.members() |> reduce_ok(&occurrence_day_count/1)
+      members = Tempo.IntervalSet.members(set)
+      reduce_ok(members, &occurrence_day_count/1)
     end
   end
 
@@ -1278,10 +1294,16 @@ defmodule Tempo.Holidays.Rule do
   end
 
   # A member whose domain admits no year never occurs, so it is dropped.
-  defp member_recurrence(%{domain: %{ranges: []}}, _rule), do: {:ok, nil}
-
   defp member_recurrence(%{role: role} = member, rule) do
-    with {:ok, recurrence} <- Tempo.from_iso8601(member_iso(member)) do
+    case member_iso(member) do
+      {:ok, iso} -> written_recurrence(iso, role, rule)
+      :never -> {:ok, nil}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp written_recurrence(iso, role, rule) do
+    with {:ok, recurrence} <- Tempo.from_iso8601(iso) do
       {:ok, role_recurrence(role, recurrence, rule)}
     end
   end
@@ -1295,8 +1317,217 @@ defmodule Tempo.Holidays.Rule do
 
   defp role_recurrence(_role, recurrence, _rule), do: recurrence
 
-  defp member_iso(%{shape: shape, domain: domain}),
-    do: "R/#{render_domain(domain)}/P#{domain.cadence}Y/#{shape}"
+  # A member's recurrence as text: `:never` for a member whose domain admits no
+  # year, and an error where its gates have no form in the calendar of its shape.
+  defp member_iso(%{domain: %{ranges: []}}) do
+    :never
+  end
+
+  defp member_iso(%{shape: shape, domain: domain}) do
+    with {:ok, domain} <- domain_of_shape(domain, shape) do
+      written_member(domain, shape)
+    end
+  end
+
+  defp written_member(%{ranges: []}, _shape) do
+    :never
+  end
+
+  defp written_member(domain, shape) do
+    {:ok, "R/#{render_domain(domain)}/P#{domain.cadence}Y/#{shape}"}
+  end
+
+  # ── a gate in the calendar of its shape ───────────────────────────────
+
+  # A rule's gates are Gregorian years: date-holidays computes one Gregorian
+  # year at a time, so `since 1997`, a disabled date and an `active` window all
+  # say which Gregorian years a holiday is in. A recurrence is in one calendar,
+  # its domain with it, so where a member's shape is of another calendar
+  # (`[u-ca=hebrew]`) each gate is converted when the member is built. A
+  # Gregorian year becomes the years of the shape's calendar whose occurrence
+  # starts in it, which Tempo is asked for: `12 Cheshvan … since 1997` is
+  # `{5758Y..}`, and the year a disabled date excludes is the year, or the two,
+  # whose occurrence of the shape falls in it.
+  #
+  # An even/odd or leap filter and an every-N-years step count Gregorian years
+  # and have no form in another calendar, so such a rule has no recurrence and
+  # is computed concretely.
+  defp domain_of_shape(
+         %{ranges: [{nil, nil}], exclusions: [], filter: "", cadence: 1} = domain,
+         _shape
+       ) do
+    {:ok, domain}
+  end
+
+  defp domain_of_shape(domain, shape) do
+    with {:ok, calendar} <- shape_calendar(shape) do
+      domain_in(domain, shape, calendar)
+    end
+  end
+
+  # The calendar a shape's rule is read in: the one its `[u-ca=…]` names, or
+  # the Gregorian the gates are in already.
+  defp shape_calendar(shape) do
+    case Tempo.from_iso8601("R/../P1Y/" <> shape) do
+      {:ok, %Interval{repeat_rule: %Tempo{calendar: calendar}}} -> {:ok, calendar}
+      {:ok, _no_rule} -> {:error, :needs_window}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp domain_in(domain, _shape, Calendar.ISO) do
+    {:ok, domain}
+  end
+
+  defp domain_in(%{filter: filter, cadence: cadence}, _shape, _calendar)
+       when filter != "" or cadence != 1 do
+    {:error, :needs_window}
+  end
+
+  defp domain_in(%{ranges: ranges, exclusions: exclusions} = domain, shape, calendar) do
+    with {:ok, ranges} <- reduce_ok(ranges, &range_in(&1, shape, calendar)),
+         {:ok, excluded} <- reduce_ok(exclusions, &years_in(&1, shape, calendar)) do
+      ranges = Enum.reject(ranges, &empty_range?/1)
+      {:ok, %{domain | ranges: ranges, exclusions: List.flatten(excluded)}}
+    end
+  end
+
+  # An inclusive range of Gregorian years, as the range of years of the shape's
+  # calendar whose occurrences start in it.
+  defp range_in({from, to}, shape, calendar) do
+    with {:ok, first} <- first_year_on_or_after(from, shape, calendar),
+         {:ok, next} <- first_year_on_or_after(year_after(to), shape, calendar) do
+      {:ok, {first, year_before(next)}}
+    end
+  end
+
+  # A Gregorian year, as the years of the shape's calendar whose occurrences
+  # start in it: none, one or two.
+  defp years_in(year, shape, calendar) do
+    with {:ok, {first, last}} <- range_in({year, year}, shape, calendar) do
+      {:ok, Enum.to_list(first..last//1)}
+    end
+  end
+
+  defp year_after(nil) do
+    nil
+  end
+
+  defp year_after(year) do
+    year + 1
+  end
+
+  defp year_before(nil) do
+    nil
+  end
+
+  defp year_before(year) do
+    year - 1
+  end
+
+  defp empty_range?({from, to}) when is_integer(from) and is_integer(to) do
+    from > to
+  end
+
+  defp empty_range?(_open_at_an_end) do
+    false
+  end
+
+  # The first year of the shape's calendar whose occurrence starts on or after
+  # 1 January of a Gregorian year. The year of that calendar the day is in, the
+  # one before it and the one after it are each asked for their occurrence: an
+  # occurrence is in its own year or beside it, and a later year's is later.
+  defp first_year_on_or_after(nil, _shape, _calendar) do
+    {:ok, nil}
+  end
+
+  defp first_year_on_or_after(year, shape, calendar) do
+    with {:ok, new_year} <- Date.new(year, 1, 1),
+         {:ok, there} <- year_in_calendar(new_year, calendar) do
+      years = [there - 1, there, there + 1]
+      sides_of(years, shape, date_days(new_year))
+    end
+  end
+
+  defp sides_of(years, shape, boundary) do
+    with {:ok, sides} <- reduce_ok(years, &side_of(&1, shape, boundary)) do
+      years
+      |> Enum.zip(sides)
+      |> first_after()
+    end
+  end
+
+  defp year_in_calendar(%Date{} = date, calendar) do
+    with {:ok, day} <- Tempo.from_iso8601(Date.to_iso8601(date)),
+         {:ok, there} <- Tempo.to_calendar(day, calendar) do
+      {:ok, Tempo.year(there)}
+    end
+  end
+
+  # Whether a year's occurrence starts before a day, on or after it, or the
+  # year has none. A year with occurrences on both sides of the day has no
+  # place in a range of years.
+  defp side_of(year, shape, boundary) do
+    with {:ok, starts} <- starts_in(year, shape) do
+      starts
+      |> Enum.split_with(&(&1 < boundary))
+      |> side()
+    end
+  end
+
+  defp side({[], []}) do
+    {:ok, :none}
+  end
+
+  defp side({[_ | _], []}) do
+    {:ok, :before}
+  end
+
+  defp side({[], [_ | _]}) do
+    {:ok, :after}
+  end
+
+  defp side({_before, _after}) do
+    {:error, :needs_window}
+  end
+
+  # The day counts of the occurrences a shape has in one year of its calendar.
+  defp starts_in(year, shape) do
+    with {:ok, recurrence} <- Tempo.from_iso8601("R/{#{year}Y}/P1Y/#{shape}"),
+         {:ok, set} <- Tempo.to_interval(recurrence) do
+      members = Tempo.IntervalSet.members(set)
+      reduce_ok(members, &occurrence_day_count/1)
+    end
+  end
+
+  # The first year whose occurrence starts on or after the day. Where none of
+  # the years asked has one, it is the year after the last whose occurrence
+  # starts before it, or the first of the years asked.
+  defp first_after([{earliest, _side} | _rest] = sides) do
+    on_or_after =
+      for {year, :after} <- sides do
+        year
+      end
+
+    before =
+      for {year, :before} <- sides do
+        year
+      end
+
+    first_of(on_or_after, before, earliest)
+  end
+
+  defp first_of([_ | _] = on_or_after, _before, _earliest) do
+    {:ok, Enum.min(on_or_after)}
+  end
+
+  defp first_of([], [_ | _] = before, _earliest) do
+    {:ok, Enum.max(before) + 1}
+  end
+
+  defp first_of([], [], earliest) do
+    {:ok, earliest}
+  end
 
   # One member is the recurrence itself; several are a recurrence set.
   defp assemble([recurrence]), do: recurrence
