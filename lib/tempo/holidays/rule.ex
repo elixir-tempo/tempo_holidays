@@ -1304,8 +1304,25 @@ defmodule Tempo.Holidays.Rule do
 
   defp written_recurrence(iso, role, rule) do
     with {:ok, recurrence} <- Tempo.from_iso8601(iso) do
-      {:ok, role_recurrence(role, recurrence, rule)}
+      recurrence = role_recurrence(role, recurrence, rule)
+      {:ok, in_rule_calendar(recurrence, rule)}
     end
+  end
+
+  # A rule of another calendar than the Gregorian says so on each of its
+  # members, the date a `disable`/`enable` move gives it among them. A set of
+  # occurrences is in one calendar, so the day of an Islamic holiday beside
+  # Gregorian ones is a Gregorian day, and the rule's calendar is what is left
+  # to say that its day begins at sunset (`Tempo.Holidays.day_start/2`).
+  defp in_rule_calendar(%Interval{metadata: metadata} = recurrence, %__MODULE__{
+         calendar: calendar
+       })
+       when is_atom(calendar) and not is_nil(calendar) do
+    %{recurrence | metadata: Map.put(metadata, :calendar, calendar)}
+  end
+
+  defp in_rule_calendar(recurrence, _rule) do
+    recurrence
   end
 
   # The base carries the holiday's span; an observed day is marked, as

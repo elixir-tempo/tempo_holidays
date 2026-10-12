@@ -156,6 +156,16 @@ defmodule Tempo.HolidaysTest do
 
   defp greg(other), do: inspect(other)
 
+  # The Gregorian date an occurrence starts on.
+  defp greg_date(interval) do
+    {:ok, date} =
+      interval
+      |> Tempo.Interval.from()
+      |> Tempo.to_date()
+
+    Date.convert!(date, Calendar.ISO)
+  end
+
   doctest Tempo.Holidays
   doctest Tempo.Holidays.Data
   doctest Tempo.Holidays.Compiler
@@ -1357,6 +1367,51 @@ defmodule Tempo.HolidaysTest do
       interval = single_interval(holiday_set("12-25", "Christmas"), ~o"2025", :sunset)
 
       assert Tempo.Interval.from(interval) == ~o"2025Y12M25D"
+    end
+
+    test "a holiday of a sunset calendar is told by its rule's calendar, in a set of one calendar" do
+      # A set of occurrences is in one calendar, so Eid al-Fitr beside the
+      # Gregorian Founding Day is a Gregorian day. Its rule's calendar, which
+      # each member carries, is what says its day begins the evening before.
+      {:ok, holidays} = Holidays.holidays(:SA, include: :public)
+
+      eid_member =
+        holidays
+        |> RecurrenceSet.members()
+        |> Enum.find(&(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
+
+      assert Tempo.metadata(eid_member).calendar == Calendrical.Islamic.UmmAlQura
+
+      {:ok, in_2026} = Tempo.to_interval_set(holidays, within: ~o"2026")
+      occurrences = IntervalSet.members(in_2026)
+      eid = Enum.find(occurrences, &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
+      founding_day = Enum.find(occurrences, &(Tempo.metadata(&1).name =~ "Founding"))
+
+      assert Tempo.Interval.from(eid).calendar == Calendar.ISO
+      assert Tempo.metadata(eid).calendar == Calendrical.Islamic.UmmAlQura
+      refute Map.has_key?(Tempo.metadata(founding_day), :calendar)
+
+      {:ok, evenings} = Holidays.day_start(in_2026, {:evening, "Asia/Riyadh"})
+      projected = IntervalSet.members(evenings)
+      eid_evening = Enum.find(projected, &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
+
+      {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(eid_evening))
+
+      assert {DateTime.to_date(begins), DateTime.to_time(begins)} ==
+               {Date.add(greg_date(eid), -1), ~T[18:00:00]}
+
+      # A Gregorian holiday is left the day it is.
+      assert Enum.find(projected, &(Tempo.metadata(&1).name =~ "Founding")) == founding_day
+    end
+
+    test "an occurrence that carries no calendar is told by the calendar its day is in" do
+      {:ok, day} = Tempo.to_interval(Tempo.from_iso8601!("1447Y10M1D[u-ca=islamic-umalqura]"))
+      {:ok, set} = IntervalSet.new([day])
+      {:ok, evenings} = Holidays.day_start(set, {:evening, "Asia/Riyadh"})
+      [evening] = IntervalSet.members(evenings)
+
+      {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(evening))
+      assert DateTime.to_time(begins) == ~T[18:00:00]
     end
 
     test "a lazy set stays lazy" do

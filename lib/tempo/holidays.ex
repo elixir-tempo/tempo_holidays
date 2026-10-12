@@ -15,7 +15,8 @@ defmodule Tempo.Holidays do
   to observances). Fixed dates and weekday-in-month holidays are ISO 8601-2
   selections (`FL12M25DN`, `FL6M1K2IN`); Easter-relative holidays are windows
   off the computed `(easter)e` event; Islamic, Hebrew and other calendar
-  holidays are recurrences in their own calendar, returned in it; a holiday
+  holidays are recurrences in their own calendar, which a set of occurrences
+  brings to the one calendar it is in; a holiday
   observed on its own date and a substitute day is a nested set of both; and a
   bridge day or a holiday moved off another is a conditional member
   (`Tempo.RecurrenceSet.keep_when/2`, `move_when/2`), resolved against the
@@ -23,8 +24,9 @@ defmodule Tempo.Holidays do
 
   Each holiday's metadata is `:id` (its date-holidays rule, unique within the
   set, where names repeat), `:name` and `:type`; a substitute day adds
-  `substitute: true`. The set's own metadata names its territory and
-  subdivision.
+  `substitute: true`, and a holiday whose rule is in another calendar than the
+  Gregorian adds `:calendar`, that calendar's module. The set's own metadata
+  names its territory and subdivision.
 
   The primary API is `holidays/2`, and `day_start/2` for the Islamic and Hebrew
   holidays whose day begins at sunset.
@@ -348,10 +350,12 @@ defmodule Tempo.Holidays do
   A day in Tempo is just a day: an Islamic or Hebrew holiday converts to a day
   in its own calendar, which carries no day-start convention. That calendar's
   day begins at sunset, so on the Gregorian timeline the holiday begins the
-  evening before. `day_start/2` projects each occurrence dated in such a
+  evening before. `day_start/2` projects each occurrence of a holiday of such a
   calendar onto the datetime interval from the boundary that begins its first
   day to the one that begins the day after its last; every other occurrence is
-  left as it is.
+  left as it is. A set of occurrences is in one calendar, so a holiday is told
+  by the `:calendar` its metadata carries, the calendar its rule is in, and an
+  occurrence that carries none by the calendar its own day is in.
 
   ### Arguments
 
@@ -386,7 +390,7 @@ defmodule Tempo.Holidays do
       iex> eid = Enum.find(Tempo.IntervalSet.members(evenings), &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
       iex> {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(eid))
       iex> {DateTime.to_date(begins), DateTime.to_time(begins)}
-      {~D[2026-03-18], ~T[18:00:00.000000]}
+      {~D[2026-03-18], ~T[18:00:00]}
 
   """
   @spec day_start(IntervalSet.t(), DayStart.t()) :: {:ok, IntervalSet.t()} | {:error, term()}
@@ -399,7 +403,7 @@ defmodule Tempo.Holidays do
   def day_start(occurrences, _day_start), do: {:error, {:invalid_occurrences, occurrences}}
 
   # A day is just a day until it is projected onto the Gregorian timeline. Each
-  # occurrence dated in a sunset-starting calendar (Islamic, Hebrew) is
+  # occurrence of a holiday of a sunset-starting calendar (Islamic, Hebrew) is
   # projected to the datetime interval that begins when its day begins, keeping
   # its metadata; every other occurrence, and `:midnight`, is left as the civil
   # day it already is. A lazy set is projected as it is walked.
@@ -424,7 +428,7 @@ defmodule Tempo.Holidays do
   end
 
   defp project_occurrence(interval, day_start) do
-    calendar = Tempo.Interval.from(interval).calendar
+    calendar = holiday_calendar(interval)
 
     with true <- sunset_calendar?(calendar),
          {:ok, projected} <- DayStart.project(interval, calendar, day_start) do
@@ -432,6 +436,15 @@ defmodule Tempo.Holidays do
     else
       _midnight_calendar_or_error -> interval
     end
+  end
+
+  # The calendar that says how an occurrence's day begins: the one its
+  # holiday's rule is in, which the occurrence carries as `:calendar`, or else
+  # the calendar the day itself is in. A set of occurrences is in one calendar,
+  # so the day of an Islamic holiday beside Gregorian ones is a Gregorian day.
+  defp holiday_calendar(interval) do
+    metadata = Tempo.metadata(interval)
+    Map.get_lazy(metadata, :calendar, fn -> Tempo.Interval.from(interval).calendar end)
   end
 
   defp sunset_calendar?(calendar) when is_atom(calendar) do

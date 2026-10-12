@@ -86,9 +86,12 @@ defmodule Tempo.Holidays.BuildTest do
     test "materialise defaults to the Chinese meridian when the calendar is absent" do
       rule = %Rule{kind: :solar_term, calendar: nil, count: 5, day: 1}
       assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
-      # Qingming 2026 is 5 April at the Chinese meridian.
-      assert Rule.materialise(%{rule | calendar: Calendrical.Chinese}, ~o"2026") ==
-               {:ok, [interval]}
+
+      # Qingming 2026 is 5 April at the Chinese meridian. A rule that names its
+      # calendar says so on its occurrence, and the day is the same day.
+      assert {:ok, [named]} = Rule.materialise(%{rule | calendar: Calendrical.Chinese}, ~o"2026")
+      assert Tempo.metadata(named) == %{calendar: Calendrical.Chinese}
+      assert Tempo.put_metadata(named, Tempo.metadata(interval)) == interval
     end
   end
 end

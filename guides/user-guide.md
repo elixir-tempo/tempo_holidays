@@ -90,19 +90,19 @@ A selection never changes a date. Glarus' Näfelser Fahrt, a public holiday, mov
 
 ## Holidays are intervals
 
-Every occurrence is a `Tempo.Interval` — a half-open span, not an instant — so a multi-day holiday is one interval. A period date-holidays splits over the year end, because its data cannot run one past it, is one member too: Victoria's summer school holidays run from 19 December 2026 to 27 January 2027, 31 December included. Dates in a non-Gregorian calendar are returned *in that calendar*: an Islamic holiday converts to an Umm al-Qura date, a Chinese one to a date in the Chinese calendar.
+Every occurrence is a `Tempo.Interval` — a half-open span, not an instant — so a multi-day holiday is one interval. A period date-holidays splits over the year end, because its data cannot run one past it, is one member too: Victoria's summer school holidays run from 19 December 2026 to 27 January 2027, 31 December included. A holiday's rule is in its own calendar — an Islamic holiday is an Umm al-Qura date, a Chinese one a date in the Chinese calendar — and a set of occurrences is in one calendar, so beside Gregorian holidays it arrives as the Gregorian days it falls on. Its metadata keeps the calendar its rule is in, as `:calendar`.
 
 ```elixir
 {:ok, saudi} = Tempo.Holidays.holidays(:SA)
 {:ok, this_year} = Tempo.to_interval_set(saudi, within: ~o"2026")
-# Eid al-Fitr lands as ~o"1447Y9M30D/10M4D[u-ca=islamic-umalqura]", an Umm al-Qura span
+# Eid al-Fitr lands as ~o"2026Y3M19D/23D", with calendar: Calendrical.Islamic.UmmAlQura in its metadata
 ```
 
 The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days.
 
 ## Day starts
 
-An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just a day; `Tempo.Holidays.day_start/2` projects the occurrences dated in those calendars onto the evening their day begins.
+An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just a day; `Tempo.Holidays.day_start/2` projects the occurrences of a holiday of those calendars, which it tells by the `:calendar` in their metadata, onto the evening their day begins.
 
 ```elixir
 {:ok, evenings} = Tempo.Holidays.day_start(this_year, {:evening, "Asia/Riyadh"})
