@@ -16,7 +16,7 @@ defmodule Tempo.Holidays.Fixtures do
 
   @type holiday :: %{
           rule: term(),
-          date: String.t(),
+          date: Date.t() | nil,
           name: String.t(),
           type: String.t(),
           substitute: boolean()
@@ -109,13 +109,25 @@ defmodule Tempo.Holidays.Fixtures do
     for entry <- :json.decode(content) do
       %{
         rule: entry["rule"],
-        date: String.slice(entry["date"] || "", 0, 10),
+        date: fixture_date(entry["date"]),
         name: entry["name"],
         type: entry["type"],
         substitute: entry["substitute"] == true
       }
     end
   end
+
+  # date-holidays writes a holiday's local start, `2026-01-01 00:00:00`, with
+  # an offset after it where the day starts at another hour
+  # (`2026-03-20 18:00:00 -0600`); the date is the day it falls on.
+  defp fixture_date(<<date::binary-size(10), _time::binary>>) do
+    case Date.from_iso8601(date) do
+      {:ok, date} -> date
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp fixture_date(_absent), do: nil
 
   # "US-2026" -> {"US", 2026}; "US-CA-2026" -> {"US-CA", 2026}
   defp split(base) do

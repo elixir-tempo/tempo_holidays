@@ -91,7 +91,7 @@ defmodule Tempo.Holidays.Conformance do
     # date and its substitute may come from two different rules), so a rule's
     # computed dates must sit inside the whole fixture's date-set, not equal
     # its own entries exactly.
-    all_dates = holidays |> Enum.map(& &1.date) |> MapSet.new()
+    all_dates = for %{date: %Date{} = date} <- holidays, into: MapSet.new(), do: date
 
     base = %{
       all_dates: all_dates,
@@ -104,7 +104,7 @@ defmodule Tempo.Holidays.Conformance do
     }
 
     holidays
-    |> Enum.filter(&is_binary(&1.rule))
+    |> Enum.filter(&(is_binary(&1.rule) and is_struct(&1.date, Date)))
     |> Enum.group_by(& &1.rule, & &1.date)
     |> Enum.reduce(acc, fn {rule, dates}, acc ->
       check_rule(rule, MapSet.new(dates), base, acc)
@@ -178,12 +178,8 @@ defmodule Tempo.Holidays.Conformance do
     fn days, type -> MapSet.member?(date_types, {days, type}) end
   end
 
-  defp fixture_days(date) do
-    case Date.from_iso8601(date) do
-      {:ok, date} -> Date.to_gregorian_days(date)
-      {:error, _} -> nil
-    end
-  end
+  defp fixture_days(%Date{} = date), do: Date.to_gregorian_days(date)
+  defp fixture_days(nil), do: nil
 
   @fixture_types %{
     "public" => :public,
@@ -263,17 +259,31 @@ defmodule Tempo.Holidays.Conformance do
   defp fixture_members(%{holidays: holidays, rule: rule}) do
     for holiday <- holidays,
         holiday.rule != rule,
-        {:ok, date} <- [Date.from_iso8601(holiday.date)],
+        %Date{} = date <- [holiday.date],
         {:ok, day} <- [Tempo.from_elixir(date)] do
       Tempo.put_metadata(day, %{type: fixture_type(holiday.type)})
     end
   end
 
-  defp to_date_set(intervals), do: intervals |> Enum.map(&gregorian/1) |> MapSet.new()
+  # An occurrence with no date is kept in the set as itself, where it matches
+  # no date of the fixture's and is reported with the mismatch.
+  defp to_date_set(intervals), do: MapSet.new(intervals, &date_or_itself/1)
+
+  defp date_or_itself(interval) do
+    case date_of(interval) do
+      {:ok, date} -> date
+      {:error, _reason} -> {:no_date, interval}
+    end
+  end
 
   # The window keeps every occurrence that overlaps it; date-holidays lists a
-  # holiday in the year it starts in.
-  defp starts_in?(interval, year), do: String.starts_with?(gregorian(interval), "#{year}-")
+  # holiday in the year it starts in. One with no date is kept, to be reported.
+  defp starts_in?(interval, year) do
+    case date_of(interval) do
+      {:ok, date} -> date.year == year
+      {:error, _reason} -> true
+    end
+  end
 
   defp record(acc, context, detail) do
     feature = feature(context.rule)
@@ -301,16 +311,13 @@ defmodule Tempo.Holidays.Conformance do
   defp accepted_divergence?(:islamic), do: true
   defp accepted_divergence?(_feature), do: false
 
-  # ── our Gregorian date for one materialised interval ────────────────
+  # ── our date for one materialised interval ──────────────────────────
 
-  defp gregorian(interval) do
-    with tempo <- Tempo.Interval.from(interval),
-         {:ok, date} <- Tempo.to_date(tempo),
-         {:ok, gregorian} <- Date.convert(date, Calendrical.Gregorian) do
-      Calendar.strftime(gregorian, "%Y-%m-%d")
-    else
-      _ -> "??"
-    end
+  # The day an occurrence starts on, in the calendar of the fixture's dates
+  # (`Calendar.ISO`), so the two are compared as dates.
+  defp date_of(interval) do
+    with {:ok, date} <- Tempo.to_date(Tempo.Interval.from(interval)),
+         do: Date.convert(date, Calendar.ISO)
   end
 
   # ── bookkeeping ─────────────────────────────────────────────────────
