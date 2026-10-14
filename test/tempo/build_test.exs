@@ -91,7 +91,7 @@ defmodule Tempo.Holidays.BuildTest do
       # calendar says so on its occurrence, and the day is the same day.
       assert {:ok, [named]} = Rule.materialise(%{rule | calendar: Calendrical.Chinese}, ~o"2026")
       assert Tempo.metadata(named) == %{calendar: Calendrical.Chinese}
-      assert Tempo.put_metadata(named, Tempo.metadata(interval)) == interval
+      assert Tempo.to_elixir(named) == Tempo.to_elixir(interval)
     end
   end
 end

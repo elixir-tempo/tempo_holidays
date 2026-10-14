@@ -10,9 +10,17 @@ defmodule Tempo.Holidays.Application do
 
   @impl true
   def start(_type, _args) do
-    with :ok <- check_time_zone_database(Tempo.TimeZoneDatabase.database()) do
+    with :ok <- check_time_zone_database(time_zone_database()) do
       Supervisor.start_link([], strategy: :one_for_one, name: Tempo.Holidays.Supervisor)
     end
+  end
+
+  # The time zone database Tempo asks, as its README says it is configured:
+  # its own `:time_zone_database`, else Elixir's.
+  @doc false
+  @spec time_zone_database() :: Calendar.time_zone_database()
+  def time_zone_database do
+    Application.get_env(:ex_tempo, :time_zone_database) || Calendar.get_time_zone_database()
   end
 
   @doc false

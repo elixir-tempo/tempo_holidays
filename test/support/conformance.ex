@@ -86,7 +86,7 @@ defmodule Tempo.Holidays.Conformance do
   end
 
   defp check_fixture(%{year: year, holidays: holidays, territory: territory}, acc, indices, limit) do
-    {:ok, year_tempo} = Tempo.from_iso8601("#{year}")
+    {:ok, year_tempo} = Tempo.new(year: year)
     # date-holidays deduplicates dates across a country's entries (an actual
     # date and its substitute may come from two different rules), so a rule's
     # computed dates must sit inside the whole fixture's date-set, not equal
@@ -237,7 +237,7 @@ defmodule Tempo.Holidays.Conformance do
   # same entries (`context.present`).
   defp resolve_conditional(compiled, context) do
     case Rule.recurrence(compiled) do
-      {:ok, %Tempo.RecurrenceSet.Conditional{} = conditional} ->
+      {:ok, %Tempo{} = conditional} ->
         resolve_in_set(conditional, context)
 
       _no_conditional_member ->
@@ -251,7 +251,7 @@ defmodule Tempo.Holidays.Conformance do
     under_test = Tempo.put_metadata(conditional, %{under_test: true})
     holidays = Tempo.RecurrenceSet.new!([under_test | fixture_members(context)])
 
-    with {:ok, occurrences} <- Tempo.to_interval_set(holidays, within: context.year_tempo) do
+    with {:ok, occurrences} <- Tempo.to_interval(holidays, within: context.year_tempo) do
       {:ok,
        occurrences
        |> Tempo.IntervalSet.members()
@@ -263,8 +263,9 @@ defmodule Tempo.Holidays.Conformance do
   defp fixture_members(%{holidays: holidays, rule: rule}) do
     for holiday <- holidays,
         holiday.rule != rule,
-        {:ok, date} <- [Date.from_iso8601(holiday.date)] do
-      Tempo.put_metadata(Tempo.from_elixir(date), %{type: fixture_type(holiday.type)})
+        {:ok, date} <- [Date.from_iso8601(holiday.date)],
+        {:ok, day} <- [Tempo.from_elixir(date)] do
+      Tempo.put_metadata(day, %{type: fixture_type(holiday.type)})
     end
   end
 

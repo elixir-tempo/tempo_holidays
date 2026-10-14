@@ -4,6 +4,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
+* [ ] **Back to the published Tempo** — `mix.exs` takes `ex_tempo` from `../tempo` and `mix.lock` Tempo's Localize and Calendrical commits while 2.0 is built; becomes `{:ex_tempo, "~> 2.0"}` once it is on hex.
+
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list, exact for 2001–2099, plus two `:public` `Election Day` members no type selection leaves out; they are always Sundays, so business-day counts are right and only a listing differs. `holidays/2` has no way to leave a holiday out by its `:id` or `:name`. Analysis in Tempo's [plans/anbima-calendar.md](https://github.com/elixir-tempo/tempo/blob/main/plans/anbima-calendar.md).
@@ -39,6 +41,10 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **`day_start/2` beside civil holidays** — a set is of one frame in Tempo 2.0, so the civil days beside projected evenings are the days they are where the day start is read: the zone named, a location's zone, or the reference place of the set's sunset holidays; a lazy set needs a location (Tempo decision 41). 2026-10-14.
+
+* [x] **On Tempo 2.0** — every recurrence is built from its parts (`Tempo.every/2`, `Tempo.selection/1`, `Tempo.new/1`, `Tempo.IntervalSet.new/2`), never written as ISO 8601 text and read; a multi-day holiday is a selection window rather than an `:occurrence_duration` directive; a conditional member is rebuilt from its rule (`Rule.base_recurrence/1`, `:falls_on`) rather than taken apart; NSW counts weeks from Mondays as dates. Tempo's laws change what is written: a date end is read through (`2026Y3M19D/22D`), an open year range is written `{2017Y/..}`, a Hebrew or lunisolar occurrence keeps its traditional month (`7m`). Rules of another calendar beside Gregorian ones are read in the set's calendar (Tempo decision 40). Conformance unchanged: 168,186 matched, 0 mismatched. 2026-10-14.
 
 * [x] **`day_start/2` tells a sunset holiday by its rule's calendar** — the user, 2026-10-12: "carry the rule's calendar in metadata for day_start". Each member built from a rule of another calendar carries `:calendar`, the rule's calendar module, and `day_start/2` reads it, falling back to the calendar of the day itself, since a set of occurrences is now in one calendar. 2026-10-12.
 

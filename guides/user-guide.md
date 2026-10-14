@@ -4,13 +4,13 @@
 
 ## Getting a territory's holidays
 
-`Tempo.Holidays.holidays/2` returns a territory's holidays as a `Tempo.RecurrenceSet`: one member per holiday, tagged with its `:id` (the date-holidays rule, unique where names repeat), `:name` and `:type`. `Tempo.to_interval_set/2` converts them to the holidays in a window — a year, or any interval — as a `Tempo.IntervalSet` of occurrences, earliest first, each tagged the same way.
+`Tempo.Holidays.holidays/2` returns a territory's holidays as a `Tempo.RecurrenceSet`: one member per holiday, tagged with its `:id` (the date-holidays rule, unique where names repeat), `:name` and `:type`. `Tempo.to_interval/2` converts them to the holidays in a window — a year, or any interval — as a set of occurrences, earliest first, each tagged the same way.
 
 ```elixir
 import Tempo.Sigils
 
 {:ok, holidays} = Tempo.Holidays.holidays(:AU)
-{:ok, this_year} = Tempo.to_interval_set(holidays, within: ~o"2026")
+{:ok, this_year} = Tempo.to_interval(holidays, within: ~o"2026")
 
 new_year = Tempo.IntervalSet.first(this_year)
 Tempo.metadata(new_year)
@@ -65,7 +65,7 @@ A holiday whose own date falls on a weekend is often observed on another day. Th
 
 ```elixir
 {:ok, england} = Tempo.Holidays.holidays(:GB, subdivision: "ENG", exclude: :observance)
-{:ok, this_year} = Tempo.to_interval_set(england, within: ~o"2026")
+{:ok, this_year} = Tempo.to_interval(england, within: ~o"2026")
 
 Tempo.IntervalSet.count(this_year)
 # => 8
@@ -90,12 +90,12 @@ A selection never changes a date. Glarus' Näfelser Fahrt, a public holiday, mov
 
 ## Holidays are intervals
 
-Every occurrence is a `Tempo.Interval` — a half-open span, not an instant — so a multi-day holiday is one interval. A period date-holidays splits over the year end, because its data cannot run one past it, is one member too: Victoria's summer school holidays run from 19 December 2026 to 27 January 2027, 31 December included. A holiday's rule is in its own calendar — an Islamic holiday is an Umm al-Qura date, a Chinese one a date in the Chinese calendar — and a set of occurrences is in one calendar, so beside Gregorian holidays it arrives as the Gregorian days it falls on. Its metadata keeps the calendar its rule is in, as `:calendar`.
+Every occurrence is an interval — a span of days, not an instant — so a multi-day holiday is one interval. A period date-holidays splits over the year end, because its data cannot run one past it, is one member too: Victoria's summer school holidays run from 19 December 2026 to 27 January 2027, 31 December included. A holiday's rule is in its own calendar — an Islamic holiday is an Umm al-Qura date, a Chinese one a date in the Chinese calendar — and a set of occurrences is in one calendar, so beside Gregorian holidays it arrives as the Gregorian days it falls on. Its metadata keeps the calendar its rule is in, as `:calendar`.
 
 ```elixir
 {:ok, saudi} = Tempo.Holidays.holidays(:SA)
-{:ok, this_year} = Tempo.to_interval_set(saudi, within: ~o"2026")
-# Eid al-Fitr lands as ~o"2026Y3M19D/23D", with calendar: Calendrical.Islamic.UmmAlQura in its metadata
+{:ok, this_year} = Tempo.to_interval(saudi, within: ~o"2026")
+# Eid al-Fitr lands as ~o"2026Y3M19D/22D", with calendar: Calendrical.Islamic.UmmAlQura in its metadata
 ```
 
 The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days.
@@ -110,5 +110,7 @@ An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just 
 ```
 
 > *"Saudi Arabia's holidays this year, each beginning on the **evening** its day begins."*
+
+A set is of one frame, so the other holidays become the days they are where the day start is read — Founding Day a day in Riyadh. Where no holiday is projected, every day is left as it is. A lazy set needs a location, since its sunset holidays are not known ahead.
 
 `:sunset` (true sunset) and `:evening` (an 18:00 proxy) begin the day the evening before, at the calendar's reference place (Mecca, Jerusalem) or at a location of your own, `{:sunset, location}` or `{:evening, location}`, a zone id or a `{longitude, latitude}` point. `:midnight` leaves the occurrences as they are. See `Tempo.Holidays.DayStart`.

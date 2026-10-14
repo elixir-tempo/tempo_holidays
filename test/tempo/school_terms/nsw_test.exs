@@ -113,24 +113,22 @@ defmodule Tempo.Holidays.SchoolTerms.NSWTest do
   # 30 January, with 199 school days, so the summer holidays run two school
   # days longer than the 2030 calendar shows until 2031's is published.
   @projected_days %{
-    {2030, :eastern} => ["2031Y1M28D/29D", "2031Y1M29D/30D"],
-    {2030, :western} => ["2031Y2M4D/5D", "2031Y2M5D/6D"]
+    {2030, :eastern} => ["2031Y1M28D", "2031Y1M29D"],
+    {2030, :western} => ["2031Y2M4D", "2031Y2M5D"]
   }
 
   defp school_days do
     {:ok, public_holidays} = Tempo.Holidays.holidays(:AU, subdivision: "NSW", include: :public)
-    Tempo.workdays(:AU, except: public_holidays)
+    Tempo.workdays!(:AU, except: public_holidays)
   end
 
   defp day(iso), do: Tempo.from_iso8601!(iso)
 
-  defp run({first, last}), do: Interval.new!(from: day(first), through: day(last))
+  defp run({first, last}), do: Interval.new!(from: day(first), to: day(last))
 
   # A term, as its first and last days in ISO 8601.
-  defp first_and_last(%Interval{} = term) do
-    last_day = term |> Interval.to() |> Tempo.shift(~o"-P1D")
-    {Tempo.to_iso8601!(Interval.from(term)), Tempo.to_iso8601!(last_day)}
-  end
+  defp first_and_last(%Tempo{} = term),
+    do: {Tempo.to_iso8601!(Interval.from(term)), Tempo.to_iso8601!(Interval.to(term))}
 
   defp first_and_last({first, last}),
     do: {Tempo.to_iso8601!(day(first)), Tempo.to_iso8601!(day(last))}
@@ -207,7 +205,7 @@ defmodule Tempo.Holidays.SchoolTerms.NSWTest do
                [:autumn, :winter, :spring, :summer]
 
       assert holidays |> IntervalSet.members() |> List.last() |> Tempo.to_iso8601!() ==
-               "2026Y12M18D/2027Y1M28D"
+               "2026Y12M18D/2027Y1M27D"
     end
   end
 
@@ -247,7 +245,7 @@ defmodule Tempo.Holidays.SchoolTerms.NSWTest do
     test "the 199-day threshold: 2027 keeps the six-week start with 199, 2029 would have 198" do
       school_days = school_days()
       {:ok, terms_2027} = NSW.terms(2027)
-      assert Tempo.count_workdays(terms_2027, school_days) == 199
+      assert Tempo.count_workdays(terms_2027, school_days) == {:ok, 199}
 
       # Six weeks after Term 4 of 2028 ended is Thursday 1 February 2029, which
       # would leave the year 198 school days: Term 1 starts after Australia Day.
@@ -256,7 +254,7 @@ defmodule Tempo.Holidays.SchoolTerms.NSWTest do
       six_weeks_start = Interval.new!(from: ~o"2029-02-01", to: Interval.to(term_1))
 
       {:ok, six_weeks_year} = IntervalSet.new([six_weeks_start | later_terms])
-      assert Tempo.count_workdays(six_weeks_year, school_days) == 198
+      assert Tempo.count_workdays(six_weeks_year, school_days) == {:ok, 198}
       assert Interval.from(term_1) == ~o"2029Y1M29D"
     end
 

@@ -103,7 +103,7 @@ defmodule Tempo.Holidays.DayStart do
 
   ### Arguments
 
-  * `interval` is a materialised occurrence, an in-calendar `t:Tempo.Interval.t/0`
+  * `interval` is a materialised occurrence, an in-calendar interval of days
     (an Islamic or Hebrew day, possibly spanning several days).
 
   * `calendar` is the occurrence's Calendrical calendar module, used to choose the
@@ -140,7 +140,7 @@ defmodule Tempo.Holidays.DayStart do
       ~D[2025-03-29]
 
   """
-  @spec project(Interval.t(), module(), t()) :: {:ok, Interval.t()} | {:error, term()}
+  @spec project(Tempo.t(), module(), t()) :: {:ok, Tempo.t()} | {:error, term()}
   def project(interval, _calendar, :midnight), do: {:ok, interval}
 
   def project(interval, calendar, day_start) do
@@ -151,12 +151,38 @@ defmodule Tempo.Holidays.DayStart do
 
   defp projected(interval, _calendar, :midnight), do: {:ok, interval}
 
+  # The occurrence's days begin at the boundary of the evening before its
+  # first, and end at the boundary of the evening of its last.
   defp projected(interval, calendar, {boundary, location}) do
-    with {:ok, from_date} <- gregorian_date(Interval.from(interval)),
-         {:ok, to_date} <- gregorian_date(Interval.to(interval)),
-         {:ok, from_instant} <- instant(boundary, Date.add(from_date, -1), location, calendar),
-         {:ok, to_instant} <- instant(boundary, Date.add(to_date, -1), location, calendar) do
-      Interval.new(Tempo.from_elixir(from_instant), Tempo.from_elixir(to_instant))
+    with {:ok, %Date.Range{first: first, last: last}} <- Tempo.to_elixir(interval),
+         {:ok, first_date} <- Date.convert(first, Calendar.ISO),
+         {:ok, last_date} <- Date.convert(last, Calendar.ISO),
+         {:ok, from_instant} <- instant(boundary, Date.add(first_date, -1), location, calendar),
+         {:ok, to_instant} <- instant(boundary, last_date, location, calendar),
+         {:ok, from} <- Tempo.from_elixir(from_instant),
+         {:ok, to} <- Tempo.from_elixir(to_instant) do
+      Interval.new(from, to)
+    end
+  end
+
+  @doc false
+  # The zone a civil day beside projected occurrences is a day in (decision
+  # 41 of Tempo): the zone named, a location's zone, or, for a bare boundary,
+  # the reference place's of the calendar given. A sunset at a location whose
+  # zone is not found is an instant in UTC, and so are its civil days; an
+  # evening there is not projected, and nor are they.
+  @spec civil_zone(t(), module() | nil) :: {:ok, String.t()} | :none
+  def civil_zone(day_start, calendar), do: day_start |> normalise() |> civil_zone_of(calendar)
+
+  defp civil_zone_of({_boundary, :canonical}, nil), do: :none
+  defp civil_zone_of({_boundary, :canonical}, calendar), do: {:ok, elem(canonical(calendar), 1)}
+  defp civil_zone_of({_boundary, zone}, _calendar) when is_binary(zone), do: {:ok, zone}
+
+  defp civil_zone_of({boundary, location}, _calendar) do
+    case {zone_of(location), boundary} do
+      {nil, :sunset} -> {:ok, "Etc/UTC"}
+      {nil, :evening} -> :none
+      {zone, _boundary} -> {:ok, zone}
     end
   end
 
@@ -182,7 +208,7 @@ defmodule Tempo.Holidays.DayStart do
   end
 
   defp evening_instant(date, zone) do
-    case DateTime.new(date, @evening_time, zone, Tempo.TimeZoneDatabase.database()) do
+    case DateTime.new(date, @evening_time, zone, Tempo.Holidays.Application.time_zone_database()) do
       {:ok, datetime} -> {:ok, datetime}
       {:ambiguous, _first, second} -> {:ok, second}
       {:gap, _just_before, just_after} -> {:ok, just_after}
@@ -243,12 +269,4 @@ defmodule Tempo.Holidays.DayStart do
 
   defp geo_point({longitude, latitude}), do: %Geo.Point{coordinates: {longitude, latitude}}
   defp geo_point(%{coordinates: _} = point), do: point
-
-  # An interval boundary as a proleptic-Gregorian `t:Date.t/0`, from whatever
-  # calendar the day is held in.
-  defp gregorian_date(tempo) do
-    with {:ok, date} <- Tempo.to_date(tempo) do
-      Date.convert(date, Calendar.ISO)
-    end
-  end
 end
