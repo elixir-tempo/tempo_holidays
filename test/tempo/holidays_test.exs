@@ -562,12 +562,14 @@ defmodule Tempo.HolidaysTest do
 
     test "a `since` year beside a rule of another calendar is a year of that calendar" do
       # A domain is in its recurrence's calendar, so the gate is the Hebrew
-      # year whose 12 Cheshvan falls in the Gregorian 1997: 5758.
+      # year whose 12 Cheshvan falls in the Gregorian 1997: 5758. The Hebrew
+      # calendar's weeks begin on Sunday, so its days of the week are Sunday 1
+      # to Saturday 7: Sunday to Thursday are 1 to 5, and Thursday is 5.
       rule = compiled("12 Cheshvan if Friday,Saturday then previous Thursday since 1997")
 
       assert members_iso(rule) == [
-               "R/{5758Y/..}/P1Y/FL2m12D{1..4,7}KN[u-ca=hebrew]",
-               "R/{5758Y/..}/P1Y/FLL2m12D{5..6}KN/P-7D4K1IN[u-ca=hebrew]"
+               "R/{5758Y/..}/P1Y/FL2m12D{1..5}KN[u-ca=hebrew]",
+               "R/{5758Y/..}/P1Y/FLL2m12D{6..7}KN/P-7D5K1IN[u-ca=hebrew]"
              ]
 
       assert_matches_materialise(rule, 1994..2000)

@@ -81,6 +81,9 @@ defmodule Tempo.Holidays.Rule do
 
   @all_weekdays [1, 2, 3, 4, 5, 6, 7]
 
+  # The days of the week by name, in ISO 8601's order, Monday first.
+  @weekday_names [:monday, :tuesday, :wednesday, :thursday, :friday, :saturday, :sunday]
+
   @type kind ::
           :fixed
           | :weekday
@@ -1358,7 +1361,7 @@ defmodule Tempo.Holidays.Rule do
   defp every_year(domain, %{parts: parts, calendar: calendar}) do
     with {:ok, from} <- domain_set(domain, calendar) do
       options =
-        [select: parts, calendar: calendar]
+        [select: named_weekdays(parts), calendar: calendar]
         |> with_option(:from, from)
         |> with_option(:years, domain.filter)
 
@@ -2455,7 +2458,48 @@ defmodule Tempo.Holidays.Rule do
 
   # A recurrence of every year from its shape, with no start.
   defp yearly(%{parts: parts, calendar: calendar}),
-    do: Tempo.every(days_of_years(1), select: parts, calendar: calendar)
+    do: Tempo.every(days_of_years(1), select: named_weekdays(parts), calendar: calendar)
+
+  # A weekday is numbered here as ISO 8601 numbers it, Monday 1, and Tempo
+  # numbers a day of the week from the day the rule's calendar's weeks
+  # begin on (Sunday 1 in the Hebrew calendar), so each is given to Tempo
+  # by its name, which Tempo numbers in the rule's calendar.
+  defp named_weekdays(parts) when is_list(parts) do
+    Enum.map(parts, &named_weekday_part/1)
+  end
+
+  defp named_weekday_part({:day_of_week, held}) do
+    {:day_of_week, weekday_names(held)}
+  end
+
+  defp named_weekday_part({:selection, parts}) when is_list(parts) do
+    {:selection, named_weekdays(parts)}
+  end
+
+  defp named_weekday_part({:all, each}) when is_list(each) do
+    {:all, Enum.map(each, &named_weekdays/1)}
+  end
+
+  defp named_weekday_part(part) do
+    part
+  end
+
+  defp weekday_names(day) when day in 1..7 do
+    Enum.at(@weekday_names, day - 1)
+  end
+
+  defp weekday_names(%Range{first: first, last: last} = days)
+       when first in 1..7 and last in 1..7 do
+    Enum.map(days, &weekday_names/1)
+  end
+
+  defp weekday_names(days) when is_list(days) do
+    Enum.flat_map(days, &List.wrap(weekday_names(&1)))
+  end
+
+  defp weekday_names(held) do
+    held
+  end
 
   # One day-resolution value becomes its interval, spanning `count` days.
   defp day_interval(%Tempo{} = start, count) when count in [nil, 1],
