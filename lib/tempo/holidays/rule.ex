@@ -2565,7 +2565,7 @@ defmodule Tempo.Holidays.Rule do
   end
 
   defp named_zone_date(%DateTime{} = utc, timezone) do
-    case DateTime.shift_zone(utc, timezone, Tempo.Holidays.Application.time_zone_database()) do
+    case DateTime.shift_zone(utc, timezone, Tempo.time_zone_database()) do
       {:ok, local} -> {:ok, DateTime.to_date(local)}
       {:error, _reason} = error -> error
     end

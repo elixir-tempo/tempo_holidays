@@ -19,11 +19,7 @@ def deps do
 end
 ```
 
-tempo_holidays requires a time zone database, as Tempo does for its zone work, and refuses to start without one. Tz is a dependency, so configure it:
-
-```elixir
-config :elixir, :time_zone_database, Tz.TimeZoneDatabase
-```
+tempo_holidays reads a zone through the time zone database Tempo asks, [`Tempo.time_zone_database/0`](https://hexdocs.pm/ex_tempo/Tempo.html#time_zone_database/0). Tempo comes with Tz and asks it where nothing else is configured, so no configuration is needed. An application that names a database for Tempo with `config :ex_tempo, :time_zone_database` must name one that knows named zones: tempo_holidays refuses to start with `Calendar.UTCOnlyTimeZoneDatabase`.
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can

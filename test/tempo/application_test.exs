@@ -3,7 +3,11 @@ defmodule Tempo.Holidays.ApplicationTest do
 
   alias Tempo.Holidays.Application
 
-  test "a time zone database is required" do
+  test "the database checked is the one Tempo asks, which knows named zones" do
+    assert Application.check_time_zone_database(Tempo.time_zone_database()) == :ok
+  end
+
+  test "a database that knows only UTC is refused" do
     assert {:error, {:time_zone_database_required, message}} =
              Application.check_time_zone_database(Calendar.UTCOnlyTimeZoneDatabase)
 

@@ -103,15 +103,15 @@ defmodule Tempo.Holidays.MixProject do
       # the recurrences need Tempo's unreleased 2.0.0 work. Becomes
       # {:ex_tempo, "~> 2.0"} before publish.
       {:ex_tempo, github: "elixir-tempo/tempo", branch: "main"},
-      # GitHub main during co-development, as in Tempo: the Islamic tier needs
-      # Calendrical's dates_in_gregorian_year, unreleased as of 1.3.0. Becomes
-      # {:calendrical, "~> 1.4"} before publish.
+      # GitHub main during co-development, as in Tempo: Tempo 2.0 and the
+      # Islamic tier need Calendrical 2.0, unreleased. Becomes
+      # {:calendrical, "~> 2.0"} before publish.
       {:calendrical, github: "elixir-localize/calendrical", branch: "main", override: true},
       {:astro, "~> 2.7"},
-      # A time zone database is required, as Tempo needs one for its zone
-      # work: an equinox or solstice in a named IANA zone (Chile's solstice `in
-      # America/Santiago`) resolves through it, and the application refuses to
-      # start without one. Tz is the one Astro and Calendrical already use.
+      # Tz, which Tempo brings and asks where nothing else is configured: an
+      # equinox or solstice in a named IANA zone (Chile's solstice `in
+      # America/Santiago`) resolves through it. Named here as the tests name
+      # `Tz.TimeZoneDatabase`.
       {:tz, "~> 0.28"},
       # Optional: resolves a `{lng, lat}` location to an IANA zone for the
       # `day_start: :evening` projection. A zone id needs no resolver, and
