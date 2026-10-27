@@ -4,7 +4,7 @@ defmodule Tempo.HolidaysTest do
   import Tempo.Sigils
 
   alias Tempo.Holidays
-  alias Tempo.Holidays.{Compiler, Data, Holiday, Rule}
+  alias Tempo.Holidays.{Data, Holiday}
   alias Tempo.IntervalSet
   alias Tempo.RecurrenceSet
 
@@ -50,12 +50,35 @@ defmodule Tempo.HolidaysTest do
   defp holiday_set(holidays) do
     holidays
     |> Enum.map(fn {rule_string, name, type} ->
-      {:ok, rule} = Compiler.compile(rule_string)
-      {:ok, recurrence} = Rule.recurrence(rule)
+      recurrence = read!(rule_string)
       metadata = %{id: rule_string, name: name, type: type}
       Tempo.put_metadata(recurrence, Map.merge(Tempo.metadata(recurrence), metadata))
     end)
     |> RecurrenceSet.new!()
+  end
+
+  # A rule read as `Tempo.Holidays.holidays/2` reads one, with the options of
+  # `Tempo.DateRule.parse/2`.
+  defp read!(rule_string, options \\ []) do
+    Tempo.DateRule.parse!(rule_string, options)
+  end
+
+  # A rule's occurrences that start in a Gregorian year, in its own calendar.
+  defp materialise(expression, year) do
+    {:ok, starting_in(expression, year)}
+  end
+
+  # A recurrence set of public holidays on the given days, beside a member
+  # that is decided by them.
+  defp public_days_with(days, member) do
+    public = for day <- days, do: Tempo.put_metadata(day, %{type: :public})
+    RecurrenceSet.new!(public ++ [member])
+  end
+
+  # The days of the month a set's occurrences in 2026 fall on.
+  defp days_in_2026(set) do
+    {:ok, occurrences} = Tempo.to_interval(set, within: ~o"2026")
+    IntervalSet.map(occurrences, &Tempo.day/1)
   end
 
   defp holiday_set(rule_string, name), do: holiday_set([{rule_string, name, :public}])
@@ -74,9 +97,10 @@ defmodule Tempo.HolidaysTest do
   # The Gregorian ISO dates a rule materialises to that year — useful for a
   # calendar (Vietnamese) whose in-calendar value carries a shared CLDR tag.
   defp gregorian_dates(rule_string, year) do
-    {:ok, rule} = Compiler.compile(rule_string)
-    {:ok, intervals} = Rule.materialise(rule, year)
-    greg_dates(intervals)
+    rule_string
+    |> read!()
+    |> starting_in(year)
+    |> greg_dates()
   end
 
   # The sorted Gregorian ISO dates a list of intervals falls on.
@@ -90,14 +114,9 @@ defmodule Tempo.HolidaysTest do
     |> Enum.sort()
   end
 
-  # The occurrences a rule's `recurrence/1` has that start in `year`: the window
-  # keeps every occurrence that overlaps it, and a holiday belongs to the year
-  # it starts in, as date-holidays counts it.
-  defp recurrence_occurrences(rule, year) do
-    {:ok, recurrence} = Rule.recurrence(rule)
-    starting_in(recurrence, year)
-  end
-
+  # The occurrences of a recurrence that start in `year`: the window keeps
+  # every occurrence that overlaps it, and a holiday belongs to the year it
+  # starts in, as date-holidays counts it.
   defp starting_in(recurrence, year) do
     {:ok, set} = Tempo.to_interval(recurrence, within: year)
     target = Tempo.year(year)
@@ -109,8 +128,8 @@ defmodule Tempo.HolidaysTest do
     end)
   end
 
-  # The Gregorian dates a rule's `recurrence/1` has in `year`.
-  defp recurrence_dates(rule, year), do: greg_dates(recurrence_occurrences(rule, year))
+  # The Gregorian dates a recurrence's occurrences start on in `year`.
+  defp recurrence_dates(recurrence, year), do: greg_dates(starting_in(recurrence, year))
 
   # The sorted `from..to` Gregorian spans of a list of intervals — so a
   # multi-day holiday is compared by its whole extent, not just its start.
@@ -120,31 +139,6 @@ defmodule Tempo.HolidaysTest do
       "#{greg(Tempo.Interval.from(interval))}..#{greg(Tempo.Interval.to(interval))}"
     end)
     |> Enum.sort()
-  end
-
-  defp recurrence_spans(rule, year), do: material_spans(recurrence_occurrences(rule, year))
-
-  # A rule's recurrence as ISO 8601 — one string per member.
-  defp members_iso(rule) do
-    case Rule.recurrence(rule) do
-      {:ok, %Tempo{form: {:all, members}}} -> Enum.map(members, &Tempo.to_iso8601!/1)
-      {:ok, recurrence} -> [Tempo.to_iso8601!(recurrence)]
-    end
-  end
-
-  # The recurrence agrees, span for span, with the independent kind-by-kind
-  # computation (`materialise_concrete/2`) in every year.
-  defp assert_matches_materialise(rule, years) do
-    for year <- years do
-      {:ok, bound} = Tempo.new(year: year)
-      {:ok, intervals} = Rule.materialise_concrete(rule, bound)
-      assert {year, recurrence_spans(rule, bound)} == {year, material_spans(intervals)}
-    end
-  end
-
-  defp compiled(rule_string, gates \\ []) do
-    {:ok, rule} = Compiler.compile(rule_string)
-    struct!(rule, gates)
   end
 
   defp greg(%Tempo{} = tempo) do
@@ -167,8 +161,6 @@ defmodule Tempo.HolidaysTest do
 
   doctest Tempo.Holidays
   doctest Tempo.Holidays.Data
-  doctest Tempo.Holidays.Compiler
-  doctest Tempo.Holidays.Rule
   doctest Tempo.Holidays.DayStart
 
   describe "holidays/2" do
@@ -322,363 +314,6 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  describe "Rule.recurrence/1 declarative forms" do
-    # The rollover tests use the tabular Civil calendar, whose Safar (month 2)
-    # has 29 days, so day 30 genuinely rolls over. They check the recurrence
-    # *form* against `materialise/2`; under the Observational calendar every day
-    # of the rollover window costs a crescent-visibility computation, which is
-    # Calendrical's to speed up, not this test's to wait for.
-    test "an Islamic day-30 rollover materialises exactly as materialise/2" do
-      rule = %Rule{kind: :islamic, month: 2, day: 30, calendar: Calendrical.Islamic.Civil}
-      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
-      assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
-    end
-
-    test "a weekday after the nth weekday after a date is a window off a window" do
-      # Jeûne genevois: the Thursday after the first Sunday of September
-      geneva = compiled("thursday after 1st sunday after 09-01")
-      assert members_iso(geneva) == ["R/../P1Y/FLLL9M1DN/P7D7K-1IN/P7D4K-1IN"]
-      assert recurrence_dates(geneva, ~o"2026") == ["2026-09-10"]
-      assert_matches_materialise(geneva, 2020..2035)
-
-      # Valais: the Monday after the third Sunday of September
-      valais = compiled("monday after 3rd sunday after 09-01")
-      assert recurrence_dates(valais, ~o"2026") == ["2026-09-21"]
-      assert_matches_materialise(valais, 2020..2035)
-    end
-
-    test "a weekday before the nth weekday after a date is a window off a window" do
-      # Benin's Vodun days (law 2024-32): the Thursday before the second Friday
-      # on or after 1 January. In 2027 the 1st is itself the first Friday.
-      vodun = compiled("Thursday before 2nd Friday after 01-01")
-      assert recurrence_dates(vodun, ~o"2026") == ["2026-01-08"]
-      assert recurrence_dates(vodun, ~o"2027") == ["2027-01-07"]
-      assert_matches_materialise(vodun, 2020..2035)
-    end
-
-    test "an Islamic single day within the month is a direct selection" do
-      rule = %Rule{kind: :islamic, month: 9, day: 15, calendar: Calendrical.Islamic.Observational}
-      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
-      assert recurrence_dates(rule, ~o"2026") == greg_dates(intervals)
-    end
-
-    test "an Islamic multi-day rollover span matches materialise/2" do
-      # The Saudi Eid al-Fitr shape — a day-30 rollover spanning 4 days — on the
-      # 29-day Civil Safar, so the rollover is exercised.
-      rule = %Rule{
-        kind: :islamic,
-        month: 2,
-        day: 30,
-        count: 4,
-        calendar: Calendrical.Islamic.Civil
-      }
-
-      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
-      assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
-    end
-
-    test "a lunisolar traditional-month date matches materialise/2 across a leap boundary" do
-      rule = %Rule{
-        kind: :lunisolar,
-        month: 1,
-        day: 1,
-        calendar: Calendrical.Chinese,
-        leap_month: false
-      }
-
-      for year <- [~o"2025", ~o"2026", ~o"2027"] do
-        {:ok, intervals} = Rule.materialise_concrete(rule, year)
-        assert recurrence_dates(rule, year) == greg_dates(intervals)
-      end
-    end
-
-    test "a lunisolar Chinese New Year lands on its known Gregorian date" do
-      rule = %Rule{
-        kind: :lunisolar,
-        month: 1,
-        day: 1,
-        calendar: Calendrical.Chinese,
-        leap_month: false
-      }
-
-      assert recurrence_dates(rule, ~o"2026") == ["2026-02-17"]
-    end
-
-    test "a lunisolar `day 0` eve matches materialise/2 (day 1, shifted back)" do
-      rule = %Rule{
-        kind: :lunisolar,
-        month: 1,
-        day: 0,
-        calendar: Calendrical.Chinese,
-        leap_month: false
-      }
-
-      for year <- [~o"2025", ~o"2026", ~o"2029"] do
-        {:ok, intervals} = Rule.materialise_concrete(rule, year)
-        assert recurrence_dates(rule, year) == greg_dates(intervals)
-      end
-    end
-
-    test "a lunisolar multi-day holiday is a §12.10 span matching materialise/2" do
-      rule = %Rule{
-        kind: :lunisolar,
-        month: 1,
-        day: 1,
-        count: 3,
-        calendar: Calendrical.Chinese,
-        leap_month: false
-      }
-
-      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
-      # Compare the spans, not just the start days: a 3-day CNY holiday.
-      assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
-    end
-
-    test "a lunisolar day-offset with a span (a New Year's eve, 5 days) folds and matches materialise/2" do
-      # offset -1 folds into the day (net_day 0 = the eve), then a 5-day span.
-      rule = %Rule{
-        kind: :lunisolar,
-        month: 1,
-        day: 1,
-        offset: -1,
-        count: 5,
-        calendar: Calendrical.Chinese,
-        leap_month: false
-      }
-
-      {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")
-      assert recurrence_spans(rule, ~o"2026") == material_spans(intervals)
-    end
-  end
-
-  describe "Rule.recurrence/1 gates" do
-    test "an added observed day is a second member, a window off the weekend date" do
-      rule = compiled("12-25 and if saturday, sunday then next monday")
-
-      assert members_iso(rule) == [
-               "R/../P1Y/FL12M25DN",
-               "R/../P1Y/FLL12M25D{6..7}KN/P8D1K-1IN"
-             ]
-
-      assert_matches_materialise(rule, 2019..2028)
-    end
-
-    test "a moved date keeps only the weekdays it stays on" do
-      rule = compiled("01-01 if sunday then next monday")
-      assert members_iso(rule) == ["R/../P1Y/FL1M1D{1..6}KN", "R/../P1Y/FLL1M1D7KN/P8D1K-1IN"]
-      assert_matches_materialise(rule, 2019..2028)
-    end
-
-    test "a substitute-only rule is the observed day alone" do
-      rule = compiled("substitutes 01-01 if sunday then next monday")
-      assert members_iso(rule) == ["R/../P1Y/FLL1M1D7KN/P8D1K-1IN"]
-      assert_matches_materialise(rule, 2019..2028)
-    end
-
-    test "ordered clauses each take the weekdays no earlier clause claimed" do
-      assert_matches_materialise(
-        compiled("12-26 if saturday then next monday if sunday then next tuesday"),
-        2019..2028
-      )
-
-      assert_matches_materialise(
-        compiled(
-          "06-04 if thursday,friday,saturday,sunday then next monday and if tuesday then previous monday"
-        ),
-        2019..2028
-      )
-    end
-
-    test "an observed day crossing into the next year lands there" do
-      # 10 Dhu al-Hijjah 1427 (Umm al-Qura) is Sunday 31 December 2006; its
-      # observed Monday is 1 January 2007.
-      rule = compiled("10 Dhu al-Hijjah and if sunday then next monday")
-      assert_matches_materialise(rule, 2005..2008)
-    end
-
-    test "a feast's substitution resolves statically from Easter" do
-      rule = compiled("orthodox and if sunday then next monday since 2000")
-
-      assert members_iso(rule) == [
-               "R/{2000Y/..}/P1Y/FL(orthodox-easter)eN",
-               "R/{2000Y/..}/P1Y/FLL(orthodox-easter)eN/P2D1K-1IN"
-             ]
-
-      assert_matches_materialise(rule, 1998..2003)
-    end
-
-    test "a weekday gate is a weekday limit" do
-      rule = compiled("05-04 not on sunday, monday")
-      assert members_iso(rule) == ["R/../P1Y/FL5M4D{2..6}KN"]
-      assert_matches_materialise(rule, 2019..2028)
-    end
-
-    test "an open since or until is an open domain" do
-      assert members_iso(compiled("01-02 since 2017")) == ["R/{2017Y/..}/P1Y/FL1M2DN"]
-      assert_matches_materialise(compiled("01-02 since 2017"), 2015..2019)
-
-      assert members_iso(compiled("12-26 prior to 2023")) == ["R/{../2022Y}/P1Y/FL12M26DN"]
-      assert_matches_materialise(compiled("12-26 prior to 2023"), 2020..2025)
-    end
-
-    test "every N years since a year is a cadence phased from it" do
-      rule = compiled("tuesday after 1st monday in November every 4 years since 1848")
-
-      assert members_iso(rule) == ["R/{1848Y/..}/P4Y/FLL11M1K1IN/P7D2K-1IN"]
-      assert_matches_materialise(rule, 2019..2029)
-    end
-
-    test "even years since a year keep both gates" do
-      rule = compiled("tuesday after 1st monday in November in even years since 2020")
-      assert members_iso(rule) == ["R/{2020Y/..}e/P1Y/FLL11M1K1IN/P7D2K-1IN"]
-      assert_matches_materialise(rule, 2016..2025)
-    end
-
-    test "an active window becomes the years whose occurrence it contains" do
-      # 10 June 1984 is inside the window, 10 June 1988 is not.
-      rule = compiled("06-10", active: [{~D[1984-03-23], ~D[1988-05-17]}])
-      assert members_iso(rule) == ["R/{1984Y..1987Y}/P1Y/FL6M10DN"]
-      assert_matches_materialise(rule, 1982..1990)
-    end
-
-    test "a disable/enable move excludes the year and adds the moved date" do
-      rule =
-        compiled("4th monday in November", disable: [~D[2015-11-23]], enable: [~D[2015-11-27]])
-
-      assert members_iso(rule) == [
-               "R/{../2014Y,2016Y/..}/P1Y/FL11M1K4IN",
-               "R/{2015Y}/P1Y/FL11M27DN"
-             ]
-
-      assert_matches_materialise(rule, 2013..2018)
-    end
-
-    test "a move keeps a lunar holiday's other occurrence in the same year" do
-      # 12 Rabi al-awwal falls twice in 2015 (3 January and 23 December); only
-      # the second is moved.
-      rule = compiled("12 Rabi al-awwal", disable: [~D[2015-12-23]], enable: [~D[2015-12-24]])
-      assert_matches_materialise(rule, 2014..2016)
-    end
-
-    test "a `since` year beside a rule of another calendar is a year of that calendar" do
-      # A domain is in its recurrence's calendar, so the gate is the Hebrew
-      # year whose 12 Cheshvan falls in the Gregorian 1997: 5758. The Hebrew
-      # calendar's weeks begin on Sunday, so its days of the week are Sunday 1
-      # to Saturday 7: Sunday to Thursday are 1 to 5, and Thursday is 5.
-      rule = compiled("12 Cheshvan if Friday,Saturday then previous Thursday since 1997")
-
-      assert members_iso(rule) == [
-               "R/{5758Y/..}/P1Y/FL2m12D{1..5}KN[u-ca=hebrew]",
-               "R/{5758Y/..}/P1Y/FLL2m12D{6..7}KN/P-7D5K1IN[u-ca=hebrew]"
-             ]
-
-      assert_matches_materialise(rule, 1994..2000)
-    end
-
-    test "a `prior to` year beside a rule of another calendar is a year of that calendar" do
-      # 25 December of the Julian 2022 is 7 January 2023, a year the rule is
-      # not in, so the last year it is in is the Julian 2021.
-      rule = compiled("julian 12-25 prior to 2023")
-      assert members_iso(rule) == ["R/{../2021Y}/P1Y/FL12M25DN[u-ca=julian]"]
-      assert_matches_materialise(rule, 2019..2025)
-    end
-
-    test "a disabled date beside a rule of another calendar excludes the years that fall in its year" do
-      # 12 Rabi al-awwal of 1436 and of 1437 both fall in 2015. The year 2015
-      # is excluded as both, the first is kept as the date it is, and the
-      # second is moved.
-      rule = compiled("12 Rabi al-awwal", disable: [~D[2015-12-23]], enable: [~D[2015-12-24]])
-
-      assert members_iso(rule) == [
-               "R/{../1435Y,1438Y/..}/P1Y/FL3M12DN[u-ca=islamic-umalqura]",
-               # 3 January 2015 and the date moved to, 24 December 2015, in
-               # the calendar of the rule they are members beside.
-               "{1436Y3M12D/1436Y3M12D}[u-ca=islamic-umalqura]",
-               "{1437Y3M13D/1437Y3M13D}[u-ca=islamic-umalqura]"
-             ]
-
-      assert_matches_materialise(rule, 2012..2018)
-    end
-
-    test "an active window beside a rule of another calendar is the years of that calendar" do
-      # The 8th of the 4th Korean month of 4356 is 27 May 2023.
-      rule = compiled("korean 4-0-8", active: [{~D[2023-01-01], nil}])
-      assert [member] = members_iso(rule)
-      assert member =~ ~r/^R\/\{4356Y\/\.\.\}\/P1Y\//
-      assert_matches_materialise(rule, 2020..2026)
-    end
-
-    test "a year filter beside a rule of another calendar has no recurrence" do
-      # Even years are even Gregorian years, and no years of another calendar,
-      # so the rule is computed a year at a time.
-      rule = compiled("12 Cheshvan in even years")
-
-      assert Rule.recurrence(rule) == {:error, :needs_window}
-      assert Rule.prepare(rule).recurrence == :needs_window
-
-      assert {:ok, [in_2024]} = Rule.materialise(rule, ~o"2024")
-      assert greg(Tempo.Interval.from(in_2024)) == "2024-11-13"
-      assert {:ok, []} = Rule.materialise(rule, ~o"2025")
-    end
-
-    test "a non-leap-year rule keeps the common years" do
-      rule = compiled("09-11 in non-leap years")
-      assert members_iso(rule) == ["R/..c/P1Y/FL9M11DN"]
-      assert_matches_materialise(rule, 2020..2029)
-    end
-
-    test "an equinox or solstice in a zone takes its date there" do
-      # The 2002 March equinox was on the 20th in UTC and the 21st in Tokyo
-      tokyo = compiled("march equinox in +09:00")
-      assert members_iso(tokyo) == ["R/../P1Y/FL(march-equinox@+09:00)eN"]
-      assert recurrence_dates(tokyo, ~o"2002") == ["2002-03-21"]
-      assert_matches_materialise(tokyo, 2000..2030)
-
-      santiago = compiled("june solstice in America/Santiago since 2022")
-      assert members_iso(santiago) == ["R/{2022Y/..}/P1Y/FL(june-solstice@America/Santiago)eN"]
-      assert_matches_materialise(santiago, 2020..2040)
-    end
-  end
-
-  describe "materialise/2 through the parsed recurrence" do
-    test "a prepared rule carries its recurrence" do
-      rule = "12-25 and if saturday, sunday then next monday" |> compiled() |> Rule.prepare()
-      assert %Tempo{form: {:all, _members}} = rule.recurrence
-      assert Rule.recurrence(rule) == {:ok, rule.recurrence}
-    end
-
-    for rule_string <- [
-          "12-25",
-          "3rd monday in January",
-          "easter -2",
-          "10 Dhu al-Hijjah",
-          "chinese 01-0-01",
-          "12-25 and if saturday, sunday then next monday"
-        ] do
-      test "#{rule_string} materialises as the concrete computation does, prepared or not" do
-        rule = compiled(unquote(rule_string))
-        prepared = Rule.prepare(rule)
-
-        for year <- [~o"2025", ~o"2026"] do
-          {:ok, concrete} = Rule.materialise_concrete(rule, year)
-          {:ok, unprepared} = Rule.materialise(rule, year)
-          {:ok, parsed} = Rule.materialise(prepared, year)
-          assert material_spans(unprepared) == material_spans(concrete)
-          assert material_spans(parsed) == material_spans(concrete)
-        end
-      end
-    end
-
-    test "a conditional rule is prepared as a conditional member, and alone gives its base" do
-      rule = "09-22 if 09-21 and 09-23 is public holiday" |> compiled() |> Rule.prepare()
-      assert %Tempo{} = rule.recurrence
-
-      {:ok, alone} = Rule.materialise(rule, ~o"2026")
-      {:ok, concrete} = Rule.materialise_concrete(rule, ~o"2026")
-      assert material_spans(alone) == material_spans(concrete)
-    end
-  end
-
   describe "holidays in a window" do
     test "every AU holiday in 2026" do
       assert {:ok, holidays} = holidays_in(:AU, ~o"2026")
@@ -805,8 +440,8 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "a holiday carrying no substitution rule keeps its own date" do
-      {:ok, anzac} = Compiler.compile("04-25")
-      assert anzac.substitute == nil
+      # Anzac Day 2026 falls on a Saturday, and its rule names no substitute day.
+      assert gregorian_dates("04-25", ~o"2026") == ["2026-04-25"]
     end
   end
 
@@ -928,20 +563,20 @@ defmodule Tempo.HolidaysTest do
 
   describe "relative-weekday holidays" do
     test "the weekday before a date — US Memorial Day (monday before 06-01)" do
-      {:ok, rule} = Compiler.compile("monday before 06-01")
+      rule = read!("monday before 06-01")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
+      assert {:ok, [interval]} = materialise(rule, ~o"2026")
       assert Tempo.Interval.from(interval) == ~o"2026Y5M25D"
 
       # Re-projects: the last Monday of May 2027 is the 31st.
-      assert {:ok, [interval_2027]} = Rule.materialise(rule, ~o"2027")
+      assert {:ok, [interval_2027]} = materialise(rule, ~o"2027")
       assert Tempo.Interval.from(interval_2027) == ~o"2027Y5M31D"
     end
 
     test "the weekday after a date (friday after 11-11)" do
-      {:ok, rule} = Compiler.compile("friday after 11-11")
+      rule = read!("friday after 11-11")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
+      assert {:ok, [interval]} = materialise(rule, ~o"2026")
       assert Tempo.Interval.from(interval) == ~o"2026Y11M13D"
     end
   end
@@ -950,18 +585,18 @@ defmodule Tempo.HolidaysTest do
     test "materialise in the Islamic calendar, not Gregorian" do
       # Islamic New Year — 1 Muharram. Projected onto the Gregorian year
       # 2025, which holds 1 Muharram of the Hijri year 1447.
-      {:ok, rule} = Compiler.compile("1 Muharram")
+      rule = read!("1 Muharram")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"1447Y1M1D[u-ca=islamic-umalqura]"
     end
 
     test "a P<n>D span covers that many days, crossing months in-calendar" do
       # Eid al-Fitr — "30 Ramadan P4D" runs from 30 Ramadan into Shawwal.
       # 30 Ramadan 1447 falls in the Gregorian year 2026.
-      {:ok, rule} = Compiler.compile("30 Ramadan P4D")
+      rule = read!("30 Ramadan P4D")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2026")
+      assert {:ok, [interval]} = materialise(rule, ~o"2026")
       assert Tempo.Interval.from(interval) == ~o"1447Y9M30D[u-ca=islamic-umalqura]"
       assert Tempo.Interval.to(interval) == ~o"1447Y10M3D[u-ca=islamic-umalqura]"
     end
@@ -969,9 +604,9 @@ defmodule Tempo.HolidaysTest do
     test "a lunar date can fall twice in one Gregorian year" do
       # 30 Ramadan (Eid al-Fitr's eve) fell in both Hijri 1420 and 1421
       # within the Gregorian year 2000 — the recurrence yields both.
-      {:ok, rule} = Compiler.compile("30 Ramadan P4D")
+      rule = read!("30 Ramadan P4D")
 
-      assert {:ok, [first, second]} = Rule.materialise(rule, ~o"2000")
+      assert {:ok, [first, second]} = materialise(rule, ~o"2000")
       assert Tempo.Interval.from(first) == ~o"1420Y9M30D[u-ca=islamic-umalqura]"
       assert Tempo.Interval.to(first) == ~o"1420Y10M3D[u-ca=islamic-umalqura]"
       assert Tempo.Interval.from(second) == ~o"1421Y9M30D[u-ca=islamic-umalqura]"
@@ -1004,22 +639,20 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "an active window gates a rule to its years" do
-      {:ok, base} = Compiler.compile("03-20")
-      rule = %{base | active: [{~D[2010-01-01], nil}]}
+      rule = read!("03-20", active: [{~D[2010-01-01], nil}])
 
-      assert {:ok, []} = Rule.materialise(rule, ~o"2009")
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2010")
+      assert {:ok, []} = materialise(rule, ~o"2009")
+      assert {:ok, [interval]} = materialise(rule, ~o"2010")
       assert Tempo.Interval.from(interval) == ~o"2010Y3M20D"
     end
 
     test "a disable+enable pair moves a hand-built occurrence, leaving other years alone" do
-      {:ok, base} = Compiler.compile("03-20")
-      rule = %{base | disable: [~D[2010-03-20]], enable: [~D[2010-03-22]]}
+      rule = read!("03-20", disable: [~D[2010-03-20]], enable: [~D[2010-03-22]])
 
-      assert {:ok, [moved]} = Rule.materialise(rule, ~o"2010")
+      assert {:ok, [moved]} = materialise(rule, ~o"2010")
       assert Tempo.Interval.from(moved) == ~o"2010Y3M22D"
 
-      assert {:ok, [untouched]} = Rule.materialise(rule, ~o"2011")
+      assert {:ok, [untouched]} = materialise(rule, ~o"2011")
       assert Tempo.Interval.from(untouched) == ~o"2011Y3M20D"
     end
   end
@@ -1028,9 +661,9 @@ defmodule Tempo.HolidaysTest do
     test "materialise in the Hebrew calendar, not Gregorian" do
       # Rosh Hashanah — 1 Tishrei. Projected onto Gregorian 2025, which holds
       # 1 Tishrei of the Hebrew year 5786.
-      {:ok, rule} = Compiler.compile("1 Tishrei")
+      rule = read!("1 Tishrei")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.equal?(Tempo.Interval.from(interval), ~o"5786Y1M1D[u-ca=hebrew]")
     end
 
@@ -1038,37 +671,39 @@ defmodule Tempo.HolidaysTest do
       # date-holidays writes Purim as "14 AdarII", the Adar before Nisan:
       # traditional month 6, which is Adar, the 6th month of an ordinary year,
       # and Adar II, the 7th month of a leap year.
-      {:ok, rule} = Compiler.compile("14 AdarII")
+      rule = read!("14 AdarII")
 
       # 2025 → Hebrew 5785, an ordinary year.
-      assert {:ok, [ordinary]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [ordinary]} = materialise(rule, ~o"2025")
       assert Tempo.equal?(Tempo.Interval.from(ordinary), ~o"5785Y6M14D[u-ca=hebrew]")
 
       # 2024 → Hebrew 5784, a leap year; month 7 is Adar II.
-      assert {:ok, [leap]} = Rule.materialise(rule, ~o"2024")
+      assert {:ok, [leap]} = materialise(rule, ~o"2024")
       assert Tempo.equal?(Tempo.Interval.from(leap), ~o"5784Y7M14D[u-ca=hebrew]")
     end
 
     test "a month after Adar is the same month in ordinary and leap years" do
       # Passover — 15 Nisan, the 7th month of the ordinary year 5786 (2026)
       # and the 8th of the leap year 5787 (2027)
-      {:ok, rule} = Compiler.compile("15 Nisan")
+      rule = read!("15 Nisan")
 
-      assert {:ok, [ordinary]} = Rule.materialise(rule, ~o"2026")
+      assert {:ok, [ordinary]} = materialise(rule, ~o"2026")
       assert Tempo.equal?(Tempo.Interval.from(ordinary), ~o"5786Y7M15D[u-ca=hebrew]")
 
-      assert {:ok, [leap]} = Rule.materialise(rule, ~o"2027")
+      assert {:ok, [leap]} = materialise(rule, ~o"2027")
       assert Tempo.equal?(Tempo.Interval.from(leap), ~o"5787Y8M15D[u-ca=hebrew]")
     end
 
-    test "Adar I occurs only in a leap year" do
-      {:ok, rule} = Compiler.compile("14 AdarI")
-      assert rule.month == 5 and rule.leap_month
+    test "Adar is Adar I in a leap year, as date-holidays reads it" do
+      rule = read!("14 Adar")
 
-      # 2027 holds Adar I of the leap year 5787; 2026 holds none
-      assert {:ok, [adar_i]} = Rule.materialise(rule, ~o"2027")
+      # 2027 holds Adar I of the leap year 5787; 2026 holds Adar of the
+      # ordinary year 5786, the month that holds Purim.
+      assert {:ok, [adar_i]} = materialise(rule, ~o"2027")
       assert Tempo.equal?(Tempo.Interval.from(adar_i), ~o"5787Y6M14D[u-ca=hebrew]")
-      assert {:ok, []} = Rule.materialise(rule, ~o"2026")
+
+      assert {:ok, [adar]} = materialise(rule, ~o"2026")
+      assert Tempo.equal?(Tempo.Interval.from(adar), ~o"5786Y6M14D[u-ca=hebrew]")
     end
   end
 
@@ -1076,9 +711,9 @@ defmodule Tempo.HolidaysTest do
     test "a Julian fixed date is returned in the Julian calendar" do
       # Orthodox Christmas — julian 12-25 — the Julian date whose Gregorian
       # projection (7 January this century) falls in the requested year.
-      {:ok, rule} = Compiler.compile("julian 12-25")
+      rule = read!("julian 12-25")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2024Y12M25D[u-ca=julian]"
 
       assert {:ok, ~o"2025Y1M7D"} =
@@ -1086,9 +721,9 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "a P<n>D span covers that many days" do
-      {:ok, rule} = Compiler.compile("julian 12-25 P2D")
+      rule = read!("julian 12-25 P2D")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2024Y12M25D[u-ca=julian]"
       assert Tempo.Interval.to(interval) == ~o"2024Y12M26D[u-ca=julian]"
     end
@@ -1096,32 +731,32 @@ defmodule Tempo.HolidaysTest do
 
   describe "lunisolar calendar holidays (Chinese, Korean)" do
     test "Chinese New Year is returned in the Chinese calendar" do
-      {:ok, rule} = Compiler.compile("chinese 01-0-01")
+      rule = read!("chinese 01-0-01")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.equal?(Tempo.Interval.from(interval), ~o"4662Y1M1D[u-ca=chinese]")
     end
 
     test "the traditional month is resolved past an intercalary month" do
       # Mid-Autumn is traditional month 8; the Chinese year 4662 carries a leap
       # month 6, so the ordinal month of the returned date is 9.
-      {:ok, rule} = Compiler.compile("chinese 08-0-15")
+      rule = read!("chinese 08-0-15")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.equal?(Tempo.Interval.from(interval), ~o"4662Y9M15D[u-ca=chinese]")
     end
 
     test "day 0 is the eve — the last day of the previous month" do
-      {:ok, rule} = Compiler.compile("chinese 01-0-00")
+      rule = read!("chinese 01-0-00")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.equal?(Tempo.Interval.from(interval), ~o"4661Y12M29D[u-ca=chinese]")
     end
 
     test "Korean Seollal is returned in the Korean (dangi) calendar with its span" do
-      {:ok, rule} = Compiler.compile("korean 01-0-01 P3D")
+      rule = read!("korean 01-0-01 P3D")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.equal?(Tempo.Interval.from(interval), ~o"4358Y1M1D[u-ca=dangi]")
       assert Tempo.equal?(Tempo.Interval.to(interval), ~o"4358Y1M3D[u-ca=dangi]")
     end
@@ -1129,161 +764,152 @@ defmodule Tempo.HolidaysTest do
 
   describe "Chinese solar-term holidays" do
     test "Qingming is the day the sun reaches 15° ecliptic longitude, in China time" do
-      {:ok, rule} = Compiler.compile("chinese 5-01 solarterm")
+      rule = read!("chinese 5-01 solarterm")
 
-      # Qingming is 4 April in 2025, 5 April in 2023. A solar term is asked
-      # of a calendar that has them, which Tempo's default calendar does not,
-      # so the day is a day of the Gregorian calendar `[u-ca=gregory]` names.
-      assert {:ok, [y2025]} = Rule.materialise(rule, ~o"2025")
-      assert Tempo.Interval.from(y2025) == ~o"2025Y4M4D[u-ca=gregory]"
+      # Qingming is 4 April in 2025, 5 April in 2023: a day of the Gregorian
+      # year the sun reaches the term in.
+      assert {:ok, [y2025]} = materialise(rule, ~o"2025")
+      assert Tempo.Interval.from(y2025) == ~o"2025Y4M4D"
 
-      assert {:ok, [y2023]} = Rule.materialise(rule, ~o"2023")
-      assert Tempo.Interval.from(y2023) == ~o"2023Y4M5D[u-ca=gregory]"
+      assert {:ok, [y2023]} = materialise(rule, ~o"2023")
+      assert Tempo.Interval.from(y2023) == ~o"2023Y4M5D"
     end
   end
 
   describe "equinox and solstice holidays" do
     test "Japan's Vernal Equinox Day is the March equinox in JST" do
-      {:ok, rule} = Compiler.compile("march equinox in +09:00")
+      rule = read!("march equinox in +09:00")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2025Y3M20D"
     end
 
     test "Japan's Autumnal Equinox Day is the September equinox in JST" do
-      {:ok, rule} = Compiler.compile("september equinox in +09:00")
+      rule = read!("september equinox in +09:00")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2025Y9M23D"
     end
 
     test "a solstice with no timezone is computed in GMT" do
-      {:ok, rule} = Compiler.compile("december solstice")
+      rule = read!("december solstice")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2025Y12M21D"
     end
 
     test "a numeric-offset timezone HH:MM survives time-stripping" do
-      # `strip_time` must not mistake the `:00` of `+09:00` for a clock time.
-      {:ok, rule} = Compiler.compile("march equinox in +09:00")
+      # The `:00` of `+09:00` is the offset's minutes, not a clock time.
+      rule = read!("march equinox in +09:00")
 
-      assert rule.kind == :equinox
-      assert rule.timezone == "+09:00"
+      assert Tempo.to_iso8601!(rule) == "R/../P1Y/FL(march-equinox@+09:00)eN"
     end
 
     test "a named IANA timezone resolves the civil date via the tz database" do
       # Chile's June solstice, observed in Santiago (UTC−4 in June).
-      {:ok, rule} = Compiler.compile("june solstice in America/Santiago")
+      rule = read!("june solstice in America/Santiago")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2025Y6M20D"
     end
   end
 
   describe "grammar extensions" do
     test "an Easter-relative rule carries a P<n>D span" do
-      {:ok, rule} = Compiler.compile("easter 47 P4D")
+      rule = read!("easter 47 P4D")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       # Easter 2025 is 20 April; +47 days is 6 June, spanning four days.
       assert Tempo.Interval.from(interval) == ~o"2025Y6M6D"
       assert Tempo.Interval.to(interval) == ~o"2025Y6M9D"
     end
 
     test "a calendar span tolerates a full duration suffix (P3DT0H0M)" do
-      {:ok, with_time} = Compiler.compile("1 Shawwal P3DT0H0M")
-      {:ok, plain} = Compiler.compile("1 Shawwal P3D")
+      with_time = read!("1 Shawwal P3DT0H0M")
+      plain = read!("1 Shawwal P3D")
 
-      assert with_time.count == 3
-      assert with_time.count == plain.count
+      assert Tempo.to_iso8601!(with_time) == Tempo.to_iso8601!(plain)
+      assert [interval] = material_spans(starting_in(with_time, ~o"2026"))
+      assert interval == "2026-03-20..2026-03-22"
     end
 
     test "a weekday after the Nth weekday after a fixed date" do
       # The Thursday after the first Sunday on or after 1 September.
-      {:ok, rule} = Compiler.compile("thursday after 1st sunday after 09-01")
+      rule = read!("thursday after 1st sunday after 09-01")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"2025Y9M11D"
     end
 
     test "an Nth weekday in month overflows into the next month when the month is short" do
       # October 2027 has only four Mondays, so the "5th monday in October"
       # (an NZ-MBH anniversary) overflows to 1 November.
-      {:ok, rule} = Compiler.compile("5th monday in October")
+      rule = read!("5th monday in October")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2027")
+      assert {:ok, [interval]} = materialise(rule, ~o"2027")
       assert Tempo.Interval.from(interval) == ~o"2027Y11M1D"
 
       # The recurrence expresses the same count from the 1st declaratively —
       # overflowing in a four-Monday October, inside October 2029 (five Mondays).
       assert recurrence_dates(rule, ~o"2027") == ["2027-11-01"]
       assert recurrence_dates(rule, ~o"2029") == ["2029-10-29"]
-
-      # A "last" weekday cannot overflow — it simply does not occur past its month.
-      {:ok, last} = Compiler.compile("last monday in May")
-      assert {:ok, [may]} = Rule.materialise(last, ~o"2026")
-      assert Tempo.Interval.from(may) == ~o"2026Y5M25D"
     end
 
     test "a date-precise `prior to` gates by the occurrence date, not just the year" do
       # Norfolk Island's holiday moved on 2022-09-09; the prior-to window keeps
       # the June occurrence in 2022 (before the cutoff) but not in 2023.
-      {:ok, rule} = Compiler.compile("Monday after 2nd saturday in June prior to 2022-09-09")
+      rule = read!("Monday after 2nd saturday in June prior to 2022-09-09")
 
-      assert rule.active == [{nil, ~D[2022-09-09]}]
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2022")
+      assert {:ok, [interval]} = materialise(rule, ~o"2022")
       assert Tempo.Interval.from(interval) == ~o"2022Y6M13D"
-      assert {:ok, []} = Rule.materialise(rule, ~o"2023")
+      assert {:ok, []} = materialise(rule, ~o"2023")
     end
 
     test "the 'and' chaining a since-condition to a bare if is a shift, not an add" do
       # `since 2022 and if sunday …` chains the year condition to a bare `if`
       # (move), unlike the additive `and if`. 28 April 2024 is a Sunday.
-      {:ok, chained} = Compiler.compile("04-28 since 2022 and if sunday then next monday")
-      assert chained.substitute == [{[7], :next, 1, :shift}]
-      assert {:ok, [interval]} = Rule.materialise(chained, ~o"2024")
+      chained = read!("04-28 since 2022 and if sunday then next monday")
+      assert {:ok, [interval]} = materialise(chained, ~o"2024")
       assert Tempo.Interval.from(interval) == ~o"2024Y4M29D"
 
-      # A genuine additive `and if` still keeps the original and adds the observed.
-      {:ok, additive} = Compiler.compile("03-02 and if sunday then next monday")
-      assert additive.substitute == [{[7], :next, 1, :add}]
+      # A genuine additive `and if` keeps the original and adds the observed:
+      # 2 March 2025 is a Sunday.
+      additive = read!("03-02 and if sunday then next monday")
+      assert recurrence_dates(additive, ~o"2025") == ["2025-03-02", "2025-03-03"]
     end
 
     test "clause modes are per-clause: a shift clause then an additive one" do
       # Tonga: the bare `if …` moves the holiday; the later `and if …` adds.
-      {:ok, rule} =
-        Compiler.compile(
+      rule =
+        read!(
           "06-04 if thursday,friday,saturday,sunday then next monday and if tuesday then previous monday"
         )
 
-      assert rule.substitute == [
-               {[4, 5, 6, 7], :next, 1, :shift},
-               {[2], :previous, 1, :add}
-             ]
-
       # 4 June 2028 is a Sunday: the shift clause fires and moves it to Monday
       # the 5th, dropping the 4th (not an add).
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2028")
+      assert {:ok, [interval]} = materialise(rule, ~o"2028")
       assert Tempo.Interval.from(interval) == ~o"2028Y6M5D"
+
+      # 4 June 2030 is a Tuesday: the additive clause keeps it and adds the
+      # Monday before.
+      assert recurrence_dates(rule, ~o"2030") == ["2030-06-03", "2030-06-04"]
     end
   end
 
   describe "year-boundary substitution" do
     test "an observed date crossing the year boundary is attributed to its own year" do
       # US New Year: 1 Jan observed the previous Friday when it is a Saturday.
-      {:ok, rule} =
-        Compiler.compile("01-01 and if saturday then previous friday if sunday then next monday")
+      rule = read!("01-01 and if saturday then previous friday if sunday then next monday")
 
       # 1 Jan 2028 is a Saturday; its observed 31 Dec 2027 belongs to 2027.
-      {:ok, ivs_2027} = Rule.materialise(rule, ~o"2027")
+      {:ok, ivs_2027} = materialise(rule, ~o"2027")
 
       assert ivs_2027 |> Enum.map(&Tempo.Interval.from/1) |> MapSet.new() ==
                MapSet.new([~o"2027Y1M1D", ~o"2027Y12M31D"])
 
       # 2028 keeps only its own 1 January — the 31 Dec 2027 observance is not
       # attributed here.
-      {:ok, ivs_2028} = Rule.materialise(rule, ~o"2028")
+      {:ok, ivs_2028} = materialise(rule, ~o"2028")
       assert Enum.map(ivs_2028, &Tempo.Interval.from/1) == [~o"2028Y1M1D"]
     end
   end
@@ -1449,9 +1075,9 @@ defmodule Tempo.HolidaysTest do
       # has 29 days (1436), the 30th day counting from its start is 1 Shawwal —
       # Eid itself — so the occurrence is labelled 1 Shawwal, not a fictional
       # "30 Ramadan", and it is no longer dropped.
-      {:ok, rule} = Compiler.compile("30 Ramadan P4D")
+      rule = read!("30 Ramadan P4D")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2015")
+      assert {:ok, [interval]} = materialise(rule, ~o"2015")
       assert Tempo.Interval.from(interval) == ~o"1436Y10M1D[u-ca=islamic-umalqura]"
       assert gregorian_dates("30 Ramadan P4D", ~o"2015") == ["2015-07-17"]
     end
@@ -1459,9 +1085,9 @@ defmodule Tempo.HolidaysTest do
     test "30 Safar in a 29-day Safar rolls to 1 Rabi al-awwal" do
       # Iran encodes an end-of-Safar observance as "30 Safar"; Safar 1437 has 29
       # days, so it rolls to 1 Rabi al-awwal.
-      {:ok, rule} = Compiler.compile("30 Safar")
+      rule = read!("30 Safar")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2015")
+      assert {:ok, [interval]} = materialise(rule, ~o"2015")
       assert Tempo.Interval.from(interval) == ~o"1437Y3M1D[u-ca=islamic-umalqura]"
       assert gregorian_dates("30 Safar", ~o"2015") == ["2015-12-12"]
     end
@@ -1469,9 +1095,9 @@ defmodule Tempo.HolidaysTest do
     test "a valid day is unaffected — 1 Muharram is unchanged" do
       # The rollover path only moves out-of-range days; a valid day resolves
       # exactly as the direct in-calendar mapping did.
-      {:ok, rule} = Compiler.compile("1 Muharram")
+      rule = read!("1 Muharram")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert Tempo.Interval.from(interval) == ~o"1447Y1M1D[u-ca=islamic-umalqura]"
     end
   end
@@ -1495,9 +1121,9 @@ defmodule Tempo.HolidaysTest do
 
     test "a day-offset span starts before its anchor (Tết eve)" do
       # "1 day before vietnamese 1-0-1 P5D" is Tết eve, five days from the 28th.
-      {:ok, rule} = Compiler.compile("1 day before vietnamese 1-0-1 P5D")
+      rule = read!("1 day before vietnamese 1-0-1 P5D")
 
-      assert {:ok, [interval]} = Rule.materialise(rule, ~o"2025")
+      assert {:ok, [interval]} = materialise(rule, ~o"2025")
       assert gregorian_dates("1 day before vietnamese 1-0-1 P5D", ~o"2025") == ["2025-01-28"]
 
       # The span runs five days — 28 January through 1 February.
@@ -1518,8 +1144,8 @@ defmodule Tempo.HolidaysTest do
     test "a Vietnamese date is a recurrence in the Vietnamese calendar" do
       # Calendrical.Vietnamese reports the CLDR type `:chinese`, which names the
       # Chinese calendar, so it is named by Calendrical's own identifier.
-      {:ok, rule} = Compiler.compile("vietnamese 1-0-1")
-      {:ok, recurrence} = Rule.recurrence(rule)
+      rule = read!("vietnamese 1-0-1")
+      recurrence = rule
       assert Tempo.to_iso8601!(recurrence) =~ "[u-ca=vietnamese]"
 
       {:ok, tet} = Tempo.to_interval(recurrence, within: ~o"2007")
@@ -1528,28 +1154,23 @@ defmodule Tempo.HolidaysTest do
   end
 
   describe "inter-holiday conditionals (bridge / if-holiday)" do
-    test "a bridge compiles to a :bridge conditional carrying its condition dates" do
-      {:ok, rule} = Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
+    test "a bridge reads to a conditional member kept by the days either side" do
+      rule = read!("09-22 if 09-21 and 09-23 is public holiday")
 
-      assert rule.kind == :fixed
-      assert {rule.month, rule.day} == {9, 22}
-      assert rule.conditional == %{kind: :bridge, type: :public, on: [{9, 21}, {9, 23}]}
-      assert Rule.conditional?(rule)
+      assert %Tempo{form: {:when, base, [keep: condition]}} = rule
+      assert Tempo.to_iso8601!(base) == "R/../P1Y/FL9M22DN"
+      assert condition[:at] == [~o"P-1D", ~o"P1D"]
+      assert condition[:falls_on] == %{type: :public}
     end
 
     test "a bridge is kept only when every condition date is a holiday of the type" do
-      {:ok, rule} = Compiler.compile("09-22 if 09-21 and 09-23 is public holiday")
-      {:ok, base} = Rule.materialise(rule, ~o"2026")
+      bridge = read!("09-22 if 09-21 and 09-23 is public holiday")
+      flanked = public_days_with([~o"2026-09-21", ~o"2026-09-23"], bridge)
+      unflanked = public_days_with([~o"2026-09-21"], bridge)
 
-      # Both flanks present — the day stays.
-      assert {:ok, [kept]} =
-               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> true end)
-
-      assert Tempo.Interval.from(kept) == ~o"2026Y9M22D"
-
-      # A missing flank — the day is dropped.
-      assert {:ok, []} =
-               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> false end)
+      # Both flanks present — the day stays; a missing flank — it is dropped.
+      assert days_in_2026(flanked) == [21, 22, 23]
+      assert days_in_2026(unflanked) == [21]
     end
 
     test "Japan's Citizens' Holiday bridges 22 September only when 21 and 23 are holidays" do
@@ -1590,53 +1211,31 @@ defmodule Tempo.HolidaysTest do
       assert dates_of(holidays_2026, "Provincial anniversary day") == [~o"2026Y3M23D"]
     end
 
-    test "an if-holiday move is extracted alongside earlier substitution clauses" do
-      {:ok, rule} =
-        Compiler.compile(
+    test "an if-holiday move is read alongside earlier substitution clauses" do
+      rule =
+        read!(
           "03-23 if Tuesday,Wednesday,Thursday then previous Monday if Friday,Saturday,Sunday then next Monday if is public holiday then next Monday"
         )
 
-      # The two weekday-substitution clauses and the if-holiday move are each
-      # extracted independently — the base is the bare fixed date.
-      assert {rule.kind, rule.month, rule.day} == {:fixed, 3, 23}
-
-      assert rule.substitute == [
-               {[2, 3, 4], :previous, 1, :shift},
-               {[5, 6, 7], :next, 1, :shift}
-             ]
-
-      assert rule.conditional ==
-               %{
-                 kind: :if_holiday,
-                 type: :public,
-                 move: %{count: 1, direction: :next, target: 1, omit: []}
-               }
+      # The date on the Monday it keeps and its two observed days, moved off a
+      # public holiday as one member.
+      assert %Tempo{form: {:when, observed, [move: move]}} = rule
+      assert length(RecurrenceSet.members(observed)) == 3
+      assert move[:falls_on] == %{type: :public}
     end
 
     test "an if-holiday occurrence moves when it coincides and stays when it does not" do
-      # A fixed 15 June (a Monday in 2026) with a "next monday" if-holiday move.
-      {:ok, rule} = Compiler.compile("06-15 if is public holiday then next monday")
-      {:ok, base} = Rule.materialise(rule, ~o"2026")
-      assert Tempo.Interval.from(hd(base)) == ~o"2026Y6M15D"
+      # A fixed 15 June (a Monday in 2026) with a "next monday" if-holiday move:
+      # on another public holiday, a Monday moving to "next monday" steps a
+      # whole week, to the 22nd; on none, it stays.
+      move = read!("06-15 if is public holiday then next monday")
 
-      # Coincides with another public holiday — a Monday moving to "next monday"
-      # steps a whole week, to the 22nd.
-      assert {:ok, [moved]} =
-               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> true end)
-
-      assert Tempo.Interval.from(moved) == ~o"2026Y6M22D"
-
-      # No coincidence — the date is unchanged.
-      assert {:ok, [same]} =
-               Rule.resolve_conditional(rule, base, ~o"2026", fn _days, _type -> false end)
-
-      assert Tempo.Interval.from(same) == ~o"2026Y6M15D"
+      assert days_in_2026(public_days_with([~o"2026-06-15"], move)) == [15, 22]
+      assert days_in_2026(public_days_with([], move)) == [15]
     end
 
-    test "a plain rule carries no conditional" do
-      {:ok, plain} = Compiler.compile("12-25")
-      refute Rule.conditional?(plain)
-      assert plain.conditional == nil
+    test "a plain rule is no conditional" do
+      refute match?(%Tempo{form: {:when, _base, _conditions}}, read!("12-25"))
     end
   end
 

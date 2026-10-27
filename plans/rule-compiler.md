@@ -8,6 +8,8 @@ Two things the user asked for on 2026-10-27: a public compiler that takes a holi
 
 ## What there is
 
+As it was on 2026-10-27, before the move; `Grammar`, `Compiler` and `Rule` are retired, and the dataset is read by `Tempo.DateRule`.
+
 * **Public:** `Tempo.Holidays.holidays/2` (a territory's holidays as a recurrence set) and `day_start/2`. A holiday is reached only through a territory.
 
 * **Public functions in modules that read as internal:** `Tempo.Holidays.Compiler.compile/1` (a rule string to a `%Tempo.Holidays.Rule{}`), `Rule.recurrence/2` (a rule to a Tempo recurrence), `Rule.materialise/2`, and `DateHolidays.compile_day/4` (a rule with its metadata to a `%Holiday{}`). None is documented as API, and `%Rule{}` is a 30-field internal struct.
@@ -130,22 +132,12 @@ Taken by the user on 2026-10-27, for the move itself:
 
 * [ ] **Tempo.DateRule** — the tokenizer, compiling from its tokens and the census gaps, in Tempo (`plans/date-rule.md` there); Tempo 2.1.
 
-* [ ] **The dataset on Tempo.DateRule** — tempo_holidays compiles its rules with it, its `Grammar`, `Compiler` and `Rule` retired; conformance on start dates unchanged. Five holidays span more days than `Rule` gave them, as date-holidays-parser does (two weekday steps with a span, three spans in hours). In this order:
-
-  * Tempo from GitHub `main` (D10); gates unchanged.
-
-  * The built data: each `%Holiday{}` holds its rule text and its `active`, `disable` and `enable` dates; a rule `Tempo.DateRule` does not read is left out; the data rebuilt.
-
-  * `holidays/2` on `Tempo.DateRule`: `:dates` as `observed:` (D6, D12), the substitute entries of a holiday's type as `replaced_by:` (D7), its metadata as `active:`, `disable:`, `enable:` (D8), a conditional's `:falls_on` set where its type is left out, the year-end pairs joined (D9), cached (D11).
-
-  * The conformance harness and the tests on the public path; `Grammar`, `Compiler`, `Rule` and the vendored parser fixture removed (they are Tempo's now).
-
-  Landed: Tempo from `main` (`4aa5a8b`); the built data and `holidays/2` on `Tempo.DateRule` (format 5, the build starting Tempo's applications; a rule outside the grammar, such as `last monday in May`, which the compiler took and the dataset never writes, is left out). The move found two defects in Tempo, fixed there (`8e70b68`, `a904215`): a rule over years with no end was walked for seconds before `to_interval/1` refused it, and `bounded?/1` called a rule over a closed domain unbounded. The conformance harness on the public path (`holidays/2`, `dates: :both`) found what the old one, compiling each fixture's rule text, could not see, gaps in the built subdivisions, now fixed: `_days` inherited below the country (Saint Barthélemy, the Canary Islands' regions, Somalia's states), a country's top-level `regions` taken as its subdivisions (AD, AG, AL, BQ, HR, IC, PE, SV), and a subdivision with no days of its own kept (New Orleans). The corpus: 170,818 checks, 169,799 matched, 0 mismatched, 0 unsupported, 120 Bengali, 899 accepted differences (850 Mauritius district fixtures of an older release, 30 Timaru and Buller fixtures that ignore their region's data, 19 Islamic).
-
 * [ ] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule`, tagged as the dataset's members are.
 
 * [ ] **Holidays of your own** — `add:` and `remove:` on `holidays/2`, `config :tempo_holidays, holidays:`, a holiday's territories and subdivisions, replacing or removing a dataset holiday by id.
 
 ### Done
 
-* [x] **The tokenizer** — `Tempo.Holidays.Grammar.tokens/1` and `tokenize/1`: the parser's 23 readers in its order and its reordering; every one of the 119 rules of its fixture (`test/fixtures/date_holidays_parser_tokens.json`, vendored with its ISC notice in `NOTICE`) reads to the parser's tokens. `on <weekdays>` is read only at the start of what is left. 2026-10-27.
+* [x] **The dataset on Tempo.DateRule** — Tempo from `main` (D10); each `%Holiday{}` holds its rule text and its `active`, `disable` and `enable` dates (format 5); `holidays/2` reads them with `Tempo.DateRule` (D6–D9, D12), cached (D11); the conformance harness on the public path; `Grammar`, `Compiler`, `Rule` and the vendored parser fixture retired. The move found two defects in Tempo, fixed there (`8e70b68`, `a904215`), and gaps in the built subdivisions (`_days` below the country, a country's top-level `regions`, a subdivision with no days of its own), fixed here. Conformance: 170,818 checks, 169,799 matched, 0 mismatched, 0 unsupported, 120 Bengali, 899 accepted differences (850 Mauritius district fixtures of an older release, 30 Timaru and Buller fixtures that ignore their region's data, 19 Islamic). 2026-10-27.
+
+* [x] **The tokenizer** — `Tempo.Holidays.Grammar.tokens/1` and `tokenize/1`: the parser's 23 readers in its order and its reordering; every one of the 119 rules of its fixture (`test/fixtures/date_holidays_parser_tokens.json`, vendored with its ISC notice in `NOTICE`) read to the parser's tokens; retired with the module once Tempo held the grammar. `on <weekdays>` is read only at the start of what is left. 2026-10-27.

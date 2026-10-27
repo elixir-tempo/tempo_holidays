@@ -1,10 +1,8 @@
 # TODO
 
-Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more than a line here. Conformance against the full date-holidays fixture corpus (`mix test --include conformance`) drives the tiers: every rule that compiles computes correct dates (zero mismatched), with a small set of accepted `known_unsupported` gaps (the Bengali calendar and two rare shapes, below) and the Islamic civil-date `divergent` differences.
+Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more than a line here. Conformance against the full date-holidays fixture corpus (`mix test --include conformance`) holds every rule `Tempo.DateRule` reads to correct dates (zero mismatched), with the Bengali calendar the one accepted `known_unsupported` gap and the `divergent` differences the Conformance guide lists.
 
 ## Open
-
-* [ ] **A public rule compiler, and holidays of your own** — `Tempo.Holidays.compile/2` from a tokenizer of date-holidays-parser's grammar (102 of its 117 test rules compile today), then holidays an application defines (`add:`/`remove:`, config). Decided 2026-10-27; plan in [plans/rule-compiler.md](plans/rule-compiler.md).
 
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
@@ -12,15 +10,15 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
 
-* [ ] **Substitute entries paired per call** — `holidays/2` rebuilds, on each call, the recurrences of the holidays a `substitutes …` entry stands in for (Japan's four take about 12 ms, Britain's three 2 ms), where every rule's own `dates:` forms are prepared at load. The pairing reads the subdivision's merged list, so preparing it means preparing each subdivision's.
-
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
 
 * [ ] **Coverage to 90%** — the CI lint row runs plain `mix test` until coverage reaches the default 90% threshold, then takes the reference workflow's `mix test --cover`. 83% today with the build-time and test-support modules ignored (`Mix.Tasks.*`, `Build`, `Conformance`, `Fixtures`); the gaps are `DayStart` (65%) and `DateHolidays` (74%).
 
 ## In progress
 
-* [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2). Then: harness parallelism.
+* [ ] **A public rule compiler, and holidays of your own** — `Tempo.Holidays.compile/2` over Tempo's `Tempo.DateRule`, then holidays an application defines (`add:`/`remove:`, config). Landed: the dataset is read by `Tempo.DateRule` at call time and `Grammar`, `Compiler` and `Rule` are retired. Plan in [plans/rule-compiler.md](plans/rule-compiler.md).
+
+* [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2) → 223 s on the public path (`holidays/2`, each territory read once). Then: harness parallelism.
 
 * [ ] **Lunations** — Astro (2 lunations per new-moon search, was 6), Calendrical (each new year and new moon once per question) and Tempo (swaps share a candidate's day numbers) take the lunisolar workload from 53.1 s to 2.07 s, results identical. Left: Tempo's traditional-month ordinal builds a whole date through `new/3`, awaiting a Calendrical traditional→ordinal API.
 
@@ -36,11 +34,11 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
-* [ ] **`Thursday before easter -46`** — a weekday relative to a computed Easter *offset* (not to Easter itself); one rule, no compiler tier for it. Accepted `known_unsupported`. Would revive if a second such rule appears.
-
-* [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
-
 ## Done
+
+* [x] **The dataset on `Tempo.DateRule`** — each rule is read by Tempo's reader of the date-holidays grammar when a territory's holidays are first asked for, and kept per territory, subdivision and `:dates` reading, its substitute entries paired once; the conformance harness runs on `holidays/2`. 170,818 checks, 0 mismatched, 0 unsupported. 2026-10-27.
+
+* [x] **Two nested weekday rules** — `Thursday before easter -46` (Fat Thursday, PL) and `friday before 1st monday before 06-01 since 2009 and prior to 2016` (US) are read by `Tempo.DateRule` and match date-holidays. 2026-10-27.
 
 * [x] **Back to the published Tempo** — `{:ex_tempo, "~> 2.0"}`, `{:calendrical, "~> 2.1"}`, `{:localize, "~> 1.4"}` and `{:astro, "~> 2.9"}` from hex, no overrides. A lunisolar day 0 (the eve) is day 1 moved back one, Calendrical 2.1 holding a month to its days. 2026-10-27.
 

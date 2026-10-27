@@ -3,9 +3,9 @@ Copyright (c) 2026 Kip Cole
 
 The code of tempo_holidays is licensed under the Apache License 2.0.
 
-It includes work of others, under their own licences:
+It includes the work of others, under their own licence:
 
-1. The holiday data
+The holiday data
 
    The compiled holiday data in priv/holidays/ is derived from the
    date-holidays dataset (holidays.yaml),
@@ -15,27 +15,3 @@ It includes work of others, under their own licences:
    Wikipedia articles. The attributions for its sources are in the
    date-holidays LICENSE file of the release the data is built from. The
    compiled data is redistributed under the same licence.
-
-2. The parser's test fixture
-
-   test/fixtures/date_holidays_parser_tokens.json is the test fixture
-   test/fixtures/parser.cjs of date-holidays-parser v3.4.7,
-   https://github.com/commenthol/date-holidays-parser, converted to JSON.
-   It is used only by the tests and is not in the package.
-
-   ISC License (ISC)
-
-   Copyright (c) 2015-present, commenthol
-
-   Permission to use, copy, modify, and/or distribute this software for
-   any purpose with or without fee is hereby granted, provided that the
-   above copyright notice and this permission notice appear in all copies.
-
-   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
-   WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR
-   BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
-   OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-   WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
-   ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
-   SOFTWARE.

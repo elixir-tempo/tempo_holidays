@@ -142,8 +142,9 @@ defmodule Tempo.Holidays.DayStart do
   ### Examples
 
       iex> import Tempo.Sigils
-      iex> {:ok, rule} = Tempo.Holidays.Compiler.compile("1 Shawwal")
-      iex> {:ok, [day]} = Tempo.Holidays.Rule.materialise(rule, ~o"2025")
+      iex> {:ok, rule} = Tempo.DateRule.parse("1 Shawwal")
+      iex> {:ok, days} = Tempo.to_interval(rule, within: ~o"2025")
+      iex> [day] = Tempo.IntervalSet.members(days)
       iex> # :midnight leaves the in-calendar day untouched
       iex> {:ok, same} = Tempo.Holidays.DayStart.project(day, Calendrical.Islamic.UmmAlQura, :midnight)
       iex> same == day

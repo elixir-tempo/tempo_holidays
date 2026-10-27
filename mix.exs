@@ -86,16 +86,11 @@ defmodule Tempo.Holidays.MixProject do
       groups_for_modules: [
         Holidays: [Tempo.Holidays.DayStart, Tempo.Holidays.Locale],
         "School terms": [Tempo.Holidays.SchoolTerms.NSW],
-        "date-holidays": [
-          Tempo.Holidays.Compiler,
-          Tempo.Holidays.DateHolidays,
-          Tempo.Holidays.Grammar
-        ],
+        "date-holidays": [Tempo.Holidays.DateHolidays],
         Internals: [
           Tempo.Holidays.Build,
           Tempo.Holidays.Data,
-          Tempo.Holidays.Holiday,
-          Tempo.Holidays.Rule
+          Tempo.Holidays.Holiday
         ]
       ]
     ]
