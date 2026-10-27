@@ -34,9 +34,9 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Done
 
-* [x] **Holidays of your own** — `holidays/2`'s `:include` takes rules (with the options of `compile/2`, read with the request's `:dates`, kept whatever their type, in place of a holiday of their id) and `:exclude` ids or names; `config :tempo_holidays, holidays:` keyed by territory or subdivision (D13–D16). 2026-10-27.
+* [x] **Holidays of your own** — `add/3` adds a holiday read from a rule to a set of holidays (with its `:dates`, whatever its type, in place of one of its id) and `remove/2` removes by id or name; `config :tempo_holidays, holidays:` with `:add` and `:remove`, keyed by territory or subdivision; `:include` and `:exclude` select types alone (D13–D17). 2026-10-28.
 
-* [x] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank], exclude: ["Election Day"])` is ANBIMA's national list. 2026-10-27.
+* [x] **Brazil's ANBIMA holidays without Election Day** — `remove(brazil, "Election Day")` on `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list. 2026-10-27.
 
 * [x] **`Tempo.Holidays.compile/2`** — a holiday from a rule in the date-holidays grammar, tagged as the dataset's holidays are. 2026-10-27.
 

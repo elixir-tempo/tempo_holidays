@@ -138,13 +138,15 @@ Taken by the user on 2026-10-27, for holidays of your own (D4):
 
 * **D16 — the options' names** (2026-10-27, the user: "use :include/:exclude not :include/:remove"). `add:` and `remove:` fold into `:include` and `:exclude`: an atom is a type, a rule in `:include` a holiday of your own, an id or name in `:exclude` one left out. A holiday a call's `:include` names is kept whatever its type (asked; the recommendation). A config entry's `:include` and `:exclude` name holidays alone; they are the territory's, selected by type as the dataset's are.
 
+* **D17 — adding and removing apart from selecting** (2026-10-28, the user: "go with the split, use add and remove"). One call held types, rules and ids, so the edits leave `holidays/2`: `:include` and `:exclude` select types alone, as before D13; `add/3` reads a rule with the set's `:dates` (now in the set's metadata), adds it whatever its type and in place of one of its id; `remove/2` removes by id or name. The config keeps `add:` and `remove:`, holidays alone. A holiday that depends on others is decided against the set's, so an added or removed one counts, except for one whose dependency `holidays/2` left out by type, which carries those as they were read. D16 is withdrawn.
+
 ## Tasks
 
 * [ ] **Tempo 2.1 from hex** — `Tempo.DateRule` is on Tempo `main` (`plans/date-rule.md` there); once Tempo 2.1 is published, `{:ex_tempo, "~> 2.1"}` in place of the GitHub dependency (D10). Blocked on the Tempo 2.1 release.
 
 ### Done
 
-* [x] **Holidays of your own** — rules in `:include` and ids or names in `:exclude` on `holidays/2` (D13, D14, D16) and `config :tempo_holidays, holidays:` (D15): an included holiday is read as `compile/2` reads it with the request's `:dates`, kept whatever its type, and takes the place of a holiday of its id; `:exclude` matches an id or a name and never leaves out an included holiday; a territory's configured holidays apply to its subdivisions, a subdivision's after its territory's, a request's after both. 2026-10-27.
+* [x] **Holidays of your own** — `add/3` and `remove/2` on a set of holidays (D13, D14, D17) and `config :tempo_holidays, holidays:` with `add:` and `remove:` (D15): an added holiday is read as `compile/2` reads it with the set's `:dates`, kept whatever its type, and takes the place of a holiday of its id; `remove/2` matches an id or a name; a territory's configured holidays apply to its subdivisions, a subdivision's after its territory's. 2026-10-28.
 
 * [x] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule` with `:dates` as `holidays/2` reads it, tagged `:id` and `:name` (the rule by default), `:type` (`:public`), the caller's `:metadata` beside them and `:calendar` for a rule of another calendar; a conditional is decided against the set it is in, and alone against none (D3). 2026-10-27.
 

@@ -114,30 +114,33 @@ A rule that depends on other holidays, such as a bridge day (`"08-14 if 08-15 is
 
 ## Holidays of your own
 
-`:include` and `:exclude` name holidays as well as types. A rule in `:include`, alone or with the options of `Tempo.Holidays.compile/2`, is a holiday of your own: it is read with the request's `:dates` and kept whatever its type. An id or a name in `:exclude` leaves out the territory's holidays of that id or name. When `:include` names holidays and no type, every type is kept.
+`Tempo.Holidays.add/3` adds a holiday of your own to the set `Tempo.Holidays.holidays/2` returns, read from a rule with the options of `Tempo.Holidays.compile/2`, and `Tempo.Holidays.remove/2` removes holidays by id or name.
 
 ```elixir
-company_day = {"1st friday in December", name: "Company Day"}
-{:ok, australia} = Tempo.Holidays.holidays(:AU, include: [:public, company_day])
+{:ok, public} = Tempo.Holidays.holidays(:AU, include: :public)
+{:ok, australia} = Tempo.Holidays.add(public, "1st friday in December", name: "Company Day")
 
-{:ok, anbima} = Tempo.Holidays.holidays(:BR, include: [:public, :bank], exclude: ["Election Day"])
+{:ok, brazil} = Tempo.Holidays.holidays(:BR, include: [:public, :bank])
+{:ok, anbima} = Tempo.Holidays.remove(brazil, "Election Day")
 ```
 
-> *"Australia's **public holidays**, with the **company day** beside them; Brazil's public and bank holidays **without Election Day**, ANBIMA's list."*
+> *"Australia's **public holidays**, with the **company day** added; Brazil's public and bank holidays **without Election Day**, ANBIMA's list."*
 
-A holiday you include with the id of one of the dataset's takes its place, and a bridge day you include is decided against the territory's holidays. Holidays an application always wants go in its configuration, keyed by territory, or by territory and subdivision, each with an `:include` and an `:exclude` that name holidays alone:
+An added holiday is read with the `:dates` the set was read with, kept whatever its type, and takes the place of a holiday of its id. A name can be shared, so removing a name removes every holiday of that name. A bridge day, or a holiday moved off another, is decided against the holidays in the set: an added bridge day counts the set's holidays, Norfolk Island's King's Birthday moves off a holiday you add on its day, and Japan's Citizens' Holiday no longer counts a holiday you remove.
+
+Holidays an application always wants go in its configuration, keyed by territory, or by territory and subdivision, each with an `:add` (rules, or `{rule, options}`) and a `:remove` (ids or names):
 
 ```elixir
 # config/config.exs
 config :tempo_holidays,
   holidays: [
-    AU: [include: [{"1st friday in December", name: "Company Day", type: :optional}]],
-    BR: [exclude: ["Election Day"]],
-    "AU-VIC": [include: [{"11-02", name: "Office Closure"}]]
+    AU: [add: [{"1st friday in December", name: "Company Day", type: :optional}]],
+    BR: [remove: ["Election Day"]],
+    "AU-VIC": [add: [{"11-02", name: "Office Closure"}]]
   ]
 ```
 
-A configured holiday is one of the territory's, selected by type as the dataset's are: the optional Company Day above is left out of `holidays(:AU, include: :public)`. A territory's apply to its subdivisions too, a subdivision's come after its territory's, and a request's own after both. The configuration is read at each request, so nothing needs to be started for it.
+A configured holiday is one of the territory's, selected by type as the dataset's are: the optional Company Day above is left out of `holidays(:AU, include: :public)`. A territory's apply to its subdivisions too, and a subdivision's come after its territory's; `Tempo.Holidays.add/3` and `Tempo.Holidays.remove/2` then change what they give. The configuration is read at each request, so nothing needs to be started for it.
 
 ## Day starts
 
