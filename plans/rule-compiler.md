@@ -2,6 +2,8 @@
 
 **Status:** in progress, 2026-10-27
 
+The grammar and its compiler move to Tempo as `Tempo.DateRule` (D5, below), planned in Tempo's `plans/date-rule.md`. What stays here: the dataset, holiday names and types, territories, the update task, `Tempo.Holidays.compile/2` as the holiday layer over `Tempo.DateRule.parse/2`, and holidays of your own.
+
 Two things the user asked for on 2026-10-27: a public compiler that takes a holiday rule, written in the date-holidays grammar, and gives a Tempo recurrence; and on top of it, holidays an application defines itself, a rule with territories and metadata, which `Tempo.Holidays.holidays/2` gives beside the dataset's. The grammar is to be derived from date-holidays, and the compilers we have reused.
 
 ## What there is
@@ -102,17 +104,19 @@ Taken by the user on 2026-10-27.
 
 * **D3 — rules that depend on other holidays.** A bridge, `if is holiday` and `if equal` compile to the conditional member the dataset's rules are: decided against the other holidays when it is in a set, and against none when it is converted alone, which the documentation says.
 
+* **D5 — where the grammar lives** (2026-10-27, the user: "the rule compiler better belongs in Tempo itself since it's a generally useful tool"). In Tempo, as `Tempo.DateRule`, a reader beside `Tempo.RRule` and `Tempo.Cron` giving Tempo expressions; tempo_holidays compiles its dataset with it.
+
 * **D4 — where your holidays come from.** Both: `holidays(:AU, add: [...], remove: [...])` for a call, and `config :tempo_holidays, holidays: [...]` for those an application always wants, read at call time, with no process to supervise.
 
 ## Tasks
 
-* [ ] **Compiling from tokens** — the tokens to the `%Rule{}` kinds, replacing the whole-rule patterns; the census gaps closed by production (optional years and cycles, a month alone, steps before any base, a count of days as a step, a nested inner `before`, `if equal`, `prior to` a month, `T16`), Bengali left an error until Calendrical has the calendar; conformance unchanged.
+* [ ] **Tempo.DateRule** — the tokenizer, compiling from its tokens and the census gaps, in Tempo (`plans/date-rule.md` there); Tempo 2.1.
 
-* [ ] **`Tempo.Holidays.compile/2`** — the public function and its error, with the dependent rules as conditional members.
+* [ ] **The dataset on Tempo.DateRule** — tempo_holidays compiles its rules with it, its `Grammar`, `Compiler` and `Rule`'s recurrence builders retired; conformance unchanged.
+
+* [ ] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule`, tagged as the dataset's members are.
 
 * [ ] **Holidays of your own** — `add:` and `remove:` on `holidays/2`, `config :tempo_holidays, holidays:`, a holiday's territories and subdivisions, replacing or removing a dataset holiday by id.
-
-* [ ] **The grammar guide** — each production with examples that run.
 
 ### Done
 
