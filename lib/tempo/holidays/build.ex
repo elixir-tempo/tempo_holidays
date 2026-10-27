@@ -16,13 +16,20 @@ defmodule Tempo.Holidays.Build do
   network I/O, while a change to the serialised structs regenerates it.
   `build/1` forces a fresh download and is what `mix tempo.holidays.update` runs.
 
+  Each rule is read with `Tempo.DateRule` as it is built, to leave out one it
+  does not read, and reading a rule can work out a date: an equinox needs
+  Astro's ephemeris, and a date of another calendar needs Calendrical. So
+  `build/1` starts Tempo's applications (`:ex_tempo`, which starts Astro
+  before Calendrical) before it reads, as the `:holidays` compiler runs
+  before anything is started.
+
   This module is Mix-only: it runs at the maintainer's build time, never at a
   consumer's runtime.
 
   """
 
   alias Localize.Utils.Http
-  alias Tempo.Holidays.{Compiler, Data, DateHolidays, Holiday}
+  alias Tempo.Holidays.{Data, DateHolidays, Holiday}
 
   @pinned_version "3.38.0"
   @language "en"
@@ -75,6 +82,7 @@ defmodule Tempo.Holidays.Build do
     directory = Keyword.get(options, :directory, default_directory())
     valid_version!(version)
     File.mkdir_p!(directory)
+    {:ok, _started} = Application.ensure_all_started(:ex_tempo)
 
     bundle = fetch_bundle(version)
 
@@ -89,14 +97,14 @@ defmodule Tempo.Holidays.Build do
     {:ok, written, unsupported(bundle)}
   end
 
-  # The rules of a bundle that do not compile, which its data leaves out. A
+  # The rules of a bundle `Tempo.DateRule` does not read, which its data leaves out. A
   # rule written `false` disables an inherited one and is no rule.
   defp unsupported(bundle) do
     bundle
     |> Map.get("holidays", %{})
     |> rules_in()
     |> Enum.uniq()
-    |> Enum.filter(&match?({:error, _}, Compiler.compile(&1)))
+    |> Enum.filter(&match?({:error, _}, Tempo.DateRule.parse(&1)))
     |> Enum.sort()
   end
 

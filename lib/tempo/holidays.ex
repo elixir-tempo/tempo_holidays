@@ -44,7 +44,8 @@ defmodule Tempo.Holidays do
 
   """
 
-  alias Tempo.Holidays.{Data, DayStart, Holiday, Locale, Rule}
+  alias Tempo.Holidays.{Data, DayStart, Holiday, Locale}
+  alias Tempo.Interval
   alias Tempo.IntervalSet
   alias Tempo.RecurrenceSet
 
@@ -187,13 +188,11 @@ defmodule Tempo.Holidays do
          {:ok, dates} <- selected_dates(options),
          {:ok, resolved} <- Locale.resolve(target, options),
          {:ok, subdivision} <- Data.subdivision(resolved.territory, resolved.subdivision),
-         {:ok, holidays} <- Data.for_territory(resolved.territory, subdivision) do
-      observed = holidays |> join_year_end_splits() |> observe(dates)
-
+         {:ok, read} <- read_holidays(resolved.territory, subdivision, dates) do
       members =
-        for holiday <- observed,
+        for {holiday, expression} <- read,
             holiday.type in types,
-            member <- holiday_member(holiday, falls_on(holiday, observed, types)),
+            member <- holiday_member(holiday, expression, read, types, dates),
             do: member
 
       RecurrenceSet.new(members, metadata: set_metadata(resolved.territory, subdivision))
@@ -220,52 +219,165 @@ defmodule Tempo.Holidays do
     end
   end
 
-  # date-holidays cannot run a period past the year end, so it writes one as two
-  # entries under one name (`Tempo.Holidays.Rule.join_year_end/2`); they are one
-  # member here, the period they describe.
-  defp join_year_end_splits(holidays) do
+  # A territory's holidays, each with its rule read by `Tempo.DateRule` as
+  # `:dates` observes it, kept for the life of the VM: a territory, a
+  # subdivision and a reading is one `:persistent_term` entry, written once.
+  defp read_holidays(territory, subdivision, dates) do
+    key = {__MODULE__, territory, subdivision, dates}
+
+    case :persistent_term.get(key, nil) do
+      nil -> read_and_keep(key, territory, subdivision, dates)
+      read -> {:ok, read}
+    end
+  end
+
+  defp read_and_keep(key, territory, subdivision, dates) do
+    with {:ok, holidays} <- Data.for_territory(territory, subdivision) do
+      read =
+        holidays
+        |> observed_entries(dates)
+        |> read_each(dates)
+        |> joined_year_ends()
+
+      :persistent_term.put(key, read)
+      {:ok, read}
+    end
+  end
+
+  # A substitute entry gives nothing under `:gazetted`, and under
+  # `:substitute` stands in for the holidays of its own type, so a selection
+  # by type keeps or drops both together.
+  defp observed_entries(holidays, :gazetted) do
+    Enum.reject(holidays, & &1.substitute)
+  end
+
+  defp observed_entries(holidays, _dates) do
+    holidays
+  end
+
+  # Each holiday with its rule read; one that reads to no date has no member.
+  defp read_each(holidays, dates) do
+    for holiday <- holidays,
+        {:ok, expression} <- [read(holiday, holidays, dates, [])],
+        match?([_ | _], RecurrenceSet.members(expression)) do
+      {holiday, expression}
+    end
+  end
+
+  defp read(%Holiday{} = holiday, holidays, dates, options) do
+    dated = [active: holiday.active, disable: holiday.disable, enable: holiday.enable]
+    replacing = replaced_by(holiday, holidays, dates)
+
+    Tempo.DateRule.parse(
+      holiday.rule,
+      [observed: observed(dates)] ++ dated ++ replacing ++ options
+    )
+  end
+
+  defp observed(:substitute) do
+    :moved
+  end
+
+  defp observed(:gazetted) do
+    :none
+  end
+
+  defp observed(:both) do
+    :as_written
+  end
+
+  # Under `:substitute` the substitute entries of a holiday's type stand in
+  # for it, each in its `active` windows; `Tempo.DateRule` takes those of the
+  # holiday's own date.
+  defp replaced_by(holiday, holidays, :substitute) do
+    entries =
+      for entry <- holidays, entry.substitute, entry.type == holiday.type, entry != holiday do
+        {entry.rule, active: entry.active}
+      end
+
+    [replaced_by: entries]
+  end
+
+  defp replaced_by(_holiday, _holidays, _dates) do
+    []
+  end
+
+  # date-holidays cannot run a period past the year end, so it writes one as
+  # two dated entries under one name; they are one member here, the period
+  # they describe, the 31st of December within it.
+  defp joined_year_ends(read) do
     {joined, continuations} =
-      Enum.map_reduce(holidays, [], fn holiday, continuations ->
-        case Enum.find_value(holidays, &continuation(holiday, &1)) do
-          {january, rule} -> {%{holiday | rule: rule}, [january.rule.source | continuations]}
-          nil -> {holiday, continuations}
+      Enum.map_reduce(read, [], fn {holiday, _expression} = entry, continuations ->
+        case Enum.find_value(read, &continuation(entry, &1)) do
+          {january, period} -> {{holiday, period}, [january | continuations]}
+          nil -> {entry, continuations}
         end
       end)
 
-    Enum.reject(joined, &(&1.rule.source in continuations))
+    Enum.reject(joined, fn {holiday, _expression} -> holiday in continuations end)
   end
 
   defp continuation(
-         %Holiday{name: name, type: type} = december,
-         %Holiday{name: name, type: type} = january
-       ) do
-    case Rule.join_year_end(december.rule, january.rule) do
-      {:ok, rule} -> {january, rule}
-      :error -> nil
+         {%Holiday{name: name, type: type} = december, december_expression},
+         {%Holiday{name: name, type: type} = january, january_expression}
+       )
+       when december != january do
+    year_end_period(single_span(december_expression), single_span(january_expression), january)
+  end
+
+  defp continuation(_december, _january) do
+    nil
+  end
+
+  defp single_span(expression) do
+    case Tempo.to_interval(expression) do
+      {:ok, occurrences} -> one_span(IntervalSet.members(occurrences))
+      {:error, _reason} -> :none
     end
   end
 
-  defp continuation(_december, _january), do: nil
+  defp one_span([span]) do
+    {:ok, span}
+  end
 
-  # The dates a holiday observed on another day is given on
-  # (`Tempo.Holidays.Rule.observe/3`). A substitute entry gives nothing under
-  # `:gazetted`, and under `:substitute` stands in for the holidays of its own
-  # type, so a selection by type keeps or drops both together.
-  defp observe(holidays, :both), do: holidays
+  defp one_span(_spans) do
+    :none
+  end
 
-  defp observe(holidays, :gazetted) do
-    for holiday <- holidays, not Rule.substitute_entry?(holiday.rule) do
-      %{holiday | rule: Rule.observe(holiday.rule, :gazetted, [])}
+  # A December period that ends with the year or the day before, and a
+  # January one from the 1st of the next, are the one period from the first
+  # through the last.
+  defp year_end_period({:ok, december}, {:ok, january}, january_holiday) do
+    if year_end?(Interval.to(december), Interval.from(january)) do
+      joined_period(
+        Interval.new(from: Interval.from(december), to: Interval.to(january)),
+        january_holiday
+      )
     end
   end
 
-  defp observe(holidays, :substitute) do
-    entries = Enum.filter(holidays, &Rule.substitute_entry?(&1.rule))
+  defp year_end_period(_december, _january, _january_holiday) do
+    nil
+  end
 
-    for holiday <- holidays do
-      own_type = for entry <- entries, entry.type == holiday.type, do: entry.rule
-      %{holiday | rule: Rule.observe(holiday.rule, :substitute, own_type)}
-    end
+  defp year_end?(last, first) do
+    dated_year_end?(Tempo.to_date(last), Tempo.to_date(first))
+  end
+
+  defp dated_year_end?({:ok, last}, {:ok, %Date{month: 1, day: 1} = first}) do
+    Date.diff(first, last) in [1, 2]
+  end
+
+  defp dated_year_end?(_last, _first) do
+    false
+  end
+
+  defp joined_period({:ok, period}, january) do
+    {january, period}
+  end
+
+  defp joined_period({:error, _reason}, _january) do
+    nil
   end
 
   # The holiday types a request keeps: those `:include` names, every type by
@@ -287,48 +399,78 @@ defmodule Tempo.Holidays do
   defp holiday_types(type) when is_atom(type), do: holiday_types([type])
   defp holiday_types(other), do: {:error, {:invalid_holiday_type, other}}
 
-  # A kept conditional reads the rest of the territory as it would unselected:
-  # when the type it falls on is left out, it reads those holidays — each at
-  # its dates before any condition, as the condition reads it — as its own
-  # `:falls_on` set.
-  defp falls_on(%Holiday{rule: %Rule{conditional: nil}}, _holidays, _types), do: []
+  # A holiday is one member: its expression, tagged with the holiday's id,
+  # name and type over any metadata the expression carries. A conditional
+  # (a bridge, an `if is holiday` move) reads the rest of the territory as it
+  # would unselected: when the type it falls on is left out, it reads those
+  # holidays as its own `:falls_on` set.
+  defp holiday_member(holiday, expression, read, types, dates) do
+    type = conditional_type(expression)
 
-  defp falls_on(%Holiday{rule: %Rule{conditional: %{type: type}} = rule}, holidays, types) do
-    if type in types do
-      []
+    if is_nil(type) or type in types do
+      [tagged(expression, holiday)]
     else
-      carried =
-        for holiday <- holidays,
-            holiday.type == type,
-            holiday.rule.source != rule.source,
-            member <- base_member(holiday),
-            do: member
-
-      [falls_on: RecurrenceSet.new!(carried)]
+      carried_member(holiday, read, type, dates)
     end
   end
 
-  # A holiday is one member: its recurrence, tagged with the holiday's id, name
-  # and type over any metadata the recurrence carries. A rule with no
-  # recurrence has no member.
-  defp holiday_member(%Holiday{rule: rule} = holiday, options) do
-    case Rule.recurrence(rule, options) do
-      {:ok, recurrence} -> [tagged(recurrence, holiday)]
-      _needs_window_or_error -> []
+  defp carried_member(holiday, read, type, dates) do
+    carried =
+      for {other, expression} <- read,
+          other.type == type,
+          other != holiday,
+          do: tagged(expression, other)
+
+    holidays = Enum.map(read, &elem(&1, 0))
+
+    case read_falling_on(holiday, holidays, dates, carried) do
+      {:ok, expression} -> [tagged(expression, holiday)]
+      {:error, _reason} -> []
     end
   end
 
-  # A holiday at its dates before any condition.
-  defp base_member(%Holiday{rule: rule} = holiday) do
-    case Rule.base_recurrence(rule) do
-      {:ok, recurrence} -> [tagged(recurrence, holiday)]
-      _needs_window_or_error -> []
+  defp read_falling_on(holiday, holidays, dates, carried) do
+    with {:ok, falls_on} <- RecurrenceSet.new(carried) do
+      read(holiday, holidays, dates, falls_on: falls_on)
     end
   end
 
-  defp tagged(recurrence, %Holiday{rule: rule, name: name, type: type}) do
-    metadata = Map.merge(Tempo.metadata(recurrence), %{id: rule.source, name: name, type: type})
-    Tempo.put_metadata(recurrence, metadata)
+  # The type of the holidays a conditional is decided against.
+  defp conditional_type(%Tempo{form: {:when, _member, conditions}}) do
+    Enum.find_value(conditions, &condition_type/1)
+  end
+
+  defp conditional_type(_expression) do
+    nil
+  end
+
+  defp condition_type({_condition, options}) do
+    case Keyword.get(options, :falls_on) do
+      %{type: type} -> type
+      _other -> nil
+    end
+  end
+
+  # A holiday of another calendar than the Gregorian says so, as a set of
+  # occurrences is in one calendar: the day of an Islamic holiday beside
+  # Gregorian ones is a Gregorian day, and its calendar is what is left to say
+  # that its day begins at sunset (`day_start/2`).
+  defp tagged(expression, %Holiday{rule: rule, name: name, type: type}) do
+    metadata =
+      expression
+      |> Tempo.metadata()
+      |> Map.merge(%{id: rule, name: name, type: type})
+      |> Map.merge(calendar_metadata(expression))
+
+    Tempo.put_metadata(expression, metadata)
+  end
+
+  defp calendar_metadata(%Tempo{calendar: Calendar.ISO}) do
+    %{}
+  end
+
+  defp calendar_metadata(%Tempo{calendar: calendar}) do
+    %{calendar: calendar}
   end
 
   defp set_metadata(territory, nil), do: %{territory: territory}

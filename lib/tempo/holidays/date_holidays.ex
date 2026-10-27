@@ -14,15 +14,16 @@ defmodule Tempo.Holidays.DateHolidays do
           %{"substitute" => true, "name" => %{"en" => "Independence Day"}}
       }
 
-  `compile_days/2` turns that into holidays, compiling each rule string
-  through `Tempo.Holidays.Compiler` and dropping the entries whose grammar
-  this slice does not yet cover — partial support is correct for partial
-  coverage. It is the source-agnostic core the `mix tempo.holidays.update`
-  task feeds a downloaded, parsed bundle into.
+  `compile_days/2` turns that into holidays, keeping each rule string with
+  its dataset dates where `Tempo.DateRule.parse/2` reads it, and dropping the
+  entries it does not (the Bengali calendar's). It is the source-agnostic
+  core the `mix tempo.holidays.update` task feeds a downloaded, parsed bundle
+  into.
 
   """
 
-  alias Tempo.Holidays.{Compiler, Holiday}
+  alias Tempo.Holidays.Holiday
+  alias Tempo.RecurrenceSet
 
   @types %{
     "public" => :public,
@@ -46,8 +47,8 @@ defmodule Tempo.Holidays.DateHolidays do
 
   ### Returns
 
-  * A list of `t:Tempo.Holidays.Holiday.t/0`, one per entry whose rule the
-    compiler understands. Unsupported entries are omitted.
+  * A list of `t:Tempo.Holidays.Holiday.t/0`, one per entry whose rule
+    `Tempo.DateRule` reads. The others are omitted.
 
   ### Examples
 
@@ -93,7 +94,7 @@ defmodule Tempo.Holidays.DateHolidays do
   * `[t:Tempo.Holidays.Holiday.t/0]` — a one-element list on a supported
     rule, so it splices cleanly into `Enum.flat_map/2`.
 
-  * `[]` when the rule's grammar is not yet supported, when the entry is
+  * `[]` when `Tempo.DateRule` does not read the rule, when the entry is
     disabled (`meta` is `false`, date-holidays' way of removing an inherited
     holiday), or when the entry is otherwise malformed.
 
@@ -101,8 +102,8 @@ defmodule Tempo.Holidays.DateHolidays do
 
       iex> meta = %{"name" => %{"en" => "Independence Day"}, "substitute" => true}
       iex> [holiday] = Tempo.Holidays.DateHolidays.compile_day("07-04", meta, "en")
-      iex> {holiday.name, holiday.type, holiday.rule.kind}
-      {"Independence Day", :public, :fixed}
+      iex> {holiday.name, holiday.type, holiday.rule}
+      {"Independence Day", :public, "07-04"}
 
       iex> names = %{"01-01" => %{"name" => %{"en" => "New Year's Day", "fr" => "Nouvel An"}}}
       iex> [holiday] = Tempo.Holidays.DateHolidays.compile_day("01-01", %{"_name" => "01-01"}, "fr", names)
@@ -117,18 +118,18 @@ defmodule Tempo.Holidays.DateHolidays do
   def compile_day(rule, meta, language, names \\ %{})
 
   def compile_day(rule, meta, language, names) when is_binary(rule) and is_map(meta) do
-    case Compiler.compile(rule) do
-      {:ok, compiled} ->
-        holiday = %Holiday{
-          name: name(meta, language, names, rule),
-          type: type(meta),
-          rule: with_gates(compiled, meta)
-        }
+    holiday = %Holiday{
+      name: name(meta, language, names, rule),
+      type: type(meta),
+      rule: rule,
+      active: active_ranges(meta),
+      disable: iso_dates(Map.get(meta, "disable")),
+      enable: iso_dates(Map.get(meta, "enable"))
+    }
 
-        [holiday]
-
-      {:error, _unsupported} ->
-        []
+    case read(holiday) do
+      {:ok, holiday} -> [holiday]
+      {:error, _unread} -> []
     end
   end
 
@@ -169,36 +170,32 @@ defmodule Tempo.Holidays.DateHolidays do
   defp type(%{"type" => type}) when is_binary(type), do: Map.get(@types, type, :public)
   defp type(_meta), do: :public
 
-  # ── occurrence-level metadata gates ─────────────────────────────────
-  #
-  # Attach date-holidays' `active` windows, `disable`d dates and `enable`d
-  # dates (see the upstream `docs/specification.md`) onto the compiled rule.
-  # Malformed entries in downloaded data are dropped, never raised on.
-  defp with_gates(rule, meta) do
-    %{
-      rule
-      | active: merge_active(rule.active, active_ranges(meta)),
-        disable: iso_dates(Map.get(meta, "disable")),
-        enable: iso_dates(Map.get(meta, "enable"))
-    }
+  # A holiday whose rule `Tempo.DateRule` reads, with its dataset dates; a
+  # `substitutes` entry, only observed days, reads to no date with
+  # `observed: :none`.
+  defp read(%Holiday{rule: rule} = holiday) do
+    options = [active: holiday.active, disable: holiday.disable, enable: holiday.enable]
+
+    with {:ok, _expression} <- Tempo.DateRule.parse(rule, options),
+         {:ok, gazetted} <- Tempo.DateRule.parse(rule, [observed: :none] ++ options) do
+      {:ok, %{holiday | substitute: not match?([_ | _], RecurrenceSet.members(gazetted))}}
+    end
   end
 
-  # The compiler may already have set an `active` window from a date-precise
-  # `since`/`prior to`; keep it, and add the metadata windows when present.
-  defp merge_active(nil, meta), do: meta
-  defp merge_active(rule_active, nil), do: rule_active
-  defp merge_active(rule_active, meta), do: rule_active ++ meta
+  # ── occurrence-level metadata ───────────────────────────────────────
+  #
+  # date-holidays' `active` windows, `disable`d dates and `enable`d dates
+  # (see the upstream `docs/specification.md`), as `Tempo.DateRule.parse/2`
+  # takes them. Malformed entries in downloaded data are dropped, never
+  # raised on.
 
   # `active` is a list of `%{"from" => bound, "to" => bound}` windows, each
   # bound an integer year (meaning its January 1st) or an ISO date, half-open.
   defp active_ranges(%{"active" => ranges}) when is_list(ranges) do
-    case Enum.flat_map(ranges, &active_range/1) do
-      [] -> nil
-      parsed -> parsed
-    end
+    Enum.flat_map(ranges, &active_range/1)
   end
 
-  defp active_ranges(_meta), do: nil
+  defp active_ranges(_meta), do: []
 
   defp active_range(range) when is_map(range) do
     [{active_bound(Map.get(range, "from")), active_bound(Map.get(range, "to"))}]
@@ -211,13 +208,10 @@ defmodule Tempo.Holidays.DateHolidays do
   defp active_bound(_absent), do: nil
 
   defp iso_dates(list) when is_list(list) do
-    case Enum.flat_map(list, &iso_date/1) do
-      [] -> nil
-      dates -> dates
-    end
+    Enum.flat_map(list, &iso_date/1)
   end
 
-  defp iso_dates(_absent), do: nil
+  defp iso_dates(_absent), do: []
 
   defp iso_date(string) when is_binary(string) do
     case Date.from_iso8601(string) do

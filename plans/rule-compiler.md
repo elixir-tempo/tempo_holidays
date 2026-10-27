@@ -140,6 +140,8 @@ Taken by the user on 2026-10-27, for the move itself:
 
   * The conformance harness and the tests on the public path; `Grammar`, `Compiler`, `Rule` and the vendored parser fixture removed (they are Tempo's now).
 
+  Landed: Tempo from `main` (`4aa5a8b`); the built data and `holidays/2` on `Tempo.DateRule` (format 5, the build starting Tempo's applications; a rule outside the grammar, such as `last monday in May`, which the compiler took and the dataset never writes, is left out). The move found two defects in Tempo, fixed there (`8e70b68`, `a904215`): a rule over years with no end was walked for seconds before `to_interval/1` refused it, and `bounded?/1` called a rule over a closed domain unbounded.
+
 * [ ] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule`, tagged as the dataset's members are.
 
 * [ ] **Holidays of your own** — `add:` and `remove:` on `holidays/2`, `config :tempo_holidays, holidays:`, a holiday's territories and subdivisions, replacing or removing a dataset holiday by id.

@@ -9,20 +9,20 @@ defmodule Tempo.Holidays.Data do
 
   `for_territory/2` reads a territory's holidays, or a subdivision's;
   `subdivision/2` resolves a subdivision code to the level the data holds it
-  at; `territories/0` lists the territories that carry data. A territory is loaded once and kept, its rules prepared
-  (`Tempo.Holidays.Rule.prepare/1`) so that every later projection evaluates
-  their already-built recurrences.
+  at; `territories/0` lists the territories that carry data. A territory is
+  loaded once and kept for the life of the VM.
 
   """
 
-  alias Tempo.Holidays.{Holiday, Rule}
+  alias Tempo.Holidays.Holiday
 
-  # The shape of the data itself — the `%Holiday{}` and `%Rule{}` structs it
-  # serialises. Bump it with any change to those structs, or to the values
-  # they hold (3: Hebrew months are traditional month numbers; 4: a dated period
-  # carries its length), so every build regenerates the data instead of loading
+  # The shape of the data itself — the `%Holiday{}` structs it serialises.
+  # Bump it with any change to that struct, or to the values it holds (3:
+  # Hebrew months are traditional month numbers; 4: a dated period carries its
+  # length; 5: a holiday holds its rule's text and dataset dates, read by
+  # `Tempo.DateRule`), so every build regenerates the data instead of loading
   # structs of an older shape.
-  @data_format 4
+  @data_format 5
 
   @doc """
   Return the compiled holidays for a territory, or one of its subdivisions.
@@ -203,7 +203,7 @@ defmodule Tempo.Holidays.Data do
 
   defp merge(base, %{holidays: additions, keys: keys}) do
     overridden = MapSet.new(keys)
-    Enum.reject(base, &(&1.rule.source in overridden)) ++ additions
+    Enum.reject(base, &(&1.rule in overridden)) ++ additions
   end
 
   defp upcase(nil), do: nil
@@ -275,48 +275,24 @@ defmodule Tempo.Holidays.Data do
     "#{version}+#{@data_format}"
   end
 
-  # A territory's data, loaded and prepared once — every rule's recurrence built
-  # (`Rule.prepare/1`) — and kept for the life of the VM, so projecting its
-  # holidays again builds and parses nothing. Each territory is a single
-  # `:persistent_term` entry written once, which costs no global GC.
+  # A territory's data, loaded once and kept for the life of the VM. Each
+  # territory is a single `:persistent_term` entry written once, which costs
+  # no global GC.
   defp prepared(code) do
     key = {__MODULE__, code}
 
     case :persistent_term.get(key, nil) do
-      nil -> load_and_prepare(key, code)
+      nil -> load_and_keep(key, code)
       territory -> {:ok, territory}
     end
   end
 
-  defp load_and_prepare(key, code) do
+  defp load_and_keep(key, code) do
     with {:ok, territory} <- load(code) do
-      prepared = prepare_territory(territory)
-      :persistent_term.put(key, prepared)
-      {:ok, prepared}
+      :persistent_term.put(key, territory)
+      {:ok, territory}
     end
   end
-
-  defp prepare_territory(%{country: country, states: states} = territory) do
-    %{territory | country: prepare_holidays(country), states: Map.new(states, &prepare_state/1)}
-  end
-
-  defp prepare_state({code, %{holidays: holidays, regions: regions} = state})
-       when is_map(regions) do
-    regions =
-      Map.new(regions, fn {region_code, region} -> prepare_region(region_code, region) end)
-
-    {code, %{state | holidays: prepare_holidays(holidays), regions: regions}}
-  end
-
-  defp prepare_state({code, %{holidays: holidays} = state}),
-    do: {code, %{state | holidays: prepare_holidays(holidays)}}
-
-  defp prepare_region(code, %{holidays: holidays} = region),
-    do: {code, %{region | holidays: prepare_holidays(holidays)}}
-
-  defp prepare_holidays(holidays), do: Enum.map(holidays, &prepare_holiday/1)
-
-  defp prepare_holiday(%Holiday{rule: rule} = holiday), do: %{holiday | rule: Rule.prepare(rule)}
 
   # `File.read/1` returns a tagged tuple, so a missing territory file never
   # raises — it is simply an unknown territory.

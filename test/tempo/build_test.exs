@@ -71,7 +71,7 @@ defmodule Tempo.Holidays.BuildTest do
   # so `Rule.materialise/2` crashed calling `nil.location/1`. The build must set
   # the meridian, and materialise must not crash if it is ever missing.
   describe "solar-term calendar" do
-    test "a built solar-term rule carries its Chinese calendar" do
+    test "a built solar-term rule reads to its solar term" do
       bundle = %{
         "holidays" => %{
           "CX" => %{"days" => %{"chinese 5-01 solarterm" => %{"name" => %{"en" => "Qingming"}}}}
@@ -79,8 +79,8 @@ defmodule Tempo.Holidays.BuildTest do
       }
 
       [holiday] = Build.holidays_from_bundle(bundle, "CX", "en")
-      assert holiday.rule.kind == :solar_term
-      assert holiday.rule.calendar == Calendrical.Chinese
+      assert holiday.rule == "chinese 5-01 solarterm"
+      assert Tempo.to_iso8601!(Tempo.DateRule.parse!(holiday.rule)) == "R/../P1Y/FL(qingming)eN"
     end
 
     test "materialise defaults to the Chinese meridian when the calendar is absent" do

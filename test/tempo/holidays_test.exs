@@ -69,7 +69,7 @@ defmodule Tempo.HolidaysTest do
 
   # The member of a holiday set that is the holiday: its id is the rule.
   defp member_of(holidays, %Holiday{rule: rule}),
-    do: Enum.find(RecurrenceSet.members(holidays), &(Tempo.metadata(&1)[:id] == rule.source))
+    do: Enum.find(RecurrenceSet.members(holidays), &(Tempo.metadata(&1)[:id] == rule))
 
   # The Gregorian ISO dates a rule materialises to that year — useful for a
   # calendar (Vietnamese) whose in-calendar value carries a shared CLDR tag.
@@ -265,26 +265,19 @@ defmodule Tempo.HolidaysTest do
   describe "holidays/2 members" do
     # A multi-day holiday keeps its span (a window of its days from the day its
     # recurrence selects) alongside its name.
-    for {territory, name} <- [
-          {:CX, "Chinese New Year"},
-          {:SA, "End of Ramadan (Eid al-Fitr)"},
-          {:KR, "Korean New Year"}
+    for {territory, name, rule, span} <- [
+          {:CX, "Chinese New Year", "chinese 01-0-01 P2D", "2026-02-17..2026-02-18"},
+          {:SA, "End of Ramadan (Eid al-Fitr)", "30 Ramadan P4D", "2026-03-19..2026-03-22"},
+          {:KR, "Korean New Year", "korean 01-0-01 P3D", "2026-02-17..2026-02-19"}
         ] do
       test "#{territory} #{name} keeps its multi-day span and its name" do
         {:ok, holidays} = Holidays.holidays(unquote(territory))
-
-        holiday =
-          Enum.find(territory_holidays(unquote(territory)), fn holiday ->
-            holiday.name == unquote(name) and is_integer(holiday.rule.count) and
-              holiday.rule.count > 1
-          end)
+        holiday = Enum.find(territory_holidays(unquote(territory)), &(&1.rule == unquote(rule)))
 
         member = member_of(holidays, holiday)
         occurrences = starting_in(RecurrenceSet.new!([member]), ~o"2026")
-        {:ok, expected} = Rule.materialise_concrete(holiday.rule, ~o"2026")
 
-        assert occurrences != []
-        assert material_spans(occurrences) == material_spans(expected)
+        assert material_spans(occurrences) == [unquote(span)]
         assert Enum.all?(occurrences, &(Tempo.metadata(&1)[:name] == unquote(name)))
       end
     end
@@ -304,12 +297,10 @@ defmodule Tempo.HolidaysTest do
     test "a bridge day is a conditional member kept by the public holidays either side" do
       {:ok, holidays} = Holidays.holidays(:JP)
       id = "09-22 if 09-21 and 09-23 is public holiday"
-      bridge = Enum.find(territory_holidays(:JP), &(&1.rule.source == id))
+      bridge = Enum.find(territory_holidays(:JP), &(&1.rule == id))
 
-      assert Rule.conditional?(bridge.rule)
-      assert {:ok, base} = Rule.base_recurrence(bridge.rule)
+      assert %Tempo{form: {:when, base, [keep: _condition]}} = member_of(holidays, bridge)
       assert Tempo.to_iso8601!(base) == "R/../P1Y/FL9M22DN"
-      assert member_of(holidays, bridge) != nil
     end
 
     test "every conditional rule in the data is a conditional member" do
@@ -323,9 +314,9 @@ defmodule Tempo.HolidaysTest do
           ] do
         {:ok, holidays} = Holidays.holidays(territory, subdivision: subdivision)
 
-        holiday = Enum.find(territory_holidays(territory, subdivision), &(&1.rule.source == id))
+        holiday = Enum.find(territory_holidays(territory, subdivision), &(&1.rule == id))
 
-        assert Rule.conditional?(holiday.rule) and member_of(holidays, holiday) != nil,
+        assert match?(%Tempo{form: {:when, _base, _conditions}}, member_of(holidays, holiday)),
                "#{territory} #{subdivision}: #{id}"
       end
     end
@@ -686,14 +677,6 @@ defmodule Tempo.HolidaysTest do
       {:ok, concrete} = Rule.materialise_concrete(rule, ~o"2026")
       assert material_spans(alone) == material_spans(concrete)
     end
-
-    test "a territory's rules come prepared" do
-      holidays = territory_holidays(:JP)
-      refute Enum.any?(holidays, &is_nil(&1.rule.recurrence))
-
-      bridge = Enum.find(holidays, &Rule.conditional?(&1.rule))
-      assert %Tempo{} = bridge.rule.recurrence
-    end
   end
 
   describe "holidays in a window" do
@@ -718,7 +701,7 @@ defmodule Tempo.HolidaysTest do
       assert Tempo.metadata(holidays) == %{territory: "AU"}
 
       new_year = Enum.find(territory_holidays(:AU), &(&1.name == "New Year's Day"))
-      assert Tempo.metadata(IntervalSet.first(holidays))[:id] == new_year.rule.source
+      assert Tempo.metadata(IntervalSet.first(holidays))[:id] == new_year.rule
     end
 
     test "converts over any window, not only a year" do
@@ -865,14 +848,14 @@ defmodule Tempo.HolidaysTest do
       assert dates_of(japan_1970, "Constitution Day") == [~o"1970Y5M3D"]
     end
 
-    test "a replaced holiday's recurrence matches its concrete computation" do
-      holidays = territory_holidays(:JP)
-      entries = for holiday <- holidays, Rule.substitute_entry?(holiday.rule), do: holiday.rule
-      constitution = Enum.find(holidays, &(&1.rule.source == "05-03"))
+    test "a replaced holiday is not on the weekdays its substitute entries take, in their years" do
+      # Japan's two substitute entries for Constitution Day, the Monday after a
+      # Sunday from 1973 and the Wednesday since 2007, both take the Sunday.
+      {:ok, japan} = Holidays.holidays(:JP)
+      constitution = Enum.find(territory_holidays(:JP), &(&1.rule == "05-03"))
 
-      rule = Rule.observe(constitution.rule, :substitute, entries)
-      assert length(rule.replaced_by) == 2
-      assert_matches_materialise(rule, 1965..2030)
+      assert Tempo.to_iso8601!(member_of(japan, constitution)) ==
+               "{R/{../1972Y}/P1Y/FL5M3DN,R/{1973Y/..}/P1Y/FL5M3D{1..6}KN}"
     end
 
     test "a substitute day for one named year is an extra day beside its holiday" do
