@@ -108,11 +108,21 @@ Taken by the user on 2026-10-27.
 
 * **D4 — where your holidays come from.** Both: `holidays(:AU, add: [...], remove: [...])` for a call, and `config :tempo_holidays, holidays: [...]` for those an application always wants, read at call time, with no process to supervise.
 
+Taken by the user on 2026-10-27, for what the holiday layer applies on top of a rule (a census of the 5,154 entries of the 3.38.0 data: 333 `and if` rules, 229 `substitutes …` entries, 253 `active` windows, 51 `disable` and 45 `enable` dates, 5 year-end pairs). Each of D6 to D8 is an option of `Tempo.DateRule.parse/2` (Tempo's `plans/date-rule.md`):
+
+* **D6 — the `:dates` option.** Read with `observed: :moved` for `:substitute`, `:none` for `:gazetted`, `:as_written` for `:both`.
+
+* **D7 — substitute entries.** A holiday a `substitutes` entry stands in for is read with `replaced_by: [entry]`: not on the entry's trigger weekdays in its years.
+
+* **D8 — `active`, `disable` and `enable`.** Passed as `active:`, `disable:` and `enable:`, folded into the domain as `Rule` folds them now.
+
+* **D9 — a period split at the year end.** One member: the union of the two dated spans, coalesced into the one period.
+
 ## Tasks
 
 * [ ] **Tempo.DateRule** — the tokenizer, compiling from its tokens and the census gaps, in Tempo (`plans/date-rule.md` there); Tempo 2.1.
 
-* [ ] **The dataset on Tempo.DateRule** — tempo_holidays compiles its rules with it, its `Grammar`, `Compiler` and `Rule`'s recurrence builders retired; conformance unchanged.
+* [ ] **The dataset on Tempo.DateRule** — tempo_holidays compiles its rules with it, its `Grammar`, `Compiler` and `Rule`'s recurrence builders retired; conformance unchanged but for four rules whose span `Rule` dropped on a weekday step (`1st saturday in October P2D` and three more), which now span their days. Needs Tempo's options for D6 to D8, taken from Tempo's `main` until 2.1 is on hex.
 
 * [ ] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule`, tagged as the dataset's members are.
 
