@@ -16,6 +16,8 @@ First release. Public holidays for every territory in the [date-holidays](https:
 
 * `Tempo.Holidays.compile/2` — a holiday from a rule in the date-holidays grammar, tagged as the dataset's holidays are (`:id`, `:name`, `:type` and metadata of your own).
 
+* Holidays of your own: `holidays/2` takes `:add` (rules with the options of `compile/2`) and `:remove` (ids or names), and `config :tempo_holidays, holidays:` gives them for every request, keyed by territory or subdivision.
+
 * Each rule is read by Tempo's `Tempo.DateRule` when a territory's holidays are first asked for, and kept for the life of the VM per territory, subdivision and `:dates` reading.
 
 * `Tempo.Holidays.day_start/2` projects the occurrences of a holiday whose day begins at sunset, told by the `:calendar` in its metadata, onto the evening before, at sunset or 18:00, at the calendar's reference place or a location of your own.

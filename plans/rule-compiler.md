@@ -128,13 +128,21 @@ Taken by the user on 2026-10-27, for the move itself:
 
 * **D12 — a substitute entry under `:gazetted`.** Read with `observed: :none`, which gives a `substitutes` rule no date (Tempo `164d6de`); what is empty is dropped.
 
+Taken by the user on 2026-10-27, for holidays of your own (D4):
+
+* **D13 — what `add:` takes.** A rule and its options, `{rule, options}` with the options of `compile/2` but `:dates`: it is read with the call's `:dates` and selected by `:include` and `:exclude` as a dataset holiday is, and a config entry is written the same way.
+
+* **D14 — what `remove:` matches.** A holiday's id or its name: `remove: ["Election Day"]` leaves out every holiday of that name (Brazil's two, for ANBIMA's list); a rule leaves out that holiday.
+
+* **D15 — the config.** Keyed by territory, or a territory and subdivision (`AU:`, `"US-CA":`), each holding the `add:` and `remove:` a call takes; a territory's entry applies to its subdivisions too, and a call's own come after the config's.
+
 ## Tasks
 
-* [ ] **Tempo.DateRule** — the tokenizer, compiling from its tokens and the census gaps, in Tempo (`plans/date-rule.md` there); Tempo 2.1.
-
-* [ ] **Holidays of your own** — `add:` and `remove:` on `holidays/2`, `config :tempo_holidays, holidays:`, a holiday's territories and subdivisions, replacing or removing a dataset holiday by id.
+* [ ] **Tempo 2.1 from hex** — `Tempo.DateRule` is on Tempo `main` (`plans/date-rule.md` there); once Tempo 2.1 is published, `{:ex_tempo, "~> 2.1"}` in place of the GitHub dependency (D10). Blocked on the Tempo 2.1 release.
 
 ### Done
+
+* [x] **Holidays of your own** — `:add` and `:remove` on `holidays/2` (D13, D14) and `config :tempo_holidays, holidays:` (D15): an added holiday is read as `compile/2` reads it with the request's `:dates` and takes the place of a holiday of its id; `:remove` matches an id or a name and applies first; a territory's configured holidays apply to its subdivisions, a subdivision's after its territory's, a request's after both. 2026-10-27.
 
 * [x] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule` with `:dates` as `holidays/2` reads it, tagged `:id` and `:name` (the rule by default), `:type` (`:public`), the caller's `:metadata` beside them and `:calendar` for a rule of another calendar; a conditional is decided against the set it is in, and alone against none (D3). 2026-10-27.
 

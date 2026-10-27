@@ -28,9 +28,11 @@ defmodule Tempo.Holidays do
   Gregorian adds `:calendar`, that calendar's module. The set's own metadata
   names its territory and subdivision.
 
-  The primary API is `holidays/2`; `compile/2` reads a holiday of your own
-  from a rule in the dataset's grammar, and `day_start/2` projects the Islamic
-  and Hebrew holidays whose day begins at sunset onto the evening before.
+  The primary API is `holidays/2`, which gives holidays of your own beside
+  the dataset's (`:add`, `:remove` and the `:holidays` configuration);
+  `compile/2` reads a holiday from a rule in the dataset's grammar, and
+  `day_start/2` projects the Islamic and Hebrew holidays whose day begins at
+  sunset onto the evening before.
 
   ## Example
 
@@ -76,9 +78,11 @@ defmodule Tempo.Holidays do
 
   @dates [:substitute, :gazetted, :both]
 
-  @options [:territory, :locale, :subdivision, :include, :exclude, :dates]
+  @options [:territory, :locale, :subdivision, :include, :exclude, :dates, :add, :remove]
 
   @rule_options [:id, :name, :type, :metadata, :dates]
+
+  @own_options [:add, :remove]
 
   # The calendars whose day begins at sunset, so `day_start/2` projects their
   # holidays onto the evening before.
@@ -107,6 +111,20 @@ defmodule Tempo.Holidays do
   A selection by type never changes a holiday's date: a kept holiday that moves
   off another (Näfelser Fahrt off Maundy Thursday, an observance) carries the
   holidays it depends on when their type is left out.
+
+  Holidays of your own sit beside the dataset's: `:add` and `:remove` for one
+  request, and `config :tempo_holidays, holidays:` for every request, keyed by
+  territory, or by territory and subdivision, each with the `:add` and
+  `:remove` a request takes. A territory's apply to its subdivisions too, a
+  subdivision's come after its territory's, and a request's own after both.
+  The configuration is read at each request.
+
+      config :tempo_holidays,
+        holidays: [
+          AU: [add: [{"1st friday in December", name: "Company Day", type: :optional}]],
+          BR: [remove: ["Election Day"]],
+          "AU-VIC": [add: [{"11-02", name: "Office Closure"}]]
+        ]
 
   ### Arguments
 
@@ -147,6 +165,16 @@ defmodule Tempo.Holidays do
       them. A holiday the data moves to another day, rather than observing on
       both, is on the day it moves to.
 
+  * `:add` — holidays of your own, a list of rules in the date-holidays
+    grammar, each `{rule, options}` with the options of `compile/2` but
+    `:dates`, or a rule alone. Each is read with the request's `:dates`,
+    selected by `:include` and `:exclude` as the dataset's holidays are, and
+    takes the place of a holiday of its id. The default is none.
+
+  * `:remove` — the holidays to leave out, a list of ids or names: `"Election
+    Day"` leaves out every holiday of that name. It applies before `:add`.
+    The default is none.
+
   ### Returns
 
   * `{:ok, recurrence_set}` — a recurrence set (a `t:Tempo.t/0`) of the holidays: the
@@ -155,7 +183,11 @@ defmodule Tempo.Holidays do
   * `{:error, reason}` — `{:unknown_territory, territory}`,
     `{:invalid_locale, target}`, `{:unknown_subdivision, subdivision}`,
     `{:ambiguous_subdivision, subdivision}`, `{:invalid_holiday_type, value}`,
-    `{:invalid_dates, value}` or `{:invalid_option, option}`.
+    `{:invalid_dates, value}`, `{:invalid_add, value}`,
+    `{:invalid_remove, value}`, `{:invalid_config, entry}` or
+    `{:invalid_option, option}`, or
+
+  * an error `compile/2` returns for a holiday of `:add`.
 
   ### Examples
 
@@ -175,6 +207,13 @@ defmodule Tempo.Holidays do
       iex> Tempo.IntervalSet.count(this_year)
       8
 
+      iex> import Tempo.Sigils
+      iex> company_day = {"1st friday in December", name: "Company Day"}
+      iex> {:ok, australia} = Tempo.Holidays.holidays(:AU, include: :public, add: [company_day])
+      iex> {:ok, december} = Tempo.to_interval(australia, within: ~o"2026-12")
+      iex> Tempo.IntervalSet.map(december, &Tempo.metadata(&1).name)
+      ["Company Day", "Christmas Day", "Boxing Day"]
+
   """
   @spec holidays(target(), keyword()) ::
           {:ok, Tempo.t()} | {:error, {atom(), term()} | Exception.t()}
@@ -191,7 +230,9 @@ defmodule Tempo.Holidays do
          {:ok, dates} <- selected_dates(options),
          {:ok, resolved} <- Locale.resolve(target, options),
          {:ok, subdivision} <- Data.subdivision(resolved.territory, resolved.subdivision),
-         {:ok, read} <- read_holidays(resolved.territory, subdivision, dates) do
+         {:ok, changes} <- own_changes(resolved.territory, subdivision, options),
+         {:ok, dataset} <- read_holidays(resolved.territory, subdivision, dates),
+         {:ok, read} <- with_own(dataset, changes, dates) do
       members =
         for {holiday, expression} <- read,
             holiday.type in types,
@@ -214,6 +255,185 @@ defmodule Tempo.Holidays do
 
   defp known_option?({option, _value}, known), do: option in known
   defp known_option?(_other, _known), do: false
+
+  # The holidays of your own a request makes, in the order they apply: the
+  # configured ones of its territory, then of its subdivision, then its own.
+  # Each is a list of ids or names to leave out and a list of rules to add.
+  defp own_changes(territory, subdivision, options) do
+    with {:ok, configured} <- configured_changes(territory, subdivision),
+         {:ok, change} <- own_change(options) do
+      {:ok, configured ++ [change]}
+    end
+  end
+
+  defp configured_changes(territory, subdivision) do
+    entries = Application.get_env(:tempo_holidays, :holidays, [])
+
+    with {:ok, entries} <- configured_entries(entries, []) do
+      entries
+      |> Enum.filter(&applies?(&1, territory, subdivision))
+      |> Enum.sort_by(&depth/1)
+      |> changes_of([])
+    end
+  end
+
+  defp configured_entries([], entries) do
+    {:ok, Enum.reverse(entries)}
+  end
+
+  defp configured_entries([{key, options} = entry | rest], entries)
+       when is_atom(key) or is_binary(key) do
+    case known_options(options, @own_options) do
+      :ok -> configured_entries(rest, [{config_path(key), options} | entries])
+      {:error, _reason} -> {:error, {:invalid_config, entry}}
+    end
+  end
+
+  defp configured_entries([entry | _rest], _entries) do
+    {:error, {:invalid_config, entry}}
+  end
+
+  defp configured_entries(entries, _entries) do
+    {:error, {:invalid_config, entries}}
+  end
+
+  # A config key, `:AU` or `:"US-CA"`, as its territory and the path of its
+  # subdivision.
+  defp config_path(key) do
+    key
+    |> to_string()
+    |> String.upcase()
+    |> String.split("-", parts: 2)
+  end
+
+  # A territory's entry applies to it and its subdivisions; a subdivision's
+  # to it and the regions within it.
+  defp applies?({[territory], _options}, territory, _subdivision) do
+    true
+  end
+
+  defp applies?({[territory, path], _options}, territory, subdivision)
+       when is_binary(subdivision) do
+    code = String.upcase(subdivision)
+    code == path or String.starts_with?(code, path <> "-")
+  end
+
+  defp applies?(_entry, _territory, _subdivision) do
+    false
+  end
+
+  defp depth({path, _options}) do
+    length(path)
+  end
+
+  defp changes_of([], changes) do
+    {:ok, Enum.reverse(changes)}
+  end
+
+  defp changes_of([{_path, options} | rest], changes) do
+    with {:ok, change} <- own_change(options) do
+      changes_of(rest, [change | changes])
+    end
+  end
+
+  defp own_change(options) do
+    with {:ok, remove} <- removals(Keyword.get(options, :remove, [])),
+         {:ok, add} <- additions(Keyword.get(options, :add, [])) do
+      {:ok, {remove, add}}
+    end
+  end
+
+  defp removals(remove) when is_list(remove) do
+    if Enum.all?(remove, &is_binary/1) do
+      {:ok, remove}
+    else
+      {:error, {:invalid_remove, remove}}
+    end
+  end
+
+  defp removals(remove) do
+    {:error, {:invalid_remove, remove}}
+  end
+
+  defp additions(add) when is_list(add) do
+    if Enum.all?(add, &addition?/1) do
+      {:ok, Enum.map(add, &addition/1)}
+    else
+      {:error, {:invalid_add, add}}
+    end
+  end
+
+  defp additions(add) do
+    {:error, {:invalid_add, add}}
+  end
+
+  defp addition?({rule, options}) do
+    is_binary(rule) and is_list(options)
+  end
+
+  defp addition?(rule) do
+    is_binary(rule)
+  end
+
+  defp addition({rule, options}) do
+    {rule, options}
+  end
+
+  defp addition(rule) do
+    {rule, []}
+  end
+
+  # The dataset's holidays with each change applied in turn: the holidays it
+  # names left out, then its own added, each in place of a holiday of its id.
+  defp with_own(read, [], _dates) do
+    {:ok, read}
+  end
+
+  defp with_own(read, [{remove, add} | changes], dates) do
+    with {:ok, added} <- read_added(add, dates, []) do
+      kept = Enum.reject(read, &(named_in?(&1, remove) or same_id?(&1, added)))
+      with_own(kept ++ added, changes, dates)
+    end
+  end
+
+  defp read_added([], _dates, added) do
+    {:ok, Enum.reverse(added)}
+  end
+
+  defp read_added([{rule, options} | rest], dates, added) do
+    with {:ok, holiday} <- read_own(rule, options, dates) do
+      read_added(rest, dates, [holiday | added])
+    end
+  end
+
+  # A holiday of your own, read with the request's `:dates` as `compile/2`
+  # reads it, beside the holiday it stands for.
+  defp read_own(rule, options, dates) do
+    if List.keymember?(options, :dates, 0) do
+      {:error, {:invalid_option, :dates}}
+    else
+      own_holiday(rule, compile(rule, [dates: dates] ++ options))
+    end
+  end
+
+  defp own_holiday(rule, {:ok, expression}) do
+    %{name: name, type: type} = Tempo.metadata(expression)
+    {:ok, {%Holiday{rule: rule, name: name, type: type}, expression}}
+  end
+
+  defp own_holiday(_rule, error) do
+    error
+  end
+
+  defp named_in?({_holiday, expression}, names) do
+    %{id: id, name: name} = Tempo.metadata(expression)
+    id in names or name in names
+  end
+
+  defp same_id?({_holiday, expression}, added) do
+    %{id: id} = Tempo.metadata(expression)
+    Enum.any?(added, fn {_other, other} -> Tempo.metadata(other).id == id end)
+  end
 
   defp selected_dates(options) do
     case Keyword.get(options, :dates, :substitute) do
@@ -241,6 +461,7 @@ defmodule Tempo.Holidays do
         |> observed_entries(dates)
         |> read_each(dates)
         |> joined_year_ends()
+        |> Enum.map(fn {holiday, expression} -> {holiday, tagged(expression, holiday)} end)
 
       :persistent_term.put(key, read)
       {:ok, read}
@@ -403,33 +624,38 @@ defmodule Tempo.Holidays do
   defp holiday_types(other), do: {:error, {:invalid_holiday_type, other}}
 
   # A holiday is one member: its expression, tagged with the holiday's id,
-  # name and type over any metadata the expression carries. A conditional
-  # (a bridge, an `if is holiday` move) reads the rest of the territory as it
-  # would unselected: when the type it falls on is left out, it reads those
-  # holidays as its own `:falls_on` set.
+  # name and type when it was read. A conditional (a bridge, an `if is
+  # holiday` move) reads the rest of the territory as it would unselected:
+  # when the type it falls on is left out, it reads those holidays as its own
+  # `:falls_on` set, and keeps its tags.
   defp holiday_member(holiday, expression, read, types, dates) do
     type = conditional_type(expression)
 
     if is_nil(type) or type in types do
-      [tagged(expression, holiday)]
+      [expression]
     else
-      carried_member(holiday, read, type, dates)
+      carried_member(holiday, expression, read, type, dates)
     end
   end
 
-  defp carried_member(holiday, read, type, dates) do
+  defp carried_member(holiday, expression, read, type, dates) do
     carried =
-      for {other, expression} <- read,
+      for {other, other_expression} <- read,
           other.type == type,
           other != holiday,
-          do: tagged(expression, other)
+          do: other_expression
 
     holidays = Enum.map(read, &elem(&1, 0))
 
     case read_falling_on(holiday, holidays, dates, carried) do
-      {:ok, expression} -> [tagged(expression, holiday)]
+      {:ok, carrying} -> [with_tags_of(carrying, expression)]
       {:error, _reason} -> []
     end
+  end
+
+  defp with_tags_of(expression, tagged) do
+    metadata = Map.merge(Tempo.metadata(expression), Tempo.metadata(tagged))
+    Tempo.put_metadata(expression, metadata)
   end
 
   defp read_falling_on(holiday, holidays, dates, carried) do

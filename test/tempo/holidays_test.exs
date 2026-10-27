@@ -387,6 +387,95 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
+  describe "holidays of your own" do
+    test "remove: leaves out the holidays of a name" do
+      {:ok, all} = holidays_in(:BR, ~o"2026", include: [:public, :bank])
+
+      {:ok, anbima} =
+        holidays_in(:BR, ~o"2026", include: [:public, :bank], remove: ["Election Day"])
+
+      assert length(dates_of(all, "Election Day")) == 2
+      assert dates_of(anbima, "Election Day") == []
+      assert IntervalSet.count(anbima) == IntervalSet.count(all) - 2
+    end
+
+    test "remove: leaves out a holiday by its id" do
+      {:ok, australia} = holidays_in(:AU, ~o"2026", remove: ["04-25"])
+      assert dates_of(australia, "Anzac Day") == []
+    end
+
+    test "add: adds a holiday read from a rule, selected by its type" do
+      company_day = {"1st friday in December", name: "Company Day", type: :optional}
+
+      {:ok, australia} = holidays_in(:AU, ~o"2026", add: [company_day])
+      {:ok, public} = holidays_in(:AU, ~o"2026", add: [company_day], include: :public)
+
+      assert dates_of(australia, "Company Day") == [~o"2026Y12M4D"]
+      assert dates_of(public, "Company Day") == []
+    end
+
+    test "add: reads a holiday with the request's :dates" do
+      # 10 October 2026 is a Saturday.
+      ten_ten = {"10-10 and if saturday,sunday then next monday", name: "Ten Ten Day"}
+
+      {:ok, substitute} = holidays_in(:AU, ~o"2026", add: [ten_ten])
+      {:ok, gazetted} = holidays_in(:AU, ~o"2026", add: [ten_ten], dates: :gazetted)
+
+      assert dates_of(substitute, "Ten Ten Day") == [~o"2026Y10M12D"]
+      assert dates_of(gazetted, "Ten Ten Day") == [~o"2026Y10M10D"]
+    end
+
+    test "an added holiday with a dataset holiday's id replaces it" do
+      new_year =
+        {"01-02", id: "01-01 and if saturday,sunday then next monday", name: "New Year's Day"}
+
+      {:ok, australia} = holidays_in(:AU, ~o"2026", add: [new_year])
+      assert dates_of(australia, "New Year's Day") == [~o"2026Y1M2D"]
+    end
+
+    test "an added bridge day is decided against the territory's holidays" do
+      bridge = {"12-24 if 12-25 is holiday", name: "Christmas Bridge"}
+
+      {:ok, australia} = holidays_in(:AU, ~o"2026", add: [bridge])
+      assert dates_of(australia, "Christmas Bridge") == [~o"2026Y12M24D"]
+    end
+
+    test "an added bridge day keeps its day and its name when the holidays it depends on are left out" do
+      bridge = {"12-24 if 12-25 is holiday", name: "Christmas Bridge", type: :optional}
+
+      {:ok, optional} = holidays_in(:AU, ~o"2026", add: [bridge], include: :optional)
+      assert dates_of(optional, "Christmas Bridge") == [~o"2026Y12M24D"]
+    end
+
+    test "a request's remove: applies before its add:" do
+      boxing_day = {"12-29", name: "Boxing Day"}
+
+      {:ok, australia} = holidays_in(:AU, ~o"2026", remove: ["Boxing Day"], add: [boxing_day])
+      assert dates_of(australia, "Boxing Day") == [~o"2026Y12M29D"]
+    end
+
+    test "a holiday of your own that is not well formed is an error" do
+      assert Holidays.holidays(:AU, add: "12-24") == {:error, {:invalid_add, "12-24"}}
+
+      assert Holidays.holidays(:AU, add: [{:christmas, []}]) ==
+               {:error, {:invalid_add, [{:christmas, []}]}}
+
+      assert Holidays.holidays(:AU, add: [{"12-24", dates: :both}]) ==
+               {:error, {:invalid_option, :dates}}
+
+      assert Holidays.holidays(:AU, add: [{"12-24", type: :day}]) ==
+               {:error, {:invalid_holiday_type, :day}}
+
+      assert {:error, %Tempo.ParseError{}} = Holidays.holidays(:AU, add: ["12-24 on a full moon"])
+
+      assert Holidays.holidays(:AU, remove: "Boxing Day") ==
+               {:error, {:invalid_remove, "Boxing Day"}}
+
+      assert Holidays.holidays(:AU, remove: [:boxing_day]) ==
+               {:error, {:invalid_remove, [:boxing_day]}}
+    end
+  end
+
   describe "holidays in a window" do
     test "every AU holiday in 2026" do
       assert {:ok, holidays} = holidays_in(:AU, ~o"2026")

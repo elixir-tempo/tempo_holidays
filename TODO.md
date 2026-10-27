@@ -6,8 +6,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
-* [ ] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list, exact for 2001–2099, plus two `:public` `Election Day` members no type selection leaves out; they are always Sundays, so business-day counts are right and only a listing differs. `holidays/2` has no way to leave a holiday out by its `:id` or `:name`. Analysis in Tempo's [plans/anbima-calendar.md](https://github.com/elixir-tempo/tempo/blob/main/plans/anbima-calendar.md).
-
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
@@ -16,13 +14,13 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## In progress
 
-* [ ] **A public rule compiler, and holidays of your own** — `Tempo.Holidays.compile/2` over Tempo's `Tempo.DateRule`, then holidays an application defines (`add:`/`remove:`, config). Landed: the dataset is read by `Tempo.DateRule` at call time, `Grammar`, `Compiler` and `Rule` are retired, and `compile/2` is in. Plan in [plans/rule-compiler.md](plans/rule-compiler.md).
-
 * [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2) → 223 s on the public path (`holidays/2`, each territory read once). Then: harness parallelism.
 
 * [ ] **Lunations** — Astro (2 lunations per new-moon search, was 6), Calendrical (each new year and new moon once per question) and Tempo (swaps share a candidate's day numbers) take the lunisolar workload from 53.1 s to 2.07 s, results identical. Left: Tempo's traditional-month ordinal builds a whole date through `new/3`, awaiting a Calendrical traditional→ordinal API.
 
 ## Blocked
+
+* [ ] **Tempo from hex** — tempo_holidays takes Tempo from GitHub `main` while `Tempo.DateRule` is unreleased; `{:ex_tempo, "~> 2.1"}` once Tempo 2.1 is published, before this library's release. Blocked on the Tempo 2.1 release.
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
@@ -35,6 +33,12 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Holidays of your own** — `holidays/2` takes `:add` (rules with the options of `compile/2`, read with the request's `:dates`, in place of a holiday of their id) and `:remove` (ids or names); `config :tempo_holidays, holidays:` keyed by territory or subdivision (D13–D15). 2026-10-27.
+
+* [x] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank], remove: ["Election Day"])` is ANBIMA's national list. 2026-10-27.
+
+* [x] **`Tempo.Holidays.compile/2`** — a holiday from a rule in the date-holidays grammar, tagged as the dataset's holidays are. 2026-10-27.
 
 * [x] **The dataset on `Tempo.DateRule`** — each rule is read by Tempo's reader of the date-holidays grammar when a territory's holidays are first asked for, and kept per territory, subdivision and `:dates` reading, its substitute entries paired once; the conformance harness runs on `holidays/2`. 170,818 checks, 0 mismatched, 0 unsupported. 2026-10-27.
 
