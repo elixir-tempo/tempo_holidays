@@ -103,10 +103,12 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # The versions Tempo 2.0 requires: the recurrences are Tempo 2.0's, and
-      # the Islamic tier needs Calendrical 2.
-      {:ex_tempo, "~> 2.0"},
-      {:calendrical, "~> 2.1"},
+      # Tempo from GitHub `main` while the rules move onto Tempo.DateRule,
+      # which is in Tempo 2.1; `~> 2.1` from hex once it is published. It
+      # requires Calendrical 2.2, whose lunisolar calendars name a year by its
+      # sexagenary cycle.
+      {:ex_tempo, github: "elixir-tempo/tempo"},
+      {:calendrical, "~> 2.2"},
       {:astro, "~> 2.9"},
       # Tz, which Tempo brings and asks where nothing else is configured: an
       # equinox or solstice in a named IANA zone (Chile's solstice `in
