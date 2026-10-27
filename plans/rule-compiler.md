@@ -106,8 +106,6 @@ Taken by the user on 2026-10-27.
 
 ## Tasks
 
-* [ ] **The tokenizer** — the parser's token kinds and order, its fixture as a golden test (116 rules, `#1111` aside), the `Dhu al-Qidah` spelling among them.
-
 * [ ] **Compiling from tokens** — the tokens to the `%Rule{}` kinds, replacing the whole-rule patterns; the census gaps closed by production (optional years and cycles, a month alone, steps before any base, a count of days as a step, a nested inner `before`, `if equal`, `prior to` a month, `T16`), Bengali left an error until Calendrical has the calendar; conformance unchanged.
 
 * [ ] **`Tempo.Holidays.compile/2`** — the public function and its error, with the dependent rules as conditional members.
@@ -115,3 +113,7 @@ Taken by the user on 2026-10-27.
 * [ ] **Holidays of your own** — `add:` and `remove:` on `holidays/2`, `config :tempo_holidays, holidays:`, a holiday's territories and subdivisions, replacing or removing a dataset holiday by id.
 
 * [ ] **The grammar guide** — each production with examples that run.
+
+### Done
+
+* [x] **The tokenizer** — `Tempo.Holidays.Grammar.tokens/1` and `tokenize/1`: the parser's 23 readers in its order and its reordering; every one of the 119 rules of its fixture (`test/fixtures/date_holidays_parser_tokens.json`, vendored with its ISC notice in `NOTICE`) reads to the parser's tokens. `on <weekdays>` is read only at the start of what is left. 2026-10-27.
