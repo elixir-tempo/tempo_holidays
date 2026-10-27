@@ -3,7 +3,7 @@ defmodule Tempo.Holidays.BuildTest do
 
   import Tempo.Sigils
 
-  alias Tempo.Holidays.{Build, Rule}
+  alias Tempo.Holidays.{Build, Data, Rule}
 
   describe "holidays_from_bundle/3" do
     setup do
@@ -64,6 +64,36 @@ defmodule Tempo.Holidays.BuildTest do
 
       # Inherited Christmas kept, Thanksgiving removed, own Founders' Day added.
       assert names == ["Christmas Day", "Founders' Day"]
+    end
+  end
+
+  # The subdivisions of the built data, as date-holidays-parser's `getRules`
+  # reads them: each level inherits what its `_days` names before its own
+  # days, a country's top-level `regions` are its subdivisions, and one with
+  # no days of its own has the level above's holidays.
+  describe "subdivisions" do
+    test "a state inherits the days its `_days` names" do
+      # Saint Barthélemy is a state of France whose days are the territory BL's.
+      {:ok, france} = Data.for_territory(:FR)
+      {:ok, saint_barthelemy} = Data.for_territory(:FR, "BL")
+
+      refute Enum.any?(france, &(&1.rule == "08-24"))
+      assert Enum.any?(saint_barthelemy, &(&1.rule == "08-24" and &1.name == "Saint Barth"))
+    end
+
+    test "a region inherits the days its `_days` names" do
+      # El Hierro, a region of the Canary Islands, has the days of IC's region EH.
+      {:ok, el_hierro} = Data.for_territory(:ES, "CN-EH")
+      assert Enum.any?(el_hierro, &(&1.rule == "09-24"))
+    end
+
+    test "a country's top-level regions are its subdivisions" do
+      assert Data.subdivision(:AD, "07") == {:ok, "07"}
+    end
+
+    test "a region with no days of its own has its state's holidays" do
+      assert Data.for_territory(:US, "LA-NO") ==
+               Data.for_territory(:US, "LA")
     end
   end
 

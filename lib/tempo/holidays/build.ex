@@ -163,29 +163,52 @@ defmodule Tempo.Holidays.Build do
     country = compile_days(resolve_days(bundle, code), names, language)
 
     states =
-      ["holidays", code, "states"]
-      |> then(&get_in(bundle, &1))
-      |> as_map()
-      |> Enum.map(fn {state, data} -> {state, compile_state(data, names, language)} end)
-      |> Enum.reject(fn {_state, entry} -> empty_state?(entry) end)
-      |> Map.new()
+      bundle
+      |> subdivisions_of(code)
+      |> Map.new(fn {state, data} -> {state, compile_state(bundle, data, names, language)} end)
 
     write_country(directory, code, %{country: country, states: states})
   end
 
-  defp compile_state(state_data, names, language) do
-    days = sub_days(state_data)
+  # A country's first level of subdivisions: its `states`, and its `regions`
+  # where it writes them at the top (Andorra's parishes, Croatia's counties),
+  # which date-holidays-parser takes as states, ahead of a state of the same
+  # code.
+  defp subdivisions_of(bundle, code) do
+    territory = as_map(get_in(bundle, ["holidays", code]))
+    Map.merge(as_map(Map.get(territory, "states")), as_map(Map.get(territory, "regions")))
+  end
 
+  # A state or a region with no days of its own is kept: date-holidays lists
+  # it (New Orleans, `US-LA-NO`), and it has the holidays of the level above.
+  defp compile_state(bundle, state_data, names, language) do
     regions =
       state_data
       |> sub_regions()
-      |> Enum.map(fn {region, data} ->
-        {region, compile_level(sub_days(data), names, language)}
+      |> Map.new(fn {region, data} ->
+        {region, compile_level(level_days(bundle, data), names, language)}
       end)
-      |> Enum.reject(fn {_region, entry} -> entry.keys == [] end)
-      |> Map.new()
 
-    days |> compile_level(names, language) |> Map.put(:regions, regions)
+    bundle
+    |> level_days(state_data)
+    |> compile_level(names, language)
+    |> Map.put(:regions, regions)
+  end
+
+  # A state's or a region's days: those its `_days` names (Saint Barthélemy
+  # the territory `BL`'s, a Canary Island its region of `IC`), with its own
+  # over them, `false` among them to remove one of the level above's.
+  defp level_days(bundle, data) do
+    inherited = referenced_days(bundle, is_map(data) && Map.get(data, "_days"))
+    Map.merge(inherited, sub_days(data))
+  end
+
+  defp referenced_days(bundle, reference) when is_binary(reference) or is_list(reference) do
+    as_days(get_in(bundle, ["holidays"] ++ List.wrap(reference) ++ ["days"]))
+  end
+
+  defp referenced_days(_bundle, _none) do
+    %{}
   end
 
   defp compile_level(days, names, language) do
@@ -214,9 +237,6 @@ defmodule Tempo.Holidays.Build do
     |> Enum.reject(fn {_rule, meta} -> meta == false end)
     |> Map.new()
   end
-
-  defp empty_state?(%{holidays: [], keys: [], regions: regions}), do: regions == %{}
-  defp empty_state?(_entry), do: false
 
   defp as_days(days) when is_map(days), do: days
   defp as_days(_absent), do: %{}

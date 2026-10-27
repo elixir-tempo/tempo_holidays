@@ -1,26 +1,30 @@
 defmodule Tempo.Holidays.ConformanceTest do
-  # Drives the compiler + materialiser to full agreement with date-holidays.
-  # Each compiled rule's computed Gregorian dates must sit inside the fixture's
-  # date-set for that country-year (see `Tempo.Holidays.Conformance`). The gate
-  # is zero unsupported and zero mismatched rules across the whole corpus.
+  # Holds `Tempo.Holidays.holidays/2` to date-holidays' own output: for each
+  # territory and year of its fixtures, the days our occurrences of each rule
+  # start on must hold the fixture's dates for that rule and lie among the
+  # fixture's dates that year (see `Tempo.Holidays.Conformance`). The gate is
+  # zero unsupported and zero mismatched rules across the whole corpus.
   #
   # Two buckets hold *accepted* non-defects, excluded from the gate:
   #
   #   * `divergent` — the Islamic civil dates, where date-holidays uses a fixed
   #     table with a 6pm/timezone day-start and Calendrical uses the
-  #     midnight-anchored Umm al-Qura. Excluded from `mismatched`.
+  #     midnight-anchored Umm al-Qura; a rule a region's data removes with
+  #     `false` which its fixture lists all the same (Timaru, Buller: their
+  #     fixtures give the state's holidays, not the region's); and a fixture
+  #     for a subdivision the data does not define (Mauritius' districts),
+  #     generated from an older release. Excluded from `mismatched`.
   #
-  #   * `known_unsupported` — rules we knowingly do not compile yet: the Bengali
-  #     (revised) calendar, which needs a Calendrical calendar first, and two
-  #     rare/expired compound shapes. Deferred follow-ups; excluded from
-  #     `unsupported`. See `Conformance.accepted_unsupported?/1`.
+  #   * `known_unsupported` — rules `Tempo.DateRule` does not read: the Bengali
+  #     (revised) calendar, which needs a Calendrical calendar first. Excluded
+  #     from `unsupported`. See `Conformance.accepted_unsupported?/1`.
   use ExUnit.Case, async: false
 
   alias Tempo.Holidays.{Conformance, Fixtures}
 
   @moduletag :conformance
-  # The full corpus is ~168k rule-checks and runs for tens of minutes; this is
-  # an opt-in exhaustive test, so let it run to completion.
+  # The full corpus is ~171k rule-checks and runs for minutes; this is an
+  # opt-in exhaustive test, so let it run to completion.
   @moduletag timeout: :infinity
 
   test "our computed dates match date-holidays across the full corpus" do

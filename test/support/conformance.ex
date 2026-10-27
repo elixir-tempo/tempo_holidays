@@ -1,14 +1,19 @@
 defmodule Tempo.Holidays.Conformance do
   @moduledoc false
 
-  # Test-only. Runs date-holidays fixtures through `Compiler` + `Rule` and
-  # checks, per rule, that our computed Gregorian date-set equals the set of
-  # dates date-holidays produced for that rule (a substituted holiday yields
-  # both the actual and the substitute date, so the comparison is per-rule,
-  # not per-entry). Reports totals and per-feature breakdowns so the gaps can
-  # be driven to zero.
+  # Test-only. Runs date-holidays fixtures through the public path: for each
+  # territory and year, the holidays `Tempo.Holidays.holidays/2` gives with
+  # `dates: :both` (the dates as date-holidays gives them, a substituted
+  # holiday's own date and its substitute), converted over the year, and
+  # checks, rule by rule, that the days our occurrences of a rule start on hold
+  # every date date-holidays gives that rule and lie among the dates it gives
+  # the year. Reports totals and per-feature breakdowns so the gaps can be
+  # driven to zero.
 
-  alias Tempo.Holidays.{Compiler, Data, Rule}
+  alias Tempo.Holidays
+  alias Tempo.Holidays.Data
+  alias Tempo.Interval
+  alias Tempo.IntervalSet
 
   @type stats :: %{
           rules: non_neg_integer(),
@@ -17,18 +22,14 @@ defmodule Tempo.Holidays.Conformance do
           known_unsupported: %{atom() => non_neg_integer()},
           mismatched: %{atom() => non_neg_integer()},
           divergent: %{atom() => non_neg_integer()},
-          samples: [map()],
-          prepared: %{{String.t(), [Rule.t()] | nil} => Rule.t()}
+          samples: [map()]
         }
 
   @doc "Run conformance over the given fixtures, returning aggregate stats."
   @spec run([Tempo.Holidays.Fixtures.fixture()], keyword()) :: stats()
   def run(fixtures, options \\ []) do
     sample_limit = Keyword.get(options, :samples, 25)
-    gate_indices = gate_indices(fixtures)
-
-    fixtures
-    |> Enum.reduce(initial(), &check_fixture(&1, &2, gate_indices, sample_limit))
+    Enum.reduce(fixtures, initial(), &check_fixture(&1, &2, sample_limit))
   end
 
   defp initial do
@@ -39,41 +40,35 @@ defmodule Tempo.Holidays.Conformance do
       known_unsupported: %{},
       mismatched: %{},
       divergent: %{},
-      samples: [],
-      prepared: %{}
+      samples: []
     }
   end
 
-  # date-holidays' `active`/`disable`/`enable` metadata lives on the source
-  # `days`, not in the fixture output, so re-compiling a bare rule string
-  # cannot see it. Load the *built* runtime data once per distinct territory
-  # and index its gates by rule source, so each fixture rule is materialised
-  # with the same gates the shipped data carries.
-  defp gate_indices(fixtures) do
-    fixtures
-    |> Enum.map(& &1.territory)
-    |> Enum.uniq()
-    |> Map.new(&{&1, gate_index(&1)})
-  end
-
-  defp gate_index(territory) do
+  defp check_fixture(%{year: year, holidays: holidays, territory: territory}, acc, limit) do
+    # date-holidays deduplicates dates across a country's entries (an actual
+    # date and its substitute may come from two different rules), so a rule's
+    # computed dates must sit inside the whole fixture's date-set, not equal
+    # its own entries exactly.
+    all_dates = for %{date: %Date{} = date} <- holidays, into: MapSet.new(), do: date
     {code, subdivision} = split_territory(territory)
 
-    case holidays_for(code, subdivision) do
-      {:ok, holidays} -> Enum.group_by(holidays, & &1.rule.source, & &1.rule)
-      {:error, _absent} -> %{}
-    end
-  end
+    context = %{
+      all_dates: all_dates,
+      territory: territory,
+      year: year,
+      limit: limit,
+      ours: our_occurrences(code, subdivision, year),
+      rules: our_rules(code, subdivision),
+      parent_rules: parent_rules(code, subdivision),
+      unknown_subdivision: unknown_subdivision?(code, subdivision)
+    }
 
-  # date-holidays gives a subdivision it holds no data for the country's
-  # holidays, and its fixtures for such a subdivision (Mauritius' districts)
-  # are the country's. The library refuses an unknown subdivision; the harness
-  # reads the country's gates for it, as date-holidays does.
-  defp holidays_for(code, subdivision) do
-    case Data.for_territory(code, subdivision) do
-      {:error, {:unknown_subdivision, _subdivision}} -> Data.for_territory(code)
-      result -> result
-    end
+    holidays
+    |> Enum.filter(&(is_binary(&1.rule) and is_struct(&1.date, Date)))
+    |> Enum.group_by(& &1.rule, & &1.date)
+    |> Enum.reduce(acc, fn {rule, dates}, acc ->
+      check_rule(rule, MapSet.new(dates), context, acc)
+    end)
   end
 
   # A fixture territory is `<country>[-<state>[-<region>]]`, e.g. `US-CA` or
@@ -85,62 +80,144 @@ defmodule Tempo.Holidays.Conformance do
     end
   end
 
-  defp check_fixture(%{year: year, holidays: holidays, territory: territory}, acc, indices, limit) do
-    {:ok, year_tempo} = Tempo.new(year: year)
-    # date-holidays deduplicates dates across a country's entries (an actual
-    # date and its substitute may come from two different rules), so a rule's
-    # computed dates must sit inside the whole fixture's date-set, not equal
-    # its own entries exactly.
-    all_dates = for %{date: %Date{} = date} <- holidays, into: MapSet.new(), do: date
+  # Our occurrences that year: by rule, the days they start on in the year,
+  # as date-holidays lists a holiday in the year it starts in; and every
+  # occurrence the year holds, as the dates it runs from and to.
+  defp our_occurrences(code, subdivision, year) do
+    with {:ok, holidays} <- holidays_for(code, subdivision),
+         {:ok, window} <- Tempo.new(year: year),
+         {:ok, occurrences} <- Tempo.to_interval(holidays, within: window) do
+      members = IntervalSet.members(occurrences)
+      {:ok, %{starts: starts_by_rule(members, year), spans: spans(members)}}
+    end
+  end
 
-    base = %{
-      all_dates: all_dates,
-      holidays: holidays,
-      year_tempo: year_tempo,
-      territory: territory,
-      year: year,
-      gates: Map.get(indices, territory, %{}),
-      limit: limit
-    }
+  defp starts_by_rule(occurrences, year) do
+    for occurrence <- occurrences,
+        {:ok, date} <- [date_of(Interval.from(occurrence))],
+        date.year == year,
+        reduce: %{} do
+      starts ->
+        Map.update(
+          starts,
+          Tempo.metadata(occurrence)[:id],
+          MapSet.new([date]),
+          &MapSet.put(&1, date)
+        )
+    end
+  end
 
-    holidays
-    |> Enum.filter(&(is_binary(&1.rule) and is_struct(&1.date, Date)))
-    |> Enum.group_by(& &1.rule, & &1.date)
-    |> Enum.reduce(acc, fn {rule, dates}, acc ->
-      check_rule(rule, MapSet.new(dates), base, acc)
+  defp spans(occurrences) do
+    for occurrence <- occurrences,
+        {:ok, from} <- [date_of(Interval.from(occurrence))],
+        {:ok, to} <- [date_of(Interval.to(occurrence))] do
+      {from, to}
+    end
+  end
+
+  # date-holidays gives a subdivision it holds no data for the country's
+  # holidays, and its fixtures for such a subdivision (Mauritius' districts)
+  # are the country's. The library refuses an unknown subdivision; the harness
+  # reads the country's for it, as date-holidays does.
+  defp holidays_for(code, subdivision) do
+    case Holidays.holidays(code, subdivision: subdivision, dates: :both) do
+      {:error, {:unknown_subdivision, _subdivision}} -> Holidays.holidays(code, dates: :both)
+      result -> result
+    end
+  end
+
+  # The rules the built data holds for the territory.
+  defp our_rules(code, subdivision) do
+    result =
+      case Data.for_territory(code, subdivision) do
+        {:error, {:unknown_subdivision, _subdivision}} -> Data.for_territory(code)
+        result -> result
+      end
+
+    case result do
+      {:ok, holidays} -> MapSet.new(holidays, & &1.rule)
+      {:error, _reason} -> MapSet.new()
+    end
+  end
+
+  # A subdivision date-holidays' data does not define: its fixtures (Mauritius'
+  # districts) are the country's of an older release, and list rules the
+  # data no longer holds.
+  defp unknown_subdivision?(_code, nil) do
+    false
+  end
+
+  defp unknown_subdivision?(code, subdivision) do
+    match?({:error, {:unknown_subdivision, _subdivision}}, Data.subdivision(code, subdivision))
+  end
+
+  # The rules of the level a subdivision is in: a region's state, a state's
+  # country, and none for the country itself.
+  defp parent_rules(_code, nil) do
+    MapSet.new()
+  end
+
+  defp parent_rules(code, subdivision) do
+    case String.split(subdivision, "-", parts: 2) do
+      [state, _region] -> our_rules(code, state)
+      [_state] -> our_rules(code, nil)
+    end
+  end
+
+  defp check_rule(rule, expected, context, acc) do
+    acc = %{acc | rules: acc.rules + 1}
+    context = Map.merge(context, %{rule: rule, expected: expected})
+
+    case context.ours do
+      {:ok, ours} -> check_ours(Map.fetch(ours.starts, rule), ours, context, acc)
+      {:error, reason} -> record(acc, context, %{error: reason})
+    end
+  end
+
+  defp check_ours({:ok, starts}, _ours, context, acc) do
+    if MapSet.subset?(context.expected, starts) and MapSet.subset?(starts, context.all_dates) do
+      %{acc | matched: acc.matched + 1}
+    else
+      record(acc, context, %{expected: context.expected, ours: starts})
+    end
+  end
+
+  # A rule with no occurrence of its own that year: the January half of a
+  # period date-holidays splits at the year end, which we hold as one period
+  # begun before its date; a rule a subdivision's data removes (`false`) from
+  # the level above, which date-holidays gives it all the same, an accepted
+  # difference; a rule our data does not hold; or a mismatch.
+  defp check_ours(:error, ours, context, acc) do
+    cond do
+      Enum.all?(context.expected, &continued?(&1, ours.spans)) ->
+        %{acc | matched: acc.matched + 1}
+
+      removed_by_subdivision?(context) ->
+        bump(acc, :divergent, :removed_by_subdivision)
+
+      context.unknown_subdivision and not MapSet.member?(context.rules, context.rule) ->
+        bump(acc, :divergent, :stale_subdivision_fixture)
+
+      not MapSet.member?(context.rules, context.rule) ->
+        record_unsupported(acc, context.rule)
+
+      true ->
+        record(acc, context, %{expected: context.expected, ours: MapSet.new()})
+    end
+  end
+
+  defp removed_by_subdivision?(context) do
+    MapSet.member?(context.parent_rules, context.rule) and
+      not MapSet.member?(context.rules, context.rule)
+  end
+
+  defp continued?(date, spans) do
+    Enum.any?(spans, fn {from, to} ->
+      Date.compare(from, date) == :lt and Date.compare(date, to) != :gt
     end)
   end
 
-  defp check_rule(rule, expected, base, acc) do
-    acc = %{acc | rules: acc.rules + 1}
-    context = Map.merge(base, %{rule: rule, expected: expected, present: present_fun(base, rule)})
-
-    case prepared_rule(rule, context.gates, acc) do
-      {:ok, prepared, acc} -> check_materialised(prepared, context, acc)
-      {:error, acc} -> record_unsupported(acc, rule)
-    end
-  end
-
-  # Compile, gate and prepare each distinct rule once — keyed by its source and
-  # the gates the territory's built data gives it — so its recurrence is built a
-  # single time however many fixtures exercise it.
-  defp prepared_rule(rule, gates, acc) do
-    key = {rule, Map.get(gates, rule)}
-
-    case Map.fetch(acc.prepared, key) do
-      {:ok, prepared} -> {:ok, prepared, acc}
-      :error -> compile_and_prepare(Compiler.compile(rule), gates, key, acc)
-    end
-  end
-
-  defp compile_and_prepare({:ok, compiled}, gates, key, acc) do
-    prepared = compiled |> attach_gates(gates) |> Rule.prepare()
-    {:ok, prepared, %{acc | prepared: Map.put(acc.prepared, key, prepared)}}
-  end
-
-  defp compile_and_prepare({:error, _reason}, _gates, _key, acc), do: {:error, acc}
-
-  # A rule that does not compile is a defect unless it is an accepted known gap
+  # A rule our data does not hold is a defect unless it is an accepted gap
   # (`accepted_unsupported?/1`), which is tracked in its own bucket — the way
   # `divergent` sits apart from `mismatched`.
   defp record_unsupported(acc, rule) do
@@ -148,141 +225,10 @@ defmodule Tempo.Holidays.Conformance do
     bump(acc, bucket, feature(rule))
   end
 
-  # Rules we knowingly do not compile yet, excluded from the `unsupported` gate.
-  # `bengali-revised` needs a Bengali calendar in Calendrical before a
-  # `tempo_holidays` tier can exist; the other two are a rare compound Easter
-  # offset and an expired doubly-nested US rule, tracked as deferred follow-ups.
-  # All are gaps, not defects.
+  # The rules `Tempo.DateRule` does not read: the Bengali calendar, which
+  # needs a Bengali calendar in Calendrical. A gap, not a defect.
   defp accepted_unsupported?(rule) do
-    String.starts_with?(rule, "bengali") or
-      rule =~ ~r/^Thursday before easter/i or
-      rule =~ ~r/^friday before 1st monday before 06-01/i
-  end
-
-  # A `(gregorian_days, type) -> boolean()` for the conditional second pass,
-  # built from date-holidays' own output: the fixture's other entries, of the
-  # right type, on that day. The rule under test is excluded by identity —
-  # exactly as `PostRule` skips the rule it is resolving — so an if-holiday day
-  # never coincides with itself.
-  defp present_fun(%{holidays: holidays}, current_rule) do
-    date_types =
-      holidays
-      |> Enum.reject(&(&1.rule == current_rule))
-      |> Enum.reduce(MapSet.new(), fn holiday, set ->
-        case fixture_days(holiday.date) do
-          nil -> set
-          days -> MapSet.put(set, {days, fixture_type(holiday.type)})
-        end
-      end)
-
-    fn days, type -> MapSet.member?(date_types, {days, type}) end
-  end
-
-  defp fixture_days(%Date{} = date), do: Date.to_gregorian_days(date)
-  defp fixture_days(nil), do: nil
-
-  @fixture_types %{
-    "public" => :public,
-    "bank" => :bank,
-    "school" => :school,
-    "observance" => :observance,
-    "optional" => :optional
-  }
-
-  defp fixture_type(type), do: Map.get(@fixture_types, type, :public)
-
-  # Copy the built rule's occurrence-level gates onto the freshly compiled
-  # rule; a source the built data does not carry leaves the rule ungated,
-  # exactly as before this enrichment existed.
-  defp attach_gates(compiled, gates) do
-    case Map.get(gates, compiled.source) do
-      [%Rule{} = built | _] ->
-        %{compiled | active: built.active, disable: built.disable, enable: built.enable}
-
-      _absent ->
-        compiled
-    end
-  end
-
-  defp check_materialised(compiled, context, acc) do
-    case materialise_rule(compiled, context) do
-      {:ok, intervals} ->
-        ours = to_date_set(intervals)
-
-        if MapSet.subset?(context.expected, ours) and MapSet.subset?(ours, context.all_dates) do
-          %{acc | matched: acc.matched + 1}
-        else
-          record(acc, context, %{expected: context.expected, ours: ours})
-        end
-
-      {:error, _} ->
-        record(acc, context, %{error: :materialise})
-    end
-  end
-
-  defp materialise_rule(compiled, context) do
-    if Rule.conditional?(compiled),
-      do: resolve_conditional(compiled, context),
-      else: Rule.materialise(compiled, context.year_tempo)
-  end
-
-  # A bridge / if-holiday rule is resolved as its holiday set resolves it when
-  # the set converts: a conditional member of a recurrence set, here holding the
-  # fixture's other entries — Tempo's second pass against date-holidays' own
-  # output. A conditional no member can express resolves concretely against the
-  # same entries (`context.present`).
-  defp resolve_conditional(compiled, context) do
-    case Rule.recurrence(compiled) do
-      {:ok, %Tempo{} = conditional} ->
-        resolve_in_set(conditional, context)
-
-      _no_conditional_member ->
-        with {:ok, base} <- Rule.materialise_concrete(compiled, context.year_tempo) do
-          Rule.resolve_conditional(compiled, base, context.year_tempo, context.present)
-        end
-    end
-  end
-
-  defp resolve_in_set(conditional, context) do
-    under_test = Tempo.put_metadata(conditional, %{under_test: true})
-    holidays = Tempo.RecurrenceSet.new!([under_test | fixture_members(context)])
-
-    with {:ok, occurrences} <- Tempo.to_interval(holidays, within: context.year_tempo) do
-      {:ok,
-       occurrences
-       |> Tempo.IntervalSet.members()
-       |> Enum.filter(&(Tempo.metadata(&1)[:under_test] && starts_in?(&1, context.year)))}
-    end
-  end
-
-  # The fixture's other entries as typed days — what `present_fun/2` tallies.
-  defp fixture_members(%{holidays: holidays, rule: rule}) do
-    for holiday <- holidays,
-        holiday.rule != rule,
-        %Date{} = date <- [holiday.date],
-        {:ok, day} <- [Tempo.from_elixir(date)] do
-      Tempo.put_metadata(day, %{type: fixture_type(holiday.type)})
-    end
-  end
-
-  # An occurrence with no date is kept in the set as itself, where it matches
-  # no date of the fixture's and is reported with the mismatch.
-  defp to_date_set(intervals), do: MapSet.new(intervals, &date_or_itself/1)
-
-  defp date_or_itself(interval) do
-    case date_of(interval) do
-      {:ok, date} -> date
-      {:error, _reason} -> {:no_date, interval}
-    end
-  end
-
-  # The window keeps every occurrence that overlaps it; date-holidays lists a
-  # holiday in the year it starts in. One with no date is kept, to be reported.
-  defp starts_in?(interval, year) do
-    case date_of(interval) do
-      {:ok, date} -> date.year == year
-      {:error, _reason} -> true
-    end
+    String.starts_with?(rule, "bengali")
   end
 
   defp record(acc, context, detail) do
@@ -311,13 +257,10 @@ defmodule Tempo.Holidays.Conformance do
   defp accepted_divergence?(:islamic), do: true
   defp accepted_divergence?(_feature), do: false
 
-  # ── our date for one materialised interval ──────────────────────────
-
-  # The day an occurrence starts on, in the calendar of the fixture's dates
+  # The date a day of an occurrence is, in the calendar of the fixture's dates
   # (`Calendar.ISO`), so the two are compared as dates.
-  defp date_of(interval) do
-    with {:ok, date} <- Tempo.to_date(Tempo.Interval.from(interval)),
-         do: Date.convert(date, Calendar.ISO)
+  defp date_of(day) do
+    with {:ok, date} <- Tempo.to_date(day), do: Date.convert(date, Calendar.ISO)
   end
 
   # ── bookkeeping ─────────────────────────────────────────────────────
@@ -371,7 +314,7 @@ defmodule Tempo.Holidays.Conformance do
     rules checked:     #{stats.rules}
     matched:           #{stats.matched}
     unsupported:       #{unsupported}  #{inspect(sorted(stats.unsupported))}
-    known unsupported: #{known_unsupported}  #{inspect(sorted(stats.known_unsupported))}  (accepted gaps: Bengali calendar, two rare shapes)
+    known unsupported: #{known_unsupported}  #{inspect(sorted(stats.known_unsupported))}  (accepted gap: the Bengali calendar)
     mismatched:        #{mismatched}  #{inspect(sorted(stats.mismatched))}
     divergent:         #{divergent}  #{inspect(sorted(stats.divergent))}  (accepted reference differences)
     """
