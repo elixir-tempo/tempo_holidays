@@ -132,11 +132,11 @@ Taken by the user on 2026-10-27, for the move itself:
 
 * [ ] **Tempo.DateRule** — the tokenizer, compiling from its tokens and the census gaps, in Tempo (`plans/date-rule.md` there); Tempo 2.1.
 
-* [ ] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule`, tagged as the dataset's members are.
-
 * [ ] **Holidays of your own** — `add:` and `remove:` on `holidays/2`, `config :tempo_holidays, holidays:`, a holiday's territories and subdivisions, replacing or removing a dataset holiday by id.
 
 ### Done
+
+* [x] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule` with `:dates` as `holidays/2` reads it, tagged `:id` and `:name` (the rule by default), `:type` (`:public`), the caller's `:metadata` beside them and `:calendar` for a rule of another calendar; a conditional is decided against the set it is in, and alone against none (D3). 2026-10-27.
 
 * [x] **The dataset on Tempo.DateRule** — Tempo from `main` (D10); each `%Holiday{}` holds its rule text and its `active`, `disable` and `enable` dates (format 5); `holidays/2` reads them with `Tempo.DateRule` (D6–D9, D12), cached (D11); the conformance harness on the public path; `Grammar`, `Compiler`, `Rule` and the vendored parser fixture retired. The move found two defects in Tempo, fixed there (`8e70b68`, `a904215`), and gaps in the built subdivisions (`_days` below the country, a country's top-level `regions`, a subdivision with no days of its own), fixed here. Conformance: 170,818 checks, 169,799 matched, 0 mismatched, 0 unsupported, 120 Bengali, 899 accepted differences (850 Mauritius district fixtures of an older release, 30 Timaru and Buller fixtures that ignore their region's data, 19 Islamic). 2026-10-27.
 

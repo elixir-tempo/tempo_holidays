@@ -28,8 +28,9 @@ defmodule Tempo.Holidays do
   Gregorian adds `:calendar`, that calendar's module. The set's own metadata
   names its territory and subdivision.
 
-  The primary API is `holidays/2`, and `day_start/2` for the Islamic and Hebrew
-  holidays whose day begins at sunset.
+  The primary API is `holidays/2`; `compile/2` reads a holiday of your own
+  from a rule in the dataset's grammar, and `day_start/2` projects the Islamic
+  and Hebrew holidays whose day begins at sunset onto the evening before.
 
   ## Example
 
@@ -76,6 +77,8 @@ defmodule Tempo.Holidays do
   @dates [:substitute, :gazetted, :both]
 
   @options [:territory, :locale, :subdivision, :include, :exclude, :dates]
+
+  @rule_options [:id, :name, :type, :metadata, :dates]
 
   # The calendars whose day begins at sunset, so `day_start/2` projects their
   # holidays onto the evening before.
@@ -183,7 +186,7 @@ defmodule Tempo.Holidays do
   def holidays(target, options), do: holiday_set(target, options)
 
   defp holiday_set(target, options) do
-    with :ok <- known_options(options),
+    with :ok <- known_options(options, @options),
          {:ok, types} <- selected_types(options),
          {:ok, dates} <- selected_dates(options),
          {:ok, resolved} <- Locale.resolve(target, options),
@@ -199,18 +202,18 @@ defmodule Tempo.Holidays do
     end
   end
 
-  defp known_options(options) when is_list(options) do
-    case Enum.reject(options, &known_option?/1) do
+  defp known_options(options, known) when is_list(options) do
+    case Enum.reject(options, &known_option?(&1, known)) do
       [] -> :ok
       [{option, _value} | _rest] -> {:error, {:invalid_option, option}}
       [other | _rest] -> {:error, {:invalid_option, other}}
     end
   end
 
-  defp known_options(options), do: {:error, {:invalid_option, options}}
+  defp known_options(options, _known), do: {:error, {:invalid_option, options}}
 
-  defp known_option?({option, _value}), do: option in @options
-  defp known_option?(_other), do: false
+  defp known_option?({option, _value}, known), do: option in known
+  defp known_option?(_other, _known), do: false
 
   defp selected_dates(options) do
     case Keyword.get(options, :dates, :substitute) do
@@ -456,10 +459,14 @@ defmodule Tempo.Holidays do
   # Gregorian ones is a Gregorian day, and its calendar is what is left to say
   # that its day begins at sunset (`day_start/2`).
   defp tagged(expression, %Holiday{rule: rule, name: name, type: type}) do
+    tagged(expression, %{id: rule, name: name, type: type})
+  end
+
+  defp tagged(expression, tags) do
     metadata =
       expression
       |> Tempo.metadata()
-      |> Map.merge(%{id: rule, name: name, type: type})
+      |> Map.merge(tags)
       |> Map.merge(calendar_metadata(expression))
 
     Tempo.put_metadata(expression, metadata)
@@ -475,6 +482,123 @@ defmodule Tempo.Holidays do
 
   defp set_metadata(territory, nil), do: %{territory: territory}
   defp set_metadata(territory, subdivision), do: %{territory: territory, subdivision: subdivision}
+
+  @doc """
+  Reads a holiday rule into the holiday it describes.
+
+  The rule is written in the date-holidays grammar the dataset's holidays are
+  written in, which Tempo reads with `Tempo.DateRule`: `"12-25"`, `"4th
+  thursday in November"`, `"01-26 and if saturday, sunday then next monday"`,
+  `"15 Nisan"`. The holiday is tagged as a member of `holidays/2` is, so it
+  sits beside a territory's holidays as one of them.
+
+  A rule that depends on other holidays, a bridge day (`"08-14 if 08-15 is
+  holiday"`) or a holiday moved off another, is a conditional member: decided
+  against the other members of a set it is in, and against none when it is
+  converted alone, so alone it falls on no day.
+
+  ### Arguments
+
+  * `rule` is a holiday rule in the date-holidays grammar. See
+    [the grammar](https://hexdocs.pm/ex_tempo/date-rule-grammar.html).
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:name` — the holiday's name. The default is the rule.
+
+  * `:type` — its `t:holiday_type/0`. The default is `:public`.
+
+  * `:id` — its id, unique within a set of holidays. The default is the rule,
+    as a dataset holiday's id is its rule.
+
+  * `:metadata` — a map of metadata of your own, kept beside the id, name and
+    type. The default is `%{}`.
+
+  * `:dates` — the dates a holiday observed on another day is given on,
+    `:substitute`, `:gazetted` or `:both`, as for `holidays/2`. The default
+    is `:substitute`.
+
+  ### Returns
+
+  * `{:ok, holiday}` — the holiday, a `t:Tempo.t/0`: a yearly recurrence, a
+    recurrence set of its date and its observed days, or a conditional
+    member, tagged with `:id`, `:name`, `:type` and your own metadata, and
+    with `:calendar` for a rule of another calendar than the Gregorian.
+
+  * `{:error, exception}` — a `Tempo.ParseError` for a rule that cannot be
+    read, naming where reading stopped, or another exception for a date the
+    rule names that its calendar does not have (`Tempo.DateRule.parse/2`), or
+
+  * `{:error, reason}` — `{:invalid_option, option}`, `{:invalid_id, value}`,
+    `{:invalid_name, value}`, `{:invalid_holiday_type, value}`,
+    `{:invalid_metadata, value}` or `{:invalid_dates, value}`.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, thanksgiving} = Tempo.Holidays.compile("4th thursday in November", name: "Thanksgiving Day")
+      iex> Tempo.metadata(thanksgiving)
+      %{id: "4th thursday in November", name: "Thanksgiving Day", type: :public}
+      iex> {:ok, this_year} = Tempo.to_interval(thanksgiving, within: ~o"2026")
+      iex> Tempo.IntervalSet.map(this_year, &Tempo.day/1)
+      [26]
+
+      iex> {:error, %Tempo.ParseError{}} = Tempo.Holidays.compile("12-25 on a full moon")
+
+  """
+  @spec compile(String.t(), keyword()) ::
+          {:ok, Tempo.t()} | {:error, {atom(), term()} | Exception.t()}
+  def compile(rule, options \\ []) do
+    with :ok <- known_options(options, @rule_options),
+         {:ok, dates} <- selected_dates(options),
+         {:ok, expression} <- Tempo.DateRule.parse(rule, observed: observed(dates)),
+         {:ok, tags} <- rule_tags(rule, options),
+         {:ok, metadata} <- caller_metadata(options) do
+      {:ok, tagged(expression, Map.merge(metadata, tags))}
+    end
+  end
+
+  # The id, name and type a holiday of your own is tagged with.
+  defp rule_tags(rule, options) do
+    with {:ok, id} <- rule_id(Keyword.get(options, :id, rule)),
+         {:ok, name} <- rule_name(Keyword.get(options, :name, rule)),
+         {:ok, type} <- holiday_type(Keyword.get(options, :type, :public)) do
+      {:ok, %{id: id, name: name, type: type}}
+    end
+  end
+
+  defp rule_id(id) when is_binary(id) do
+    {:ok, id}
+  end
+
+  defp rule_id(id) do
+    {:error, {:invalid_id, id}}
+  end
+
+  defp rule_name(name) when is_binary(name) do
+    {:ok, name}
+  end
+
+  defp rule_name(name) do
+    {:error, {:invalid_name, name}}
+  end
+
+  defp holiday_type(type) when type in @holiday_types do
+    {:ok, type}
+  end
+
+  defp holiday_type(type) do
+    {:error, {:invalid_holiday_type, type}}
+  end
+
+  defp caller_metadata(options) do
+    case Keyword.get(options, :metadata, %{}) do
+      metadata when is_map(metadata) -> {:ok, metadata}
+      other -> {:error, {:invalid_metadata, other}}
+    end
+  end
 
   @doc """
   Projects holiday occurrences onto the evening their day begins.

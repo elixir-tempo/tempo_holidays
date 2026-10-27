@@ -16,7 +16,7 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## In progress
 
-* [ ] **A public rule compiler, and holidays of your own** — `Tempo.Holidays.compile/2` over Tempo's `Tempo.DateRule`, then holidays an application defines (`add:`/`remove:`, config). Landed: the dataset is read by `Tempo.DateRule` at call time and `Grammar`, `Compiler` and `Rule` are retired. Plan in [plans/rule-compiler.md](plans/rule-compiler.md).
+* [ ] **A public rule compiler, and holidays of your own** — `Tempo.Holidays.compile/2` over Tempo's `Tempo.DateRule`, then holidays an application defines (`add:`/`remove:`, config). Landed: the dataset is read by `Tempo.DateRule` at call time, `Grammar`, `Compiler` and `Rule` are retired, and `compile/2` is in. Plan in [plans/rule-compiler.md](plans/rule-compiler.md).
 
 * [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2) → 223 s on the public path (`holidays/2`, each territory read once). Then: harness parallelism.
 

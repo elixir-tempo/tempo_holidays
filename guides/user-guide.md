@@ -98,7 +98,19 @@ Every occurrence is an interval — a span of days, not an instant — so a mult
 # Eid al-Fitr lands as ~o"2026Y3M19D/22D", with calendar: Calendrical.Islamic.UmmAlQura in its metadata
 ```
 
-The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days.
+## A holiday from a rule
+
+Every holiday in the data is a rule in the date-holidays grammar, which Tempo reads with `Tempo.DateRule`. The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days; [its reference](https://hexdocs.pm/ex_tempo/date-rule-grammar.html) gives every form. `Tempo.Holidays.compile/2` reads a rule of your own into a holiday, tagged as the dataset's holidays are.
+
+```elixir
+{:ok, company_day} = Tempo.Holidays.compile("1st friday in December", name: "Company Day", type: :optional)
+{:ok, this_year} = Tempo.to_interval(company_day, within: ~o"2026")
+# => 4 December 2026, tagged %{id: "1st friday in December", name: "Company Day", type: :optional}
+```
+
+> *"The **company day** is the first Friday in December; **this year's** is the 4th."*
+
+A rule that depends on other holidays, such as a bridge day (`"08-14 if 08-15 is holiday"`), is decided against the holidays of a set it is in, and alone falls on no day.
 
 ## Day starts
 
@@ -128,4 +140,4 @@ config :tempo_holidays, data_dir: {:my_app, "holidays"}
 mix tempo.holidays.update --version 3.38.0
 ```
 
-The task writes the data to `priv/holidays` of your project, which goes into a release with your application and can be committed with it, and tempo_holidays reads it from there. `Tempo.Holidays.Data.version/0` says which date-holidays release is loaded. The task lists any rule of the release that this tempo_holidays does not compile yet; those holidays are left out of the data. Data built by a release of tempo_holidays with another data format is not read: the package's own data is, until the task is run again.
+The task writes the data to `priv/holidays` of your project, which goes into a release with your application and can be committed with it, and tempo_holidays reads it from there. `Tempo.Holidays.Data.version/0` says which date-holidays release is loaded. The task lists any rule of the release that `Tempo.DateRule` does not read yet; those holidays are left out of the data. Data built by a release of tempo_holidays with another data format is not read: the package's own data is, until the task is run again.

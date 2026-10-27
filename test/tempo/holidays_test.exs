@@ -314,6 +314,79 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
+  describe "compile/2" do
+    test "a rule is a holiday tagged as a dataset member is" do
+      {:ok, thanksgiving} = Holidays.compile("4th thursday in November", name: "Thanksgiving Day")
+
+      assert Tempo.metadata(thanksgiving) ==
+               %{id: "4th thursday in November", name: "Thanksgiving Day", type: :public}
+
+      assert days_in_2026(thanksgiving) == [26]
+    end
+
+    test "a holiday's id, type and metadata of your own" do
+      {:ok, company_day} =
+        Holidays.compile("1st friday in December",
+          id: "company-day",
+          name: "Company Day",
+          type: :optional,
+          metadata: %{office: "Sydney"}
+        )
+
+      assert Tempo.metadata(company_day) ==
+               %{id: "company-day", name: "Company Day", type: :optional, office: "Sydney"}
+    end
+
+    test "the id, name and type are the holiday's own over metadata of the same keys" do
+      {:ok, christmas} =
+        Holidays.compile("12-25", name: "Christmas Day", metadata: %{name: "Xmas"})
+
+      assert Tempo.metadata(christmas).name == "Christmas Day"
+    end
+
+    test "a holiday observed on a substitute day is given on the days :dates says" do
+      # Australia Day 2025 falls on a Sunday, observed on Monday the 27th.
+      rule = "01-26 and if saturday,sunday then next monday"
+
+      dates =
+        for reading <- [:substitute, :gazetted, :both] do
+          {:ok, australia_day} = Holidays.compile(rule, dates: reading)
+          recurrence_dates(australia_day, ~o"2025")
+        end
+
+      assert dates == [["2025-01-27"], ["2025-01-26"], ["2025-01-26", "2025-01-27"]]
+    end
+
+    test "a rule of another calendar carries its calendar" do
+      {:ok, passover} = Holidays.compile("15 Nisan", name: "Passover")
+      assert Tempo.metadata(passover).calendar == Calendrical.Hebrew
+      assert recurrence_dates(passover, ~o"2026") == ["2026-04-02"]
+    end
+
+    test "a bridge day is decided against the holidays of a set it is in" do
+      {:ok, bridge} = Holidays.compile("08-14 if 08-15 is holiday", name: "Bridge Day")
+      {:ok, assumption} = Holidays.compile("08-15", name: "Assumption Day")
+
+      assert days_in_2026(bridge) == []
+      assert days_in_2026(RecurrenceSet.new!([assumption, bridge])) == [14, 15]
+    end
+
+    test "invalid input is an error" do
+      assert {:error, %Tempo.ParseError{}} = Holidays.compile("12-25 on a full moon")
+      assert {:error, %Tempo.ParseError{}} = Holidays.compile("")
+      assert {:error, %Tempo.ParseError{}} = Holidays.compile(nil)
+      assert Holidays.compile("12-25", region: :AU) == {:error, {:invalid_option, :region}}
+      assert Holidays.compile("12-25", :public) == {:error, {:invalid_option, :public}}
+      assert Holidays.compile("12-25", type: :day) == {:error, {:invalid_holiday_type, :day}}
+      assert Holidays.compile("12-25", name: :christmas) == {:error, {:invalid_name, :christmas}}
+      assert Holidays.compile("12-25", id: 1) == {:error, {:invalid_id, 1}}
+      assert Holidays.compile("12-25", dates: :observed) == {:error, {:invalid_dates, :observed}}
+
+      assert Holidays.compile("12-25", metadata: [office: "Sydney"]) ==
+               {:error, {:invalid_metadata, [office: "Sydney"]}}
+    end
+  end
+
   describe "holidays in a window" do
     test "every AU holiday in 2026" do
       assert {:ok, holidays} = holidays_in(:AU, ~o"2026")

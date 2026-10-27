@@ -14,6 +14,8 @@ First release. Public holidays for every territory in the [date-holidays](https:
 
 * `:dates` gives a holiday observed on a substitute day on that day (`:substitute`, the default), on its own date (`:gazetted`) or on both (`:both`). A period date-holidays splits over the year end is one member, and a dated period keeps its length.
 
+* `Tempo.Holidays.compile/2` — a holiday from a rule in the date-holidays grammar, tagged as the dataset's holidays are (`:id`, `:name`, `:type` and metadata of your own).
+
 * Each rule is read by Tempo's `Tempo.DateRule` when a territory's holidays are first asked for, and kept for the life of the VM per territory, subdivision and `:dates` reading.
 
 * `Tempo.Holidays.day_start/2` projects the occurrences of a holiday whose day begins at sunset, told by the `:calendar` in its metadata, onto the evening before, at sunset or 18:00, at the calendar's reference place or a location of your own.
