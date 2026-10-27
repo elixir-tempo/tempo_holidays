@@ -114,30 +114,30 @@ A rule that depends on other holidays, such as a bridge day (`"08-14 if 08-15 is
 
 ## Holidays of your own
 
-`Tempo.Holidays.holidays/2` adds holidays of your own to a territory's and leaves out those you name. `:add` takes rules, each with the options of `Tempo.Holidays.compile/2`, read with the request's `:dates` and selected by `:include` and `:exclude` as the dataset's are; `:remove` takes ids or names, and applies first.
+`:include` and `:exclude` name holidays as well as types. A rule in `:include`, alone or with the options of `Tempo.Holidays.compile/2`, is a holiday of your own: it is read with the request's `:dates` and kept whatever its type. An id or a name in `:exclude` leaves out the territory's holidays of that id or name. When `:include` names holidays and no type, every type is kept.
 
 ```elixir
 company_day = {"1st friday in December", name: "Company Day"}
-{:ok, australia} = Tempo.Holidays.holidays(:AU, include: :public, add: [company_day])
+{:ok, australia} = Tempo.Holidays.holidays(:AU, include: [:public, company_day])
 
-{:ok, anbima} = Tempo.Holidays.holidays(:BR, include: [:public, :bank], remove: ["Election Day"])
+{:ok, anbima} = Tempo.Holidays.holidays(:BR, include: [:public, :bank], exclude: ["Election Day"])
 ```
 
 > *"Australia's **public holidays**, with the **company day** beside them; Brazil's public and bank holidays **without Election Day**, ANBIMA's list."*
 
-A holiday you add with the id of one of the dataset's takes its place, and a bridge day you add is decided against the territory's holidays. Holidays an application always wants go in its configuration, keyed by territory, or by territory and subdivision, each with the `:add` and `:remove` a request takes:
+A holiday you include with the id of one of the dataset's takes its place, and a bridge day you include is decided against the territory's holidays. Holidays an application always wants go in its configuration, keyed by territory, or by territory and subdivision, each with an `:include` and an `:exclude` that name holidays alone:
 
 ```elixir
 # config/config.exs
 config :tempo_holidays,
   holidays: [
-    AU: [add: [{"1st friday in December", name: "Company Day", type: :optional}]],
-    BR: [remove: ["Election Day"]],
-    "AU-VIC": [add: [{"11-02", name: "Office Closure"}]]
+    AU: [include: [{"1st friday in December", name: "Company Day", type: :optional}]],
+    BR: [exclude: ["Election Day"]],
+    "AU-VIC": [include: [{"11-02", name: "Office Closure"}]]
   ]
 ```
 
-A territory's apply to its subdivisions too, a subdivision's come after its territory's, and a request's own after both. The configuration is read at each request, so nothing needs to be started for it.
+A configured holiday is one of the territory's, selected by type as the dataset's are: the optional Company Day above is left out of `holidays(:AU, include: :public)`. A territory's apply to its subdivisions too, a subdivision's come after its territory's, and a request's own after both. The configuration is read at each request, so nothing needs to be started for it.
 
 ## Day starts
 

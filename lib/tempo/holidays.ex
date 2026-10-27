@@ -29,7 +29,7 @@ defmodule Tempo.Holidays do
   names its territory and subdivision.
 
   The primary API is `holidays/2`, which gives holidays of your own beside
-  the dataset's (`:add`, `:remove` and the `:holidays` configuration);
+  the dataset's (`:include`, `:exclude` and the `:holidays` configuration);
   `compile/2` reads a holiday from a rule in the dataset's grammar, and
   `day_start/2` projects the Islamic and Hebrew holidays whose day begins at
   sunset onto the evening before.
@@ -78,11 +78,11 @@ defmodule Tempo.Holidays do
 
   @dates [:substitute, :gazetted, :both]
 
-  @options [:territory, :locale, :subdivision, :include, :exclude, :dates, :add, :remove]
+  @options [:territory, :locale, :subdivision, :include, :exclude, :dates]
 
   @rule_options [:id, :name, :type, :metadata, :dates]
 
-  @own_options [:add, :remove]
+  @config_options [:include, :exclude]
 
   # The calendars whose day begins at sunset, so `day_start/2` projects their
   # holidays onto the evening before.
@@ -112,18 +112,21 @@ defmodule Tempo.Holidays do
   off another (Näfelser Fahrt off Maundy Thursday, an observance) carries the
   holidays it depends on when their type is left out.
 
-  Holidays of your own sit beside the dataset's: `:add` and `:remove` for one
-  request, and `config :tempo_holidays, holidays:` for every request, keyed by
-  territory, or by territory and subdivision, each with the `:add` and
-  `:remove` a request takes. A territory's apply to its subdivisions too, a
-  subdivision's come after its territory's, and a request's own after both.
-  The configuration is read at each request.
+  Holidays of your own sit beside the dataset's: the holidays a request's
+  `:include` and `:exclude` name, and `config :tempo_holidays, holidays:` for
+  every request, keyed by territory, or by territory and subdivision, each
+  with an `:include` and an `:exclude` that name holidays alone. A
+  territory's apply to its subdivisions too, a subdivision's come after its
+  territory's, and a request's own after both. The configured holidays are
+  the territory's, selected by type as the dataset's are; the holidays a
+  request names are kept whatever their type. The configuration is read at
+  each request.
 
       config :tempo_holidays,
         holidays: [
-          AU: [add: [{"1st friday in December", name: "Company Day", type: :optional}]],
-          BR: [remove: ["Election Day"]],
-          "AU-VIC": [add: [{"11-02", name: "Office Closure"}]]
+          AU: [include: [{"1st friday in December", name: "Company Day", type: :optional}]],
+          BR: [exclude: ["Election Day"]],
+          "AU-VIC": [include: [{"11-02", name: "Office Closure"}]]
         ]
 
   ### Arguments
@@ -147,11 +150,18 @@ defmodule Tempo.Holidays do
     its state (`"CA-LA"`, Los Angeles, where `"LA"` alone is Louisiana). See
     `Tempo.Holidays.Data.subdivision/2`.
 
-  * `:include` — the `t:holiday_type/0` to keep, a type or a list of them. The
-    default is every type.
+  * `:include` — what to keep, an item or a list of them, each a
+    `t:holiday_type/0` or a holiday of your own: a rule in the date-holidays
+    grammar, or `{rule, options}` with the options of `compile/2` but
+    `:dates`. The types kept are those it names, or every type when it names
+    none but holidays. A holiday it names is read with the request's
+    `:dates`, kept whatever its type, and takes the place of a holiday of its
+    id. The default is every type.
 
-  * `:exclude` — the `t:holiday_type/0` to leave out, a type or a list of them,
-    winning over `:include`. The default is none.
+  * `:exclude` — what to leave out, an item or a list of them, each a
+    `t:holiday_type/0`, winning over `:include`, or a holiday's id or name:
+    `"Election Day"` leaves out every holiday of that name. A holiday
+    `:include` names is never left out. The default is none.
 
   * `:dates` — the dates a holiday observed on another day is given on, when
     its own date falls on a weekend, say:
@@ -165,16 +175,6 @@ defmodule Tempo.Holidays do
       them. A holiday the data moves to another day, rather than observing on
       both, is on the day it moves to.
 
-  * `:add` — holidays of your own, a list of rules in the date-holidays
-    grammar, each `{rule, options}` with the options of `compile/2` but
-    `:dates`, or a rule alone. Each is read with the request's `:dates`,
-    selected by `:include` and `:exclude` as the dataset's holidays are, and
-    takes the place of a holiday of its id. The default is none.
-
-  * `:remove` — the holidays to leave out, a list of ids or names: `"Election
-    Day"` leaves out every holiday of that name. It applies before `:add`.
-    The default is none.
-
   ### Returns
 
   * `{:ok, recurrence_set}` — a recurrence set (a `t:Tempo.t/0`) of the holidays: the
@@ -183,11 +183,11 @@ defmodule Tempo.Holidays do
   * `{:error, reason}` — `{:unknown_territory, territory}`,
     `{:invalid_locale, target}`, `{:unknown_subdivision, subdivision}`,
     `{:ambiguous_subdivision, subdivision}`, `{:invalid_holiday_type, value}`,
-    `{:invalid_dates, value}`, `{:invalid_add, value}`,
-    `{:invalid_remove, value}`, `{:invalid_config, entry}` or
+    `{:invalid_dates, value}`, `{:invalid_include, item}`,
+    `{:invalid_exclude, item}`, `{:invalid_config, entry}` or
     `{:invalid_option, option}`, or
 
-  * an error `compile/2` returns for a holiday of `:add`.
+  * an error `compile/2` returns for a holiday `:include` names.
 
   ### Examples
 
@@ -209,7 +209,7 @@ defmodule Tempo.Holidays do
 
       iex> import Tempo.Sigils
       iex> company_day = {"1st friday in December", name: "Company Day"}
-      iex> {:ok, australia} = Tempo.Holidays.holidays(:AU, include: :public, add: [company_day])
+      iex> {:ok, australia} = Tempo.Holidays.holidays(:AU, include: [:public, company_day])
       iex> {:ok, december} = Tempo.to_interval(australia, within: ~o"2026-12")
       iex> Tempo.IntervalSet.map(december, &Tempo.metadata(&1).name)
       ["Company Day", "Christmas Day", "Boxing Day"]
@@ -226,21 +226,30 @@ defmodule Tempo.Holidays do
 
   defp holiday_set(target, options) do
     with :ok <- known_options(options, @options),
-         {:ok, types} <- selected_types(options),
+         {:ok, selection} <- selection(options),
          {:ok, dates} <- selected_dates(options),
          {:ok, resolved} <- Locale.resolve(target, options),
          {:ok, subdivision} <- Data.subdivision(resolved.territory, resolved.subdivision),
-         {:ok, changes} <- own_changes(resolved.territory, subdivision, options),
+         {:ok, changes} <- configured_changes(resolved.territory, subdivision),
          {:ok, dataset} <- read_holidays(resolved.territory, subdivision, dates),
-         {:ok, read} <- with_own(dataset, changes, dates) do
-      members =
-        for {holiday, expression} <- read,
-            holiday.type in types,
-            member <- holiday_member(holiday, expression, read, types, dates),
-            do: member
-
+         {:ok, territorial} <- with_own(dataset, changes, dates),
+         {:ok, own} <- read_added(selection.holidays, dates, []) do
+      members = selected_members(territorial, own, selection, dates)
       RecurrenceSet.new(members, metadata: set_metadata(resolved.territory, subdivision))
     end
+  end
+
+  # A request's members: the territory's holidays (the dataset's and the
+  # configured) of the kept types, less those it names in `:exclude`, then
+  # the holidays its `:include` names, each kept whatever its type.
+  defp selected_members(territorial, own, %{types: types, names: names}, dates) do
+    kept = without(territorial, names, own)
+    read = kept ++ own
+    selected = for {holiday, _expression} = entry <- kept, holiday.type in types, do: entry
+
+    for {holiday, expression} <- selected ++ own,
+        member <- holiday_member(holiday, expression, read, types, dates),
+        do: member
   end
 
   defp known_options(options, known) when is_list(options) do
@@ -256,24 +265,104 @@ defmodule Tempo.Holidays do
   defp known_option?({option, _value}, known), do: option in known
   defp known_option?(_other, _known), do: false
 
-  # The holidays of your own a request makes, in the order they apply: the
-  # configured ones of its territory, then of its subdivision, then its own.
-  # Each is a list of ids or names to leave out and a list of rules to add.
-  defp own_changes(territory, subdivision, options) do
-    with {:ok, configured} <- configured_changes(territory, subdivision),
-         {:ok, change} <- own_change(options) do
-      {:ok, configured ++ [change]}
+  # What a request's `:include` and `:exclude` name: the holiday types it
+  # keeps, the holidays of its own it adds and the ids or names it leaves out.
+  defp selection(options) do
+    with {:ok, {types, holidays}} <- included(Keyword.get(options, :include, @holiday_types)),
+         {:ok, {excluded, names}} <- excluded(Keyword.get(options, :exclude, [])) do
+      {:ok, %{types: kept_types(types, holidays) -- excluded, holidays: holidays, names: names}}
     end
   end
 
+  # The types an `:include` keeps: those it names, or every type when it names
+  # holidays and no type.
+  defp kept_types([], [_ | _]) do
+    @holiday_types
+  end
+
+  defp kept_types(types, _holidays) do
+    types
+  end
+
+  # An `:include` or `:exclude` is one item or a list of them.
+  defp included(include) do
+    included_items(items(include), [], [])
+  end
+
+  defp excluded(exclude) do
+    excluded_items(items(exclude), [], [])
+  end
+
+  defp items(items) when is_list(items) do
+    items
+  end
+
+  defp items(item) do
+    [item]
+  end
+
+  # An `:include` item is a type, or a holiday of your own: a rule, or a rule
+  # and the options of `compile/2`.
+  defp included_items([], types, holidays) do
+    {:ok, {Enum.reverse(types), Enum.reverse(holidays)}}
+  end
+
+  defp included_items([type | rest], types, holidays) when type in @holiday_types do
+    included_items(rest, [type | types], holidays)
+  end
+
+  defp included_items([rule | rest], types, holidays) when is_binary(rule) do
+    included_items(rest, types, [{rule, []} | holidays])
+  end
+
+  defp included_items([{rule, options} = holiday | rest], types, holidays)
+       when is_binary(rule) and is_list(options) do
+    included_items(rest, types, [holiday | holidays])
+  end
+
+  defp included_items([other | _rest], _types, _holidays) when is_atom(other) do
+    {:error, {:invalid_holiday_type, other}}
+  end
+
+  defp included_items([other | _rest], _types, _holidays) do
+    {:error, {:invalid_include, other}}
+  end
+
+  # An `:exclude` item is a type, or a holiday's id or name.
+  defp excluded_items([], types, names) do
+    {:ok, {Enum.reverse(types), Enum.reverse(names)}}
+  end
+
+  defp excluded_items([type | rest], types, names) when type in @holiday_types do
+    excluded_items(rest, [type | types], names)
+  end
+
+  defp excluded_items([name | rest], types, names) when is_binary(name) do
+    excluded_items(rest, types, [name | names])
+  end
+
+  defp excluded_items([other | _rest], _types, _names) when is_atom(other) do
+    {:error, {:invalid_holiday_type, other}}
+  end
+
+  defp excluded_items([other | _rest], _types, _names) do
+    {:error, {:invalid_exclude, other}}
+  end
+
+  # The configured changes to a territory's holidays, in the order they
+  # apply: its territory's, then its subdivision's. Each is a list of ids or
+  # names to leave out and a list of rules to add.
   defp configured_changes(territory, subdivision) do
     entries = Application.get_env(:tempo_holidays, :holidays, [])
 
     with {:ok, entries} <- configured_entries(entries, []) do
-      entries
-      |> Enum.filter(&applies?(&1, territory, subdivision))
-      |> Enum.sort_by(&depth/1)
-      |> changes_of([])
+      changes =
+        entries
+        |> Enum.filter(&applies?(&1, territory, subdivision))
+        |> Enum.sort_by(&depth/1)
+        |> Enum.map(&elem(&1, 1))
+
+      {:ok, changes}
     end
   end
 
@@ -283,8 +372,8 @@ defmodule Tempo.Holidays do
 
   defp configured_entries([{key, options} = entry | rest], entries)
        when is_atom(key) or is_binary(key) do
-    case known_options(options, @own_options) do
-      :ok -> configured_entries(rest, [{config_path(key), options} | entries])
+    case configured_change(options) do
+      {:ok, change} -> configured_entries(rest, [{config_path(key), change} | entries])
       {:error, _reason} -> {:error, {:invalid_config, entry}}
     end
   end
@@ -322,78 +411,44 @@ defmodule Tempo.Holidays do
     false
   end
 
-  defp depth({path, _options}) do
+  defp depth({path, _change}) do
     length(path)
   end
 
-  defp changes_of([], changes) do
-    {:ok, Enum.reverse(changes)}
-  end
-
-  defp changes_of([{_path, options} | rest], changes) do
-    with {:ok, change} <- own_change(options) do
-      changes_of(rest, [change | changes])
+  # A configured entry's `:include` and `:exclude` name holidays alone: the
+  # types are a request's to select.
+  defp configured_change(options) do
+    with :ok <- known_options(options, @config_options),
+         {:ok, included} <- included(Keyword.get(options, :include, [])),
+         {:ok, excluded} <- excluded(Keyword.get(options, :exclude, [])) do
+      holidays_alone(included, excluded)
     end
   end
 
-  defp own_change(options) do
-    with {:ok, remove} <- removals(Keyword.get(options, :remove, [])),
-         {:ok, add} <- additions(Keyword.get(options, :add, [])) do
-      {:ok, {remove, add}}
-    end
+  defp holidays_alone({[], holidays}, {[], names}) do
+    {:ok, {names, holidays}}
   end
 
-  defp removals(remove) when is_list(remove) do
-    if Enum.all?(remove, &is_binary/1) do
-      {:ok, remove}
-    else
-      {:error, {:invalid_remove, remove}}
-    end
+  defp holidays_alone(_included, _excluded) do
+    {:error, :configured_type}
   end
 
-  defp removals(remove) do
-    {:error, {:invalid_remove, remove}}
-  end
-
-  defp additions(add) when is_list(add) do
-    if Enum.all?(add, &addition?/1) do
-      {:ok, Enum.map(add, &addition/1)}
-    else
-      {:error, {:invalid_add, add}}
-    end
-  end
-
-  defp additions(add) do
-    {:error, {:invalid_add, add}}
-  end
-
-  defp addition?({rule, options}) do
-    is_binary(rule) and is_list(options)
-  end
-
-  defp addition?(rule) do
-    is_binary(rule)
-  end
-
-  defp addition({rule, options}) do
-    {rule, options}
-  end
-
-  defp addition(rule) do
-    {rule, []}
-  end
-
-  # The dataset's holidays with each change applied in turn: the holidays it
-  # names left out, then its own added, each in place of a holiday of its id.
+  # The dataset's holidays with each configured change applied in turn: the
+  # holidays it names left out, then its own added, each in place of a
+  # holiday of its id.
   defp with_own(read, [], _dates) do
     {:ok, read}
   end
 
-  defp with_own(read, [{remove, add} | changes], dates) do
-    with {:ok, added} <- read_added(add, dates, []) do
-      kept = Enum.reject(read, &(named_in?(&1, remove) or same_id?(&1, added)))
-      with_own(kept ++ added, changes, dates)
+  defp with_own(read, [{names, holidays} | changes], dates) do
+    with {:ok, added} <- read_added(holidays, dates, []) do
+      with_own(without(read, names, added) ++ added, changes, dates)
     end
+  end
+
+  # Holidays less those of the names and of the ids of the added.
+  defp without(read, names, added) do
+    Enum.reject(read, &(named_in?(&1, names) or same_id?(&1, added)))
   end
 
   defp read_added([], _dates, added) do
@@ -603,25 +658,6 @@ defmodule Tempo.Holidays do
   defp joined_period({:error, _reason}, _january) do
     nil
   end
-
-  # The holiday types a request keeps: those `:include` names, every type by
-  # default, less those `:exclude` names — each a type or a list of them.
-  defp selected_types(options) do
-    with {:ok, included} <- holiday_types(Keyword.get(options, :include, @holiday_types)),
-         {:ok, excluded} <- holiday_types(Keyword.get(options, :exclude, [])) do
-      {:ok, included -- excluded}
-    end
-  end
-
-  defp holiday_types(types) when is_list(types) do
-    case Enum.reject(types, &(&1 in @holiday_types)) do
-      [] -> {:ok, types}
-      [invalid | _] -> {:error, {:invalid_holiday_type, invalid}}
-    end
-  end
-
-  defp holiday_types(type) when is_atom(type), do: holiday_types([type])
-  defp holiday_types(other), do: {:error, {:invalid_holiday_type, other}}
 
   # A holiday is one member: its expression, tagged with the holiday's id,
   # name and type when it was read. A conditional (a bridge, an `if is

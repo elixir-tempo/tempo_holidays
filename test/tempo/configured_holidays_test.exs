@@ -30,7 +30,7 @@ defmodule Tempo.Holidays.ConfiguredHolidaysTest do
   end
 
   test "a territory's holidays apply to it and its subdivisions" do
-    configure(AU: [add: [@company_day]])
+    configure(AU: [include: [@company_day]])
 
     assert days_named(:AU, "Company Day") == [~o"2026Y12M4D"]
     assert days_named(:AU, "Company Day", subdivision: "NSW") == [~o"2026Y12M4D"]
@@ -38,7 +38,7 @@ defmodule Tempo.Holidays.ConfiguredHolidaysTest do
   end
 
   test "a subdivision's holidays apply to it alone" do
-    configure("AU-NSW": [add: [@company_day]])
+    configure("AU-NSW": [include: [@company_day]])
 
     assert days_named(:AU, "Company Day", subdivision: "NSW") == [~o"2026Y12M4D"]
     assert days_named(:AU, "Company Day", subdivision: "VIC") == []
@@ -47,18 +47,25 @@ defmodule Tempo.Holidays.ConfiguredHolidaysTest do
 
   test "a subdivision's holidays come after its territory's" do
     configure(
-      "AU-NSW": [add: [{"12-11", id: "company-day", name: "Company Day"}]],
-      AU: [add: [{"12-04", id: "company-day", name: "Company Day"}]]
+      "AU-NSW": [include: [{"12-11", id: "company-day", name: "Company Day"}]],
+      AU: [include: [{"12-04", id: "company-day", name: "Company Day"}]]
     )
 
     assert days_named(:AU, "Company Day", subdivision: "NSW") == [~o"2026Y12M11D"]
     assert days_named(:AU, "Company Day", subdivision: "VIC") == [~o"2026Y12M4D"]
   end
 
-  test "a request's own holidays come after the configured ones" do
-    configure(AU: [add: [@company_day]], BR: [remove: ["Election Day"]])
+  test "a configured holiday is the territory's, selected by type as the dataset's are" do
+    configure(AU: [include: [{"1st friday in December", name: "Company Day", type: :optional}]])
 
-    assert days_named(:AU, "Company Day", remove: ["Company Day"]) == []
+    assert days_named(:AU, "Company Day") == [~o"2026Y12M4D"]
+    assert days_named(:AU, "Company Day", include: :public) == []
+  end
+
+  test "a request's own holidays come after the configured ones" do
+    configure(AU: [include: [@company_day]], BR: [exclude: ["Election Day"]])
+
+    assert days_named(:AU, "Company Day", exclude: ["Company Day"]) == []
     assert days_named(:BR, "Election Day") == []
   end
 
@@ -66,10 +73,16 @@ defmodule Tempo.Holidays.ConfiguredHolidaysTest do
     configure(AU: [append: [@company_day]])
     assert Holidays.holidays(:AU) == {:error, {:invalid_config, {:AU, [append: [@company_day]]}}}
 
-    configure(%{AU: [add: [@company_day]]})
-    assert Holidays.holidays(:AU) == {:error, {:invalid_config, %{AU: [add: [@company_day]]}}}
+    configure(%{AU: [include: [@company_day]]})
 
-    configure(AU: [add: "12-24"])
-    assert Holidays.holidays(:AU) == {:error, {:invalid_add, "12-24"}}
+    assert Holidays.holidays(:AU) ==
+             {:error, {:invalid_config, %{AU: [include: [@company_day]]}}}
+
+    configure(AU: [include: 42])
+    assert Holidays.holidays(:AU) == {:error, {:invalid_config, {:AU, [include: 42]}}}
+
+    # Types are a request's to select.
+    configure(AU: [exclude: :observance])
+    assert Holidays.holidays(:AU) == {:error, {:invalid_config, {:AU, [exclude: :observance]}}}
   end
 end
