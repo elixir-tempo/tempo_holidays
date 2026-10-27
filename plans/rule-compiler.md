@@ -118,11 +118,27 @@ Taken by the user on 2026-10-27, for what the holiday layer applies on top of a 
 
 * **D9 — a period split at the year end.** One member: the union of the two dated spans, coalesced into the one period.
 
+Taken by the user on 2026-10-27, for the move itself:
+
+* **D10 — Tempo while the move is under way.** From GitHub `main` (`{:ex_tempo, github: "elixir-tempo/tempo"}`), so a change the move needs in Tempo lands before Tempo 2.1 is published; then `~> 2.1` from hex before this library's release.
+
+* **D11 — when a rule is read.** At call time, cached per territory, subdivision and `:dates` reading for the life of the VM, as `Rule.prepare/1` is today: the built data holds each holiday's rule text and its metadata. Reading a territory took 2–44 ms, Japan 203 ms (its `active` windows), measured on the 3.38.0 data.
+
+* **D12 — a substitute entry under `:gazetted`.** Read with `observed: :none`, which gives a `substitutes` rule no date (Tempo `164d6de`); what is empty is dropped.
+
 ## Tasks
 
 * [ ] **Tempo.DateRule** — the tokenizer, compiling from its tokens and the census gaps, in Tempo (`plans/date-rule.md` there); Tempo 2.1.
 
-* [ ] **The dataset on Tempo.DateRule** — tempo_holidays compiles its rules with it, its `Grammar`, `Compiler` and `Rule`'s recurrence builders retired; conformance unchanged but for four rules whose span `Rule` dropped on a weekday step (`1st saturday in October P2D` and three more), which now span their days. Needs Tempo's options for D6 to D8, taken from Tempo's `main` until 2.1 is on hex.
+* [ ] **The dataset on Tempo.DateRule** — tempo_holidays compiles its rules with it, its `Grammar`, `Compiler` and `Rule` retired; conformance on start dates unchanged. Five holidays span more days than `Rule` gave them, as date-holidays-parser does (two weekday steps with a span, three spans in hours). In this order:
+
+  * Tempo from GitHub `main` (D10); gates unchanged.
+
+  * The built data: each `%Holiday{}` holds its rule text and its `active`, `disable` and `enable` dates; a rule `Tempo.DateRule` does not read is left out; the data rebuilt.
+
+  * `holidays/2` on `Tempo.DateRule`: `:dates` as `observed:` (D6, D12), the substitute entries of a holiday's type as `replaced_by:` (D7), its metadata as `active:`, `disable:`, `enable:` (D8), a conditional's `:falls_on` set where its type is left out, the year-end pairs joined (D9), cached (D11).
+
+  * The conformance harness and the tests on the public path; `Grammar`, `Compiler`, `Rule` and the vendored parser fixture removed (they are Tempo's now).
 
 * [ ] **`Tempo.Holidays.compile/2`** — a rule read by `Tempo.DateRule`, tagged as the dataset's members are.
 
