@@ -4,8 +4,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
-* [ ] **Back to the published Tempo** — `mix.exs` takes `ex_tempo` from `../tempo` and `mix.lock` Tempo's Localize and Calendrical commits while 2.0 is built; becomes `{:ex_tempo, "~> 2.0"}` once it is on hex.
-
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list, exact for 2001–2099, plus two `:public` `Election Day` members no type selection leaves out; they are always Sundays, so business-day counts are right and only a listing differs. `holidays/2` has no way to leave a holiday out by its `:id` or `:name`. Analysis in Tempo's [plans/anbima-calendar.md](https://github.com/elixir-tempo/tempo/blob/main/plans/anbima-calendar.md).
@@ -41,6 +39,14 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **`friday before 1st monday before 06-01 since 2009 and prior to 2016`** — a doubly-nested weekday relative (a weekday before an *nth-weekday-before-a-date*) with a year window; one expired US rule. Accepted `known_unsupported`.
 
 ## Done
+
+* [x] **Back to the published Tempo** — `{:ex_tempo, "~> 2.0"}`, `{:calendrical, "~> 2.1"}`, `{:localize, "~> 1.4"}` and `{:astro, "~> 2.9"}` from hex, no overrides. A lunisolar day 0 (the eve) is day 1 moved back one, Calendrical 2.1 holding a month to its days. 2026-10-27.
+
+* [x] **date-holidays 3.38.0** — the pin moved from 3.37.0; Benin's "Thursday before 2nd Friday after 01-01" compiles (an outer weekday before, as well as after, the nth weekday after a date). Conformance 170,663 matched, 0 mismatched, 0 unsupported. 2026-10-27.
+
+* [x] **The data from any date-holidays release** — `mix tempo.holidays.update --version` writes to the directory `config :tempo_holidays, data_dir: {app, path}` names, which `Tempo.Holidays.Data` reads where its format is current; the task lists the rules it leaves out, and `Data.version/0` says which release is loaded. 2026-10-27.
+
+* [x] **No warning without tz_world** — a host without the optional `tz_world` compiled `DayStart` with a warning on Elixir 1.20; `@compile {:no_warn_undefined, TzWorld}`. 2026-10-27.
 
 * [x] **`day_start/2` beside civil holidays** — a set is of one frame in Tempo 2.0, so the civil days beside projected evenings are the days they are where the day start is read: the zone named, a location's zone, or the reference place of the set's sunset holidays; a lazy set needs a location (Tempo decision 41). 2026-10-14.
 

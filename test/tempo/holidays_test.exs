@@ -356,6 +356,15 @@ defmodule Tempo.HolidaysTest do
       assert_matches_materialise(valais, 2020..2035)
     end
 
+    test "a weekday before the nth weekday after a date is a window off a window" do
+      # Benin's Vodun days (law 2024-32): the Thursday before the second Friday
+      # on or after 1 January. In 2027 the 1st is itself the first Friday.
+      vodun = compiled("Thursday before 2nd Friday after 01-01")
+      assert recurrence_dates(vodun, ~o"2026") == ["2026-01-08"]
+      assert recurrence_dates(vodun, ~o"2027") == ["2027-01-07"]
+      assert_matches_materialise(vodun, 2020..2035)
+    end
+
     test "an Islamic single day within the month is a direct selection" do
       rule = %Rule{kind: :islamic, month: 9, day: 15, calendar: Calendrical.Islamic.Observational}
       {:ok, intervals} = Rule.materialise_concrete(rule, ~o"2026")

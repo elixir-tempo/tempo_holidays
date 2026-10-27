@@ -608,15 +608,17 @@ defmodule Tempo.Holidays.Compiler do
 
   # ── nested weekday after a date: "monday after 3rd sunday after 09-01" ─
   #
-  # An outer weekday relative to the Nth inner weekday *after a fixed date* —
-  # "monday after 3rd sunday after 09-01" is the Monday after the third Sunday
-  # on or after 1 September. Distinct from `compile_nested_weekday`, whose inner
-  # anchor is a weekday-in-month.
+  # An outer weekday before or after the Nth inner weekday *after a fixed date*
+  # — "monday after 3rd sunday after 09-01" is the Monday after the third
+  # Sunday on or after 1 September, and Benin's "Thursday before 2nd Friday
+  # after 01-01" the Thursday before the second Friday on or after 1 January.
+  # Distinct from `compile_nested_weekday`, whose inner anchor is a
+  # weekday-in-month.
   defp compile_nested_after_date(rule) do
     pattern =
-      ~r/^\s*(\w+)\s+after\s+(\d+)(?:st|nd|rd|th)\s+(\w+)\s+after\s+(\d{1,2})-(\d{1,2})\s*$/i
+      ~r/^\s*(\w+)\s+(before|after)\s+(\d+)(?:st|nd|rd|th)\s+(\w+)\s+after\s+(\d{1,2})-(\d{1,2})\s*$/i
 
-    with [_, outer, ordinal, inner, month, day] <- Regex.run(pattern, rule),
+    with [_, outer, direction, ordinal, inner, month, day] <- Regex.run(pattern, rule),
          {:ok, outer_code} <- Map.fetch(@weekdays, String.downcase(outer)),
          {:ok, inner_code} <- Map.fetch(@weekdays, String.downcase(inner)) do
       {:ok,
@@ -624,6 +626,7 @@ defmodule Tempo.Holidays.Compiler do
          kind: :nested_after_date,
          weekday: outer_code,
          inner_weekday: inner_code,
+         direction: relative_direction(direction),
          count: String.to_integer(ordinal),
          month: String.to_integer(month),
          day: String.to_integer(day),

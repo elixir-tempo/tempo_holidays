@@ -659,22 +659,25 @@ defmodule Tempo.Holidays.Rule do
     {:ok, shape([selection: inner_weekday] ++ relative_weekday_window(direction, 1, outer))}
   end
 
-  # A weekday relative to the nth weekday after a fixed date — "Thursday after the
-  # 1st Sunday after 09-01" (Jeûne genevois), "Monday after the 3rd Sunday after
-  # 09-01". The inner weekday is a §12.10 window off the date, as for a relative
-  # weekday, and the outer weekday a window off that one.
+  # A weekday before or after the nth weekday after a fixed date — "Thursday
+  # after the 1st Sunday after 09-01" (Jeûne genevois), "Thursday before the
+  # 2nd Friday after 01-01" (Benin's Vodun days). The inner weekday is a §12.10
+  # window off the date, as for a relative weekday, and the outer weekday a
+  # window off that one, after it where the rule names no direction.
   defp base_shape(%__MODULE__{
          kind: :nested_after_date,
          month: month,
          day: day,
          inner_weekday: inner,
          weekday: outer,
+         direction: direction,
          count: count
        }) do
     inner_date =
       [selection: [month: month, day: day]] ++ relative_weekday_window(:after, count, inner)
 
-    {:ok, shape([selection: inner_date] ++ relative_weekday_window(:after, 1, outer))}
+    outer_window = relative_weekday_window(direction || :after, 1, outer)
+    {:ok, shape([selection: inner_date] ++ outer_window)}
   end
 
   # Easter itself, or a moveable feast a fixed offset from it (Ash Wednesday −46,
@@ -2278,17 +2281,20 @@ defmodule Tempo.Holidays.Rule do
   end
 
   # "monday after 3rd sunday after 09-01": the Nth inner weekday on or after a
-  # fixed date, then the outer weekday after that. Both steps use the inclusive
-  # "after" that date-holidays applies.
+  # fixed date, then the outer weekday after (or before) that. Both steps use
+  # date-holidays' own "after" and "before".
   defp materialise_base(
          %__MODULE__{kind: :nested_after_date, weekday: outer, inner_weekday: inner} = rule,
          %Tempo{} = year
        ) do
+    direction = rule.direction || :after
+
     with {:ok, anchor} <- Tempo.new(year: Tempo.year(year), month: rule.month, day: rule.day),
          inner_shift =
            relative_shift(:after, Tempo.day_of_week(anchor, :monday), inner, rule.count),
          {:ok, inner_date} <- Tempo.shift(anchor, day: inner_shift),
-         outer_shift = relative_shift(:after, Tempo.day_of_week(inner_date, :monday), outer, 1),
+         outer_shift =
+           relative_shift(direction, Tempo.day_of_week(inner_date, :monday), outer, 1),
          {:ok, day} <- Tempo.shift(inner_date, day: outer_shift) do
       day |> Tempo.to_interval() |> first_interval() |> wrap_one()
     end
@@ -2339,10 +2345,12 @@ defmodule Tempo.Holidays.Rule do
        ) do
     target = Tempo.year(year)
     lunar_month = if rule.leap_month, do: {rule.month, :leap}, else: rule.month
+    {day, eve} = lunisolar_day(rule.day)
 
     rule
     |> lunisolar_anchor_years(target)
-    |> Enum.map(&calendar.gregorian_date_for_lunar(&1, lunar_month, rule.day))
+    |> Enum.map(&calendar.gregorian_date_for_lunar(&1, lunar_month, day))
+    |> Enum.map(&offset_date(&1, eve))
     |> Enum.filter(&(&1.year == target))
     |> Enum.uniq()
     |> reduce_ok(&converted_interval(offset_date(&1, rule.offset), calendar, rule.count))
@@ -2526,6 +2534,17 @@ defmodule Tempo.Holidays.Rule do
   # neighbour for a month it does not have.
   defp lunisolar_anchor_years(%__MODULE__{leap_month: true}, target), do: [target]
   defp lunisolar_anchor_years(%__MODULE__{}, target), do: [target - 1, target, target + 1]
+
+  # Day 0 of a lunar month is the eve of its first day (date-holidays'
+  # `chinese 01-0-00`). Calendrical holds a month to the days it has, so the
+  # eve is day 1 moved back one, as `recurrence/1` writes it.
+  defp lunisolar_day(0) do
+    {1, -1}
+  end
+
+  defp lunisolar_day(day) do
+    {day, nil}
+  end
 
   # A `<n> day[s] before/after` prefix (Vietnam's Tết eve) shifts the computed
   # Gregorian date; no offset leaves it untouched.

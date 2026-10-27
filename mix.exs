@@ -99,15 +99,11 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # GitHub main during co-development, as Localize and Calendrical are:
-      # the recurrences need Tempo's unreleased 2.0.0 work. Becomes
-      # {:ex_tempo, "~> 2.0"} before publish.
-      {:ex_tempo, github: "elixir-tempo/tempo", branch: "main"},
-      # GitHub main during co-development, as in Tempo: Tempo 2.0 and the
-      # Islamic tier need Calendrical 2.0, unreleased. Becomes
-      # {:calendrical, "~> 2.0"} before publish.
-      {:calendrical, github: "elixir-localize/calendrical", branch: "main", override: true},
-      {:astro, "~> 2.7"},
+      # The versions Tempo 2.0 requires: the recurrences are Tempo 2.0's, and
+      # the Islamic tier needs Calendrical 2.
+      {:ex_tempo, "~> 2.0"},
+      {:calendrical, "~> 2.1"},
+      {:astro, "~> 2.9"},
       # Tz, which Tempo brings and asks where nothing else is configured: an
       # equinox or solstice in a named IANA zone (Chile's solstice `in
       # America/Santiago`) resolves through it. Named here as the tests name
@@ -120,10 +116,8 @@ defmodule Tempo.Holidays.MixProject do
       # its SpatialIndex lookups are about 1,500 times faster.
       {:tz_world, "~> 2.5", optional: true},
       # LanguageTag resolution (territory + language in one tag), locale-aware
-      # date/time formatting, and MF2 for any templated holiday notes. GitHub
-      # main during co-development, as in Tempo; becomes {:localize, "~> 1.4"}
-      # before publish.
-      {:localize, github: "elixir-localize/localize", branch: "main", override: true},
+      # date/time formatting, and MF2 for any templated holiday notes.
+      {:localize, "~> 1.4"},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

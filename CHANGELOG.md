@@ -8,6 +8,8 @@ First release. Public holidays for every territory in the [date-holidays](https:
 
 * The full date-holidays grammar — fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar, solar-term and equinox/solstice dates, observed-date substitution, occurrence gates, and inter-holiday bridge days.
 
+* The data is compiled from date-holidays 3.38.0 and ships in the package. `mix tempo.holidays.update --version` builds it from another release into the directory an application names with `config :tempo_holidays, data_dir: {:my_app, "holidays"}`, which the library then reads, and lists any rule it leaves out; `Tempo.Holidays.Data.version/0` says which release is loaded.
+
 * `Tempo.Holidays.holidays/2` — a territory's holidays as a `Tempo.RecurrenceSet`, one member per holiday tagged with its `:id`, `:name` and `:type`, and with the `:calendar` of a rule of another calendar than the Gregorian, selected by type with `:include` and `:exclude`, which `Tempo.to_interval/2` converts to a window's holidays. All 1,828 of the dataset's rules are declarative recurrences, the bridge and `if`-holiday rules as conditional members.
 
 * `:dates` gives a holiday observed on a substitute day on that day (`:substitute`, the default), on its own date (`:gazetted`) or on both (`:both`). A period date-holidays splits over the year end is one member, and a dated period keeps its length.

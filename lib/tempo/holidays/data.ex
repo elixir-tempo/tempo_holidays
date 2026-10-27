@@ -17,6 +17,13 @@ defmodule Tempo.Holidays.Data do
 
   alias Tempo.Holidays.{Holiday, Rule}
 
+  # The shape of the data itself — the `%Holiday{}` and `%Rule{}` structs it
+  # serialises. Bump it with any change to those structs, or to the values
+  # they hold (3: Hebrew months are traditional month numbers; 4: a dated period
+  # carries its length), so every build regenerates the data instead of loading
+  # structs of an older shape.
+  @data_format 4
+
   @doc """
   Return the compiled holidays for a territory, or one of its subdivisions.
 
@@ -217,15 +224,55 @@ defmodule Tempo.Holidays.Data do
   """
   @spec territories() :: [String.t()]
   def territories do
-    with directory when is_binary(directory) <- holidays_dir(),
-         {:ok, files} <- File.ls(directory) do
-      files
-      |> Enum.filter(&String.ends_with?(&1, ".etf"))
-      |> Enum.map(&Path.basename(&1, ".etf"))
-      |> Enum.sort()
-    else
-      _ -> []
+    directory = holidays_dir()
+
+    case File.ls(directory) do
+      {:ok, files} ->
+        files
+        |> Enum.filter(&String.ends_with?(&1, ".etf"))
+        |> Enum.map(&Path.basename(&1, ".etf"))
+        |> Enum.sort()
+
+      {:error, _reason} ->
+        []
     end
+  end
+
+  @doc """
+  The date-holidays release the loaded data was built from.
+
+  The data is the package's own, built from the release `Tempo.Holidays`
+  pins, unless `mix tempo.holidays.update --version` has written another
+  release to the directory `config :tempo_holidays, data_dir: …` names (see
+  the task's documentation).
+
+  ### Returns
+
+  * `{:ok, version}`, such as `{:ok, "3.38.0"}`, or
+
+  * `{:error, :no_data}` when there is no data to load.
+
+  ### Examples
+
+      iex> {:ok, version} = Tempo.Holidays.Data.version()
+      iex> version =~ ~r/^\\d+\\.\\d+\\.\\d+$/
+      true
+
+  """
+  @spec version() :: {:ok, String.t()} | {:error, :no_data}
+  def version do
+    case marker_of(holidays_dir()) do
+      {:ok, version, @data_format} -> {:ok, version}
+      _other -> {:error, :no_data}
+    end
+  end
+
+  @doc false
+  # The `VERSION` file a build writes beside the data: the date-holidays
+  # release and the data format, `"3.38.0+4"`.
+  @spec marker(String.t()) :: String.t()
+  def marker(version) do
+    "#{version}+#{@data_format}"
   end
 
   # A territory's data, loaded and prepared once — every rule's recurrence built
@@ -274,19 +321,63 @@ defmodule Tempo.Holidays.Data do
   # `File.read/1` returns a tagged tuple, so a missing territory file never
   # raises — it is simply an unknown territory.
   defp load(code) do
-    with directory when is_binary(directory) <- holidays_dir(),
-         path = Path.join(directory, "#{code}.etf"),
-         {:ok, binary} <- File.read(path) do
-      {:ok, deserialize(binary)}
-    else
-      _ -> :error
+    path = Path.join(holidays_dir(), "#{code}.etf")
+
+    case File.read(path) do
+      {:ok, binary} -> {:ok, deserialize(binary)}
+      {:error, _reason} -> :error
     end
   end
 
+  # The directory `config :tempo_holidays, data_dir: …` names, where its data
+  # is in this release of the library's format, and the package's own data
+  # otherwise: data an older release built is never deserialised as this
+  # release's structs.
   defp holidays_dir do
+    configured = configured_dir(Application.get_env(:tempo_holidays, :data_dir))
+
+    if current?(configured) do
+      configured
+    else
+      packaged_dir()
+    end
+  end
+
+  defp configured_dir({app, path}) when is_atom(app) and is_binary(path) do
+    case :code.priv_dir(app) do
+      priv when is_list(priv) -> Path.join(List.to_string(priv), path)
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp configured_dir(path) when is_binary(path) do
+    path
+  end
+
+  defp configured_dir(_none) do
+    nil
+  end
+
+  defp current?(nil) do
+    false
+  end
+
+  defp current?(directory) do
+    match?({:ok, _version, @data_format}, marker_of(directory))
+  end
+
+  defp marker_of(directory) do
+    with {:ok, marker} <- File.read(Path.join(directory, "VERSION")),
+         [version, format] <- String.split(String.trim(marker), "+"),
+         {format, ""} <- Integer.parse(format) do
+      {:ok, version, format}
+    end
+  end
+
+  defp packaged_dir do
     case :code.priv_dir(:tempo_holidays) do
-      priv when is_list(priv) -> Path.join(priv, "holidays")
-      _error -> nil
+      priv when is_list(priv) -> Path.join(List.to_string(priv), "holidays")
+      {:error, _reason} -> Path.join("priv", "holidays")
     end
   end
 

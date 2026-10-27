@@ -45,6 +45,21 @@ defmodule Tempo.Holidays.DayStart do
 
   @evening_time ~T[18:00:00]
 
+  # tz_world is an optional dependency: it is called only once
+  # `tz_world_ready?/0` finds it loaded and a backend running, and a host that
+  # does not have it compiles this module without a warning.
+  @compile {:no_warn_undefined, TzWorld}
+
+  # The tz_world backends, one of which must be running for a lookup.
+  @tz_world_backends [
+    TzWorld.Backend.SpatialIndex,
+    TzWorld.Backend.EtsWithIndexCache,
+    TzWorld.Backend.DetsWithIndexCache,
+    TzWorld.Backend.Ets,
+    TzWorld.Backend.Dets,
+    TzWorld.Backend.Memory
+  ]
+
   @typedoc "Where a day-start boundary is taken: an IANA zone id or a `{longitude, latitude}` point."
   @type location :: String.t() | {number(), number()} | struct()
 
@@ -242,25 +257,12 @@ defmodule Tempo.Holidays.DayStart do
   # backend check keeps tz_world's "no backend" from raising into the caller.
   defp zone_of(location) do
     if tz_world_ready?() do
-      # A variable module is dispatched at runtime, so tz_world is not resolved
-      # at compile time — the module stays a genuinely optional dependency.
-      resolver = TzWorld
-
-      case resolver.timezone_at(geo_point(location)) do
+      case TzWorld.timezone_at(geo_point(location)) do
         {:ok, zone} -> zone
         _ -> nil
       end
     end
   end
-
-  @tz_world_backends [
-    TzWorld.Backend.SpatialIndex,
-    TzWorld.Backend.EtsWithIndexCache,
-    TzWorld.Backend.DetsWithIndexCache,
-    TzWorld.Backend.Ets,
-    TzWorld.Backend.Dets,
-    TzWorld.Backend.Memory
-  ]
 
   defp tz_world_ready? do
     Code.ensure_loaded?(TzWorld) and function_exported?(TzWorld, :timezone_at, 1) and

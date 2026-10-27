@@ -114,3 +114,18 @@ An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just 
 A set is of one frame, so the other holidays become the days they are where the day start is read — Founding Day a day in Riyadh. Where no holiday is projected, every day is left as it is. A lazy set needs a location, since its sunset holidays are not known ahead.
 
 `:sunset` (true sunset) and `:evening` (an 18:00 proxy) begin the day the evening before, at the calendar's reference place (Mecca, Jerusalem) or at a location of your own, `{:sunset, location}` or `{:evening, location}`, a zone id or a `{longitude, latitude}` point. `:midnight` leaves the occurrences as they are. See `Tempo.Holidays.DayStart`.
+
+## Updating the holiday data
+
+The holidays are compiled from a release of [date-holidays](https://github.com/commenthol/date-holidays), the one this release of tempo_holidays pins, and the compiled data ships in the package. date-holidays corrects and adds holidays between releases of tempo_holidays, and an application can take a newer release without waiting: name a directory in its `priv` for the data, and build it there.
+
+```elixir
+# config/config.exs
+config :tempo_holidays, data_dir: {:my_app, "holidays"}
+```
+
+```bash
+mix tempo.holidays.update --version 3.38.0
+```
+
+The task writes the data to `priv/holidays` of your project, which goes into a release with your application and can be committed with it, and tempo_holidays reads it from there. `Tempo.Holidays.Data.version/0` says which date-holidays release is loaded. The task lists any rule of the release that this tempo_holidays does not compile yet; those holidays are left out of the data. Data built by a release of tempo_holidays with another data format is not read: the package's own data is, until the task is run again.

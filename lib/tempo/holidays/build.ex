@@ -22,24 +22,27 @@ defmodule Tempo.Holidays.Build do
   """
 
   alias Localize.Utils.Http
-  alias Tempo.Holidays.{DateHolidays, Holiday}
+  alias Tempo.Holidays.{Compiler, Data, DateHolidays, Holiday}
 
-  @pinned_version "3.37.0"
-  @source "https://cdn.jsdelivr.net/npm/date-holidays@#{@pinned_version}/data/holidays.json"
+  @pinned_version "3.38.0"
   @language "en"
-
-  # The shape of the data itself — the `%Holiday{}` and `%Rule{}` structs it
-  # serialises. Bump it with any change to those structs, or to the values
-  # they hold (3: Hebrew months are traditional month numbers; 4: a dated period
-  # carries its length), so every build regenerates the data instead of loading
-  # structs of an older shape.
-  @data_format 4
+  @version_format ~r/\A\d+\.\d+\.\d+\z/
 
   @doc "The exact date-holidays version the data is built from."
   def pinned_version, do: @pinned_version
 
   @doc "The pinned bundle URL."
-  def source_url, do: @source
+  def source_url, do: source_url(@pinned_version)
+
+  @doc "The bundle URL of a date-holidays version, such as `\"3.38.0\"`."
+  def source_url(version) do
+    "https://cdn.jsdelivr.net/npm/date-holidays@#{version}/data/holidays.json"
+  end
+
+  @doc "The directory the package's own data is written to: its `priv/holidays`."
+  def default_directory do
+    Path.join([Path.dirname(Mix.Project.project_file()), "priv", "holidays"])
+  end
 
   @doc """
   Generate the etf data unless it is already present for the pinned version.
@@ -57,16 +60,23 @@ defmodule Tempo.Holidays.Build do
   end
 
   @doc """
-  Download the pinned bundle and (re)write every territory's etf, returning
-  `{:ok, territory_count}`. Forces the work regardless of what is already on
-  disk.
+  Download a date-holidays bundle and (re)write every territory's etf, returning
+  `{:ok, territory_count, unsupported}`, where `unsupported` lists the rules
+  the bundle holds that are not compiled yet and so are left out of the data.
+  Forces the work regardless of what is already on disk.
+
+  Options: `:version`, the date-holidays release (the pinned one by default);
+  `:directory`, where the etf is written (`default_directory/0` by default);
+  `:language`, the ISO 639-1 code for names (`"en"` by default).
   """
   def build(options \\ []) do
     language = Keyword.get(options, :language, @language)
-    directory = output_dir()
+    version = Keyword.get(options, :version, @pinned_version)
+    directory = Keyword.get(options, :directory, default_directory())
+    valid_version!(version)
     File.mkdir_p!(directory)
 
-    bundle = fetch_bundle()
+    bundle = fetch_bundle(version)
 
     written =
       bundle
@@ -75,8 +85,30 @@ defmodule Tempo.Holidays.Build do
         count + write_territory(directory, bundle, code, language)
       end)
 
-    File.write!(marker_path(), marker())
-    {:ok, written}
+    File.write!(Path.join(directory, "VERSION"), Data.marker(version))
+    {:ok, written, unsupported(bundle)}
+  end
+
+  # The rules of a bundle that do not compile, which its data leaves out. A
+  # rule written `false` disables an inherited one and is no rule.
+  defp unsupported(bundle) do
+    bundle
+    |> Map.get("holidays", %{})
+    |> rules_in()
+    |> Enum.uniq()
+    |> Enum.filter(&match?({:error, _}, Compiler.compile(&1)))
+    |> Enum.sort()
+  end
+
+  defp rules_in(%{} = map) do
+    Enum.flat_map(map, fn
+      {"days", days} when is_map(days) -> for {rule, meta} <- days, meta != false, do: rule
+      {_key, value} -> rules_in(value)
+    end)
+  end
+
+  defp rules_in(_other) do
+    []
   end
 
   @doc """
@@ -199,16 +231,27 @@ defmodule Tempo.Holidays.Build do
   # Erlang's `:json.decode/1` raises on malformed input; from a pinned,
   # immutable CDN artefact that is a build-time fault we want to fail loudly on,
   # so it is not caught.
-  defp fetch_bundle do
+  defp fetch_bundle(version) do
     _ = Application.ensure_all_started(:ssl)
     _ = Application.ensure_all_started(:inets)
+    source = source_url(version)
 
-    case Http.get(@source) do
+    case Http.get(source) do
       {:ok, body} ->
         :json.decode(body)
 
       {:error, reason} ->
-        Mix.raise("tempo_holidays: could not download #{@source}: #{inspect(reason)}")
+        Mix.raise("tempo_holidays: could not download #{source}: #{inspect(reason)}")
+    end
+  end
+
+  defp valid_version!(version) do
+    if is_binary(version) and Regex.match?(@version_format, version) do
+      :ok
+    else
+      Mix.raise(
+        "tempo_holidays: a date-holidays version is three numbers, such as 3.38.0, not #{inspect(version)}"
+      )
     end
   end
 
@@ -217,14 +260,6 @@ defmodule Tempo.Holidays.Build do
   # The data on disk is current when it was built from the pinned version in the
   # current data format.
   defp built? do
-    File.read(marker_path()) == {:ok, marker()}
-  end
-
-  defp marker, do: "#{@pinned_version}+#{@data_format}"
-
-  defp marker_path, do: Path.join(output_dir(), "VERSION")
-
-  defp output_dir do
-    Path.join([Path.dirname(Mix.Project.project_file()), "priv", "holidays"])
+    File.read(Path.join(default_directory(), "VERSION")) == {:ok, Data.marker(@pinned_version)}
   end
 end
