@@ -4,6 +4,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
+* [ ] **A public rule compiler, and holidays of your own** — `Tempo.Holidays.compile/2` from a tokenizer of date-holidays-parser's grammar (102 of its 117 test rules compile today), then holidays an application defines (`add:`/`remove:`, config). Decided 2026-10-27; plan in [plans/rule-compiler.md](plans/rule-compiler.md).
+
 * [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
 
 * [ ] **Brazil's ANBIMA holidays without Election Day** — `holidays(:BR, include: [:public, :bank])` is ANBIMA's national list, exact for 2001–2099, plus two `:public` `Election Day` members no type selection leaves out; they are always Sundays, so business-day counts are right and only a listing differs. `holidays/2` has no way to leave a holiday out by its `:id` or `:name`. Analysis in Tempo's [plans/anbima-calendar.md](https://github.com/elixir-tempo/tempo/blob/main/plans/anbima-calendar.md).
