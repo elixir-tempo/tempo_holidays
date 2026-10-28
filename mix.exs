@@ -102,7 +102,7 @@ defmodule Tempo.Holidays.MixProject do
       # which is in Tempo 2.1; `~> 2.1` from hex once it is published. It
       # requires Calendrical 2.2, whose lunisolar calendars name a year by its
       # sexagenary cycle.
-      {:ex_tempo, github: "elixir-tempo/tempo"},
+      {:ex_tempo, "~> 2.1"},
       {:calendrical, "~> 2.2"},
       {:astro, "~> 2.9"},
       # Tz, which Tempo brings and asks where nothing else is configured: an

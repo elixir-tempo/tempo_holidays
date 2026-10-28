@@ -1,6 +1,8 @@
 # A public rule compiler, and holidays of your own
 
-**Status:** in progress, 2026-10-27
+**Status:** implemented (v0.1.0), 2026-10-28
+
+Every task is done; v0.1.0, the first release, is not yet published.
 
 The grammar and its compiler move to Tempo as `Tempo.DateRule` (D5, below), planned in Tempo's `plans/date-rule.md`. What stays here: the dataset, holiday names and types, territories, the update task, `Tempo.Holidays.compile/2` as the holiday layer over `Tempo.DateRule.parse/2`, and holidays of your own.
 
@@ -142,9 +144,9 @@ Taken by the user on 2026-10-27, for holidays of your own (D4):
 
 ## Tasks
 
-* [ ] **Tempo 2.1 from hex** — `Tempo.DateRule` is on Tempo `main` (`plans/date-rule.md` there); once Tempo 2.1 is published, `{:ex_tempo, "~> 2.1"}` in place of the GitHub dependency (D10). Blocked on the Tempo 2.1 release.
-
 ### Done
+
+* [x] **Tempo 2.1 from hex** — `{:ex_tempo, "~> 2.1"}` in place of the GitHub dependency (D10), Tempo 2.1 published with `Tempo.DateRule`. 2026-10-28.
 
 * [x] **Holidays of your own** — `add/3` and `remove/2` on a set of holidays (D13, D14, D17) and `config :tempo_holidays, holidays:` with `add:` and `remove:` (D15): an added holiday is read as `compile/2` reads it with the set's `:dates`, kept whatever its type, and takes the place of a holiday of its id; `remove/2` matches an id or a name; a territory's configured holidays apply to its subdivisions, a subdivision's after its territory's. 2026-10-28.
 

@@ -20,8 +20,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Blocked
 
-* [ ] **Tempo from hex** — tempo_holidays takes Tempo from GitHub `main` while `Tempo.DateRule` is unreleased; `{:ex_tempo, "~> 2.1"}` once Tempo 2.1 is published, before this library's release. Blocked on the Tempo 2.1 release.
-
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
 ## Deferred
@@ -33,6 +31,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Tempo from hex** — `{:ex_tempo, "~> 2.1"}` now Tempo 2.1 is published with `Tempo.DateRule`, in place of GitHub `main` (D10); 206 tests and the conformance run unchanged on it. 2026-10-28.
 
 * [x] **Holidays of your own** — `add/3` adds a holiday read from a rule to a set of holidays (with its `:dates`, whatever its type, in place of one of its id) and `remove/2` removes by id or name; `config :tempo_holidays, holidays:` with `:add` and `:remove`, keyed by territory or subdivision; `:include` and `:exclude` select types alone (D13–D17). 2026-10-28.
 
