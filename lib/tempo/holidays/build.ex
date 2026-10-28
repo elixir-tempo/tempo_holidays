@@ -31,6 +31,17 @@ defmodule Tempo.Holidays.Build do
   alias Localize.Utils.Http
   alias Tempo.Holidays.{Data, DateHolidays, Holiday}
 
+  @typedoc """
+  Why the data could not be built: a version that is not three numbers, a
+  directory that could not be made, a bundle that could not be downloaded,
+  or an application that could not be started.
+  """
+  @type error ::
+          {:invalid_version, term()}
+          | {:directory, Path.t(), File.posix()}
+          | {:download_failed, String.t(), term()}
+          | {atom(), term()}
+
   @pinned_version "3.38.0"
   @language "en"
   @version_format ~r/\A\d+\.\d+\.\d+\z/
@@ -126,7 +137,7 @@ defmodule Tempo.Holidays.Build do
   * `{:error, reason}` as `build/1` returns it.
 
   """
-  @spec ensure_built() :: :noop | :ok | {:error, term()}
+  @spec ensure_built() :: :noop | :ok | {:error, error()}
   def ensure_built do
     if built?() do
       :noop
@@ -173,7 +184,7 @@ defmodule Tempo.Holidays.Build do
     that cannot be started. `message/1` says each in words.
 
   """
-  @spec build(keyword()) :: {:ok, non_neg_integer(), [String.t()]} | {:error, term()}
+  @spec build(keyword()) :: {:ok, non_neg_integer(), [String.t()]} | {:error, error()}
   def build(options \\ []) do
     language = Keyword.get(options, :language, @language)
     version = Keyword.get(options, :version, @pinned_version)
@@ -213,7 +224,7 @@ defmodule Tempo.Holidays.Build do
       "could not make /x: not a directory"
 
   """
-  @spec message(term()) :: String.t()
+  @spec message(error()) :: String.t()
   def message({:invalid_version, version}) do
     "a date-holidays version is three numbers, such as 3.38.0, not #{inspect(version)}"
   end
