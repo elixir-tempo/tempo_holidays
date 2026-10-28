@@ -20,6 +20,7 @@ defmodule Mix.Tasks.Compile.Holidays do
     case Build.ensure_built() do
       :noop -> {:noop, []}
       :ok -> {:ok, []}
+      {:error, reason} -> Mix.raise("tempo_holidays: " <> Build.message(reason))
     end
   end
 end

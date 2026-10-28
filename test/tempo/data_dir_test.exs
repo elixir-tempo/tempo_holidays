@@ -5,8 +5,27 @@ defmodule Tempo.Holidays.DataDirTest do
   alias Mix.Tasks.Tempo.Holidays.Update
   alias Tempo.Holidays.{Build, Data}
 
+  doctest Build
+
   setup do
     on_exit(fn -> Application.delete_env(:tempo_holidays, :data_dir) end)
+  end
+
+  describe "building the data" do
+    @tag :tmp_dir
+    test "an invalid version or a directory it cannot make is an error, not a raise",
+         %{tmp_dir: tmp_dir} do
+      assert Build.build(version: "latest", directory: tmp_dir) ==
+               {:error, {:invalid_version, "latest"}}
+
+      not_a_directory = Path.join(tmp_dir, "file")
+      File.write!(not_a_directory, "")
+
+      assert {:error, {:directory, _directory, :enotdir}} =
+               Build.build(directory: Path.join(not_a_directory, "holidays"))
+
+      assert Build.message({:directory, "/x", :enotdir}) == "could not make /x: not a directory"
+    end
   end
 
   # A data directory with one territory of the package's own data and a
@@ -70,7 +89,8 @@ defmodule Tempo.Holidays.DataDirTest do
     end
   end
 
-  test "a version is three numbers, refused before anything is downloaded" do
-    assert_raise Mix.Error, ~r/three numbers/, fn -> Build.build(version: "latest") end
+  test "a version is three numbers, an error before anything is downloaded" do
+    assert Build.build(version: "latest") == {:error, {:invalid_version, "latest"}}
+    assert Build.message({:invalid_version, "latest"}) =~ "three numbers"
   end
 end

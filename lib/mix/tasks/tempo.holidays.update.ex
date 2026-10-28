@@ -74,6 +74,9 @@ defmodule Mix.Tasks.Tempo.Holidays.Update do
         )
 
         left_out(unsupported, version)
+
+      {:error, reason} ->
+        Mix.raise("tempo_holidays: " <> Build.message(reason))
     end
   end
 

@@ -38,9 +38,9 @@ defmodule Tempo.Holidays.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp description do
-    "Public holidays as Tempo intervals — date-holidays rules compiled to " <>
-      "ISO 8601 / Tempo recurrences, with Calendrical and Astro for the " <>
-      "computed tail. Territory- and calendar-aware."
+    "Public holidays for every territory as Tempo recurrences, for any window: " <>
+      "the date-holidays dataset read by Tempo.DateRule, with subdivisions, " <>
+      "substitute days, other calendars and holidays of your own."
   end
 
   defp package do
@@ -98,9 +98,8 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # Tempo from GitHub `main` while the rules move onto Tempo.DateRule,
-      # which is in Tempo 2.1; `~> 2.1` from hex once it is published. It
-      # requires Calendrical 2.2, whose lunisolar calendars name a year by its
+      # Tempo 2.1, whose Tempo.DateRule reads the dataset's rules. It requires
+      # Calendrical 2.2, whose lunisolar calendars name a year by its
       # sexagenary cycle.
       {:ex_tempo, "~> 2.1"},
       {:calendrical, "~> 2.2"},

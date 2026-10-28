@@ -35,66 +35,199 @@ defmodule Tempo.Holidays.Build do
   @language "en"
   @version_format ~r/\A\d+\.\d+\.\d+\z/
 
-  @doc "The exact date-holidays version the data is built from."
-  def pinned_version, do: @pinned_version
+  @doc """
+  The date-holidays release the package's own data is built from.
 
-  @doc "The pinned bundle URL."
-  def source_url, do: source_url(@pinned_version)
+  ### Returns
 
-  @doc "The bundle URL of a date-holidays version, such as `\"3.38.0\"`."
+  * The release, a version string.
+
+  ### Examples
+
+      iex> Tempo.Holidays.Build.pinned_version()
+      "3.38.0"
+
+  """
+  @spec pinned_version() :: String.t()
+  def pinned_version do
+    @pinned_version
+  end
+
+  @doc """
+  The URL of the bundle of holiday data of the pinned date-holidays release.
+
+  ### Returns
+
+  * The URL, a string.
+
+  ### Examples
+
+      iex> Tempo.Holidays.Build.source_url()
+      "https://cdn.jsdelivr.net/npm/date-holidays@3.38.0/data/holidays.json"
+
+  """
+  @spec source_url() :: String.t()
+  def source_url do
+    source_url(@pinned_version)
+  end
+
+  @doc """
+  The URL of the bundle of holiday data of a date-holidays release.
+
+  ### Arguments
+
+  * `version` is a date-holidays release, such as `"3.37.0"`.
+
+  ### Returns
+
+  * The URL, a string.
+
+  ### Examples
+
+      iex> Tempo.Holidays.Build.source_url("3.37.0")
+      "https://cdn.jsdelivr.net/npm/date-holidays@3.37.0/data/holidays.json"
+
+  """
+  @spec source_url(String.t()) :: String.t()
   def source_url(version) do
     "https://cdn.jsdelivr.net/npm/date-holidays@#{version}/data/holidays.json"
   end
 
-  @doc "The directory the package's own data is written to: its `priv/holidays`."
+  @doc """
+  The directory the package's own data is written to: its `priv/holidays`.
+
+  ### Returns
+
+  * The directory, a path.
+
+  ### Examples
+
+      iex> Path.basename(Tempo.Holidays.Build.default_directory())
+      "holidays"
+
+  """
+  @spec default_directory() :: String.t()
   def default_directory do
     Path.join([Path.dirname(Mix.Project.project_file()), "priv", "holidays"])
   end
 
   @doc """
-  Generate the etf data unless it is already present for the pinned version.
+  Builds the package's own data unless it is already built from the pinned
+  release, as the `:holidays` compiler asks at each compilation.
 
-  Returns `:noop` when the current data is in place — the common case on a warm
-  build and on every consumer build, so neither touches the network.
+  ### Returns
+
+  * `:noop` where the data is in place: on a warm build, and on every build
+    of an application where the data ships in the package, so neither
+    touches the network, or
+
+  * `:ok` where it was built, or
+
+  * `{:error, reason}` as `build/1` returns it.
+
   """
+  @spec ensure_built() :: :noop | :ok | {:error, term()}
   def ensure_built do
     if built?() do
       :noop
     else
-      build()
-      :ok
+      built(build())
     end
   end
 
-  @doc """
-  Download a date-holidays bundle and (re)write every territory's etf, returning
-  `{:ok, territory_count, unsupported}`, where `unsupported` lists the rules
-  the bundle holds that are not compiled yet and so are left out of the data.
-  Forces the work regardless of what is already on disk.
+  defp built({:ok, _count, _unsupported}) do
+    :ok
+  end
 
-  Options: `:version`, the date-holidays release (the pinned one by default);
-  `:directory`, where the etf is written (`default_directory/0` by default);
-  `:language`, the ISO 639-1 code for names (`"en"` by default).
+  defp built({:error, _reason} = error) do
+    error
+  end
+
+  @doc """
+  Downloads a date-holidays release's bundle of holiday data and writes every
+  territory's data from it, whatever is already on disk.
+
+  ### Arguments
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:version` is the date-holidays release, three numbers such as
+    `"3.38.0"`. The default is `pinned_version/0`.
+
+  * `:directory` is where the data is written. The default is
+    `default_directory/0`.
+
+  * `:language` is the ISO 639-1 code of the holidays' names. The default is
+    `"en"`.
+
+  ### Returns
+
+  * `{:ok, territory_count, unsupported}`, where `unsupported` lists the
+    rules of the release `Tempo.DateRule` does not read, whose holidays are
+    left out of the data, or
+
+  * `{:error, reason}`: `{:invalid_version, version}`, `{:directory,
+    directory, posix}`, `{:download_failed, url, reason}`, or an application
+    that cannot be started. `message/1` says each in words.
+
   """
+  @spec build(keyword()) :: {:ok, non_neg_integer(), [String.t()]} | {:error, term()}
   def build(options \\ []) do
     language = Keyword.get(options, :language, @language)
     version = Keyword.get(options, :version, @pinned_version)
     directory = Keyword.get(options, :directory, default_directory())
-    valid_version!(version)
-    File.mkdir_p!(directory)
-    {:ok, _started} = Application.ensure_all_started(:ex_tempo)
 
-    bundle = fetch_bundle(version)
+    with :ok <- valid_version(version),
+         :ok <- directory_made(directory),
+         {:ok, _started} <- Application.ensure_all_started(:ex_tempo),
+         {:ok, bundle} <- fetch_bundle(version) do
+      written =
+        bundle
+        |> Map.get("holidays", %{})
+        |> Enum.reduce(0, fn {code, _country}, count ->
+          count + write_territory(directory, bundle, code, language)
+        end)
 
-    written =
-      bundle
-      |> Map.get("holidays", %{})
-      |> Enum.reduce(0, fn {code, _country}, count ->
-        count + write_territory(directory, bundle, code, language)
-      end)
+      File.write!(Path.join(directory, "VERSION"), Data.marker(version))
+      {:ok, written, unsupported(bundle)}
+    end
+  end
 
-    File.write!(Path.join(directory, "VERSION"), Data.marker(version))
-    {:ok, written, unsupported(bundle)}
+  @doc """
+  An error `build/1` returns, in words.
+
+  ### Arguments
+
+  * `reason` is the reason of an `{:error, reason}` from `build/1` or
+    `ensure_built/0`.
+
+  ### Returns
+
+  * The message, a string.
+
+  ### Examples
+
+      iex> Tempo.Holidays.Build.message({:directory, "/x", :enotdir})
+      "could not make /x: not a directory"
+
+  """
+  @spec message(term()) :: String.t()
+  def message({:invalid_version, version}) do
+    "a date-holidays version is three numbers, such as 3.38.0, not #{inspect(version)}"
+  end
+
+  def message({:directory, directory, posix}) do
+    "could not make #{directory}: #{:file.format_error(posix)}"
+  end
+
+  def message({:download_failed, url, reason}) do
+    "could not download #{url}: #{inspect(reason)}"
+  end
+
+  def message(reason) do
+    "could not build the holiday data: #{inspect(reason)}"
   end
 
   # The rules of a bundle `Tempo.DateRule` does not read, which its data leaves out. A
@@ -265,21 +398,23 @@ defmodule Tempo.Holidays.Build do
     source = source_url(version)
 
     case Http.get(source) do
-      {:ok, body} ->
-        :json.decode(body)
-
-      {:error, reason} ->
-        Mix.raise("tempo_holidays: could not download #{source}: #{inspect(reason)}")
+      {:ok, body} -> {:ok, :json.decode(body)}
+      {:error, reason} -> {:error, {:download_failed, source, reason}}
     end
   end
 
-  defp valid_version!(version) do
+  defp valid_version(version) do
     if is_binary(version) and Regex.match?(@version_format, version) do
       :ok
     else
-      Mix.raise(
-        "tempo_holidays: a date-holidays version is three numbers, such as 3.38.0, not #{inspect(version)}"
-      )
+      {:error, {:invalid_version, version}}
+    end
+  end
+
+  defp directory_made(directory) do
+    case File.mkdir_p(directory) do
+      :ok -> :ok
+      {:error, posix} -> {:error, {:directory, directory, posix}}
     end
   end
 

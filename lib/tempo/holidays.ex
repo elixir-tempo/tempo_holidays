@@ -1091,15 +1091,26 @@ defmodule Tempo.Holidays do
     end
   end
 
+  # An occurrence of a holiday of a calendar whose day begins at sunset is
+  # projected; any other, and one that cannot be, is left as it is.
   defp project_occurrence(interval, day_start) do
     calendar = holiday_calendar(interval)
 
-    with true <- sunset_calendar?(calendar),
-         {:ok, projected} <- DayStart.project(interval, calendar, day_start) do
-      Tempo.put_metadata(projected, Tempo.metadata(interval))
+    if sunset_calendar?(calendar) do
+      interval
+      |> DayStart.project(calendar, day_start)
+      |> projected_or_as_is(interval)
     else
-      _midnight_calendar_or_error -> interval
+      interval
     end
+  end
+
+  defp projected_or_as_is({:ok, projected}, interval) do
+    Tempo.put_metadata(projected, Tempo.metadata(interval))
+  end
+
+  defp projected_or_as_is({:error, _reason}, interval) do
+    interval
   end
 
   # The calendar that says how an occurrence's day begins: the one its
