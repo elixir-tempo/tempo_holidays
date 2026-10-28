@@ -85,4 +85,4 @@ Full API documentation is available on [HexDocs](https://hexdocs.pm/tempo_holida
 
 ## License
 
-The code is licensed under the Apache License 2.0; see [LICENSE.md](https://github.com/elixir-tempo/tempo_holidays/blob/v0.1.0/LICENSE.md). The holiday data derives from [date-holidays](https://github.com/commenthol/date-holidays) and is redistributed under CC-BY-SA-3.0; see [NOTICE](https://github.com/elixir-tempo/tempo_holidays/blob/v0.1.0/NOTICE).
+The code is licensed under the Apache License 2.0, and the holiday data, which derives from [date-holidays](https://github.com/commenthol/date-holidays), is redistributed under CC-BY-SA-3.0; [LICENSE.md](https://github.com/elixir-tempo/tempo_holidays/blob/v0.1.0/LICENSE.md) gives both.

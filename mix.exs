@@ -48,7 +48,7 @@ defmodule Tempo.Holidays.MixProject do
       maintainers: ["Kip Cole"],
       # Apache-2.0 covers the code. The compiled holiday data derives from
       # commenthol/date-holidays and is redistributed under CC-BY-SA-3.0, so
-      # both licences are declared and ship in the tarball (see NOTICE).
+      # both licences are declared, and LICENSE.md, in the tarball, gives both.
       licenses: ["Apache-2.0", "CC-BY-SA-3.0"],
       links: links(),
       files: [
