@@ -57,8 +57,7 @@ defmodule Tempo.Holidays.MixProject do
         "mix.exs",
         "README*",
         "CHANGELOG*",
-        "LICENSE*",
-        "NOTICE*"
+        "LICENSE*"
       ]
     ]
   end
