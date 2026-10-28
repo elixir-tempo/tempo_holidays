@@ -4,8 +4,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
-* [ ] **Guides** — a User guide (getting holidays, subdivisions, substitute days, the interval model, calendars, `day_start/2`) and a Conformance guide (the date-holidays corpus, the buckets, accepted divergences), wired into `mix.exs` extras.
-
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
@@ -31,6 +29,10 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Release review for v0.1.0** — the README in the house structure, the user guide's and the README's examples run as doctests (`test/tempo/guides_test.exs`), the user guide's business days and its `:locale` sentence corrected, the CHANGELOG's Highlights, `Build.build/1` returning errors where it raised, `Build` documented to the template, the package metadata and STATUS current; the package (207 territories' data, 124 KB) built and read. 2026-10-28.
+
+* [x] **Guides** — the User guide and the Conformance guide, wired into `mix.exs` extras. 2026-10-28.
 
 * [x] **Tempo from hex** — `{:ex_tempo, "~> 2.1"}` now Tempo 2.1 is published with `Tempo.DateRule`, in place of GitHub `main` (D10); 206 tests and the conformance run unchanged on it. 2026-10-28.
 

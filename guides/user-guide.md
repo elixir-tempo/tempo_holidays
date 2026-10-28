@@ -7,14 +7,12 @@
 `Tempo.Holidays.holidays/2` returns a territory's holidays as a `Tempo.RecurrenceSet`: one member per holiday, tagged with its `:id` (the date-holidays rule, unique where names repeat), `:name` and `:type`. `Tempo.to_interval/2` converts them to the holidays in a window — a year, or any interval — as a set of occurrences, earliest first, each tagged the same way.
 
 ```elixir
-import Tempo.Sigils
-
-{:ok, holidays} = Tempo.Holidays.holidays(:AU)
-{:ok, this_year} = Tempo.to_interval(holidays, within: ~o"2026")
-
-new_year = Tempo.IntervalSet.first(this_year)
-Tempo.metadata(new_year)
-# => %{id: "01-01 and if saturday,sunday then next monday", name: "New Year's Day", type: :public}
+iex> import Tempo.Sigils
+iex> {:ok, holidays} = Tempo.Holidays.holidays(:AU)
+iex> {:ok, this_year} = Tempo.to_interval(holidays, within: ~o"2026")
+iex> new_year = Tempo.IntervalSet.first(this_year)
+iex> Tempo.metadata(new_year)
+%{id: "01-01 and if saturday,sunday then next monday", name: "New Year's Day", type: :public}
 ```
 
 > *"Australia's **holidays** are a set of recurrences; **this year's** are the days they fall on in 2026, the first of them New Year's Day."*
@@ -23,11 +21,18 @@ The window keeps every holiday that overlaps it, so a holiday still running when
 
 ## Territories and subdivisions
 
-A target is a CLDR territory code (`:AU`, `"AU"`) or a BCP 47 locale, given as the first argument or as the `:territory` or `:locale` option. A locale carries its subdivision — `"en-US-u-sd-usca"` selects California — and the `:subdivision` option names one directly, with the ISO 3166-2 code after the territory's (`"ENG"`) or the whole code (`"GB-ENG"`).
+A target is a CLDR territory code (`:AU`, `"AU"`), given as the first argument or as the `:territory` option, or a BCP 47 locale, given as the `:locale` option or as a `Localize.LanguageTag` in first place; a string in first place is always a territory. A locale carries its subdivision — `"en-US-u-sd-usca"` selects California — and the `:subdivision` option names one directly, with the ISO 3166-2 code after the territory's (`"ENG"`) or the whole code (`"GB-ENG"`).
 
 ```elixir
-{:ok, england} = Tempo.Holidays.holidays(:GB, subdivision: "ENG")
-{:ok, los_angeles} = Tempo.Holidays.holidays(:US, subdivision: "CA-LA")
+iex> {:ok, england} = Tempo.Holidays.holidays(:GB, subdivision: "ENG")
+iex> Tempo.metadata(england)
+%{territory: "GB", subdivision: "ENG", dates: :substitute}
+iex> {:ok, los_angeles} = Tempo.Holidays.holidays(:US, subdivision: "CA-LA")
+iex> Tempo.metadata(los_angeles)
+%{territory: "US", subdivision: "CA-LA", dates: :substitute}
+iex> {:ok, california} = Tempo.Holidays.holidays(locale: "en-US-u-sd-usca")
+iex> Tempo.metadata(california)
+%{territory: "US", subdivision: "CA", dates: :substitute}
 ```
 
 > *"**England's** holidays are Great Britain's with England's own; **Los Angeles'** are the United States', California's and the city's."*
@@ -39,14 +44,16 @@ A subdivision is found at whichever level the data holds it: a state, or a regio
 Because the holidays are a Tempo value, they meet anything else through set algebra. A set operation converts them over the other operand, keeping every occurrence that overlaps it.
 
 ```elixir
-{:ok, diary} =
-  Tempo.IntervalSet.new([
-    Tempo.to_interval!(~o"2026-04-03T09/2026-04-03T10"),
-    Tempo.to_interval!(~o"2026-04-08T09/2026-04-08T10")
-  ])
-
-{:ok, clashes} = Tempo.intersection(diary, holidays, metadata: :merge)
-# => the 3 April meeting, labelled "Good Friday"
+iex> import Tempo.Sigils
+iex> {:ok, holidays} = Tempo.Holidays.holidays(:AU)
+iex> {:ok, diary} =
+...>   Tempo.IntervalSet.new([
+...>     Tempo.to_interval!(~o"2026-04-03T09/2026-04-03T10"),
+...>     Tempo.to_interval!(~o"2026-04-08T09/2026-04-08T10")
+...>   ])
+iex> {:ok, clashes} = Tempo.intersection(diary, holidays, metadata: :merge)
+iex> Tempo.IntervalSet.map(clashes, &Tempo.metadata(&1).name)
+["Good Friday"]
 ```
 
 > *"The **clashes** are the diary entries that fall on a holiday, each labelled with the holiday it hit."*
@@ -64,11 +71,11 @@ A holiday whose own date falls on a weekend is often observed on another day. Th
 * **`:both`** — its own date and its substitute day, as date-holidays gives them.
 
 ```elixir
-{:ok, england} = Tempo.Holidays.holidays(:GB, subdivision: "ENG", exclude: :observance)
-{:ok, this_year} = Tempo.to_interval(england, within: ~o"2026")
-
-Tempo.IntervalSet.count(this_year)
-# => 8
+iex> import Tempo.Sigils
+iex> {:ok, england} = Tempo.Holidays.holidays(:GB, subdivision: "ENG", exclude: :observance)
+iex> {:ok, this_year} = Tempo.to_interval(england, within: ~o"2026")
+iex> Tempo.IntervalSet.count(this_year)
+8
 ```
 
 > *"England has **eight** public and bank holidays in 2026: Boxing Day falls on a Saturday and is counted once, on the Monday it is observed."*
@@ -80,8 +87,10 @@ date-holidays writes a substitute day two ways, and both are observed in place o
 A holiday's `:type` is `:public`, `:bank`, `:school`, `:optional` or `:observance`. `:include` keeps the types it names and `:exclude` leaves types out, winning over `:include`; each takes a type or a list of them.
 
 ```elixir
-{:ok, days_off} = Tempo.Holidays.holidays(:DE, include: [:public, :bank])
-{:ok, without_observances} = Tempo.Holidays.holidays(:US, exclude: :observance)
+iex> {:ok, _days_off} = Tempo.Holidays.holidays(:DE, include: [:public, :bank])
+iex> {:ok, _without_observances} = Tempo.Holidays.holidays(:US, exclude: :observance)
+iex> Tempo.Holidays.holidays(:US, include: :festive)
+{:error, {:invalid_holiday_type, :festive}}
 ```
 
 > *"Germany's **days off** are its public and bank holidays; the US holidays **without observances** leave out the likes of Valentine's Day."*
@@ -93,9 +102,14 @@ A selection never changes a date. Glarus' Näfelser Fahrt, a public holiday, mov
 Every occurrence is an interval — a span of days, not an instant — so a multi-day holiday is one interval. A period date-holidays splits over the year end, because its data cannot run one past it, is one member too: Victoria's summer school holidays run from 19 December 2026 to 27 January 2027, 31 December included. A holiday's rule is in its own calendar — an Islamic holiday is an Umm al-Qura date, a Chinese one a date in the Chinese calendar — and a set of occurrences is in one calendar, so beside Gregorian holidays it arrives as the Gregorian days it falls on. Its metadata keeps the calendar its rule is in, as `:calendar`.
 
 ```elixir
-{:ok, saudi} = Tempo.Holidays.holidays(:SA)
-{:ok, this_year} = Tempo.to_interval(saudi, within: ~o"2026")
-# Eid al-Fitr lands as ~o"2026Y3M19D/22D", with calendar: Calendrical.Islamic.UmmAlQura in its metadata
+iex> import Tempo.Sigils
+iex> {:ok, saudi} = Tempo.Holidays.holidays(:SA)
+iex> {:ok, this_year} = Tempo.to_interval(saudi, within: ~o"2026")
+iex> eid = Enum.find(Tempo.IntervalSet.members(this_year), &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
+iex> Tempo.equal?(eid, ~o"2026-03-19/2026-03-22")
+true
+iex> Tempo.metadata(eid).calendar
+Calendrical.Islamic.UmmAlQura
 ```
 
 ## A holiday from a rule
@@ -103,9 +117,11 @@ Every occurrence is an interval — a span of days, not an instant — so a mult
 Every holiday in the data is a rule in the date-holidays grammar, which Tempo reads with `Tempo.DateRule`. The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days; [its reference](https://hexdocs.pm/ex_tempo/date-rule-grammar.html) gives every form. `Tempo.Holidays.compile/2` reads a rule of your own into a holiday, tagged as the dataset's holidays are.
 
 ```elixir
-{:ok, company_day} = Tempo.Holidays.compile("1st friday in December", name: "Company Day", type: :optional)
-{:ok, this_year} = Tempo.to_interval(company_day, within: ~o"2026")
-# => 4 December 2026, tagged %{id: "1st friday in December", name: "Company Day", type: :optional}
+iex> import Tempo.Sigils
+iex> {:ok, company_day} = Tempo.Holidays.compile("1st friday in December", name: "Company Day", type: :optional)
+iex> {:ok, this_year} = Tempo.to_interval(company_day, within: ~o"2026")
+iex> Tempo.IntervalSet.map(this_year, &Tempo.day/1)
+[4]
 ```
 
 > *"The **company day** is the first Friday in December; **this year's** is the 4th."*
@@ -117,11 +133,19 @@ A rule that depends on other holidays, such as a bridge day (`"08-14 if 08-15 is
 `Tempo.Holidays.add/3` adds a holiday of your own to the set `Tempo.Holidays.holidays/2` returns, read from a rule with the options of `Tempo.Holidays.compile/2`, and `Tempo.Holidays.remove/2` removes holidays by id or name.
 
 ```elixir
-{:ok, public} = Tempo.Holidays.holidays(:AU, include: :public)
-{:ok, australia} = Tempo.Holidays.add(public, "1st friday in December", name: "Company Day")
+iex> import Tempo.Sigils
+iex> {:ok, public} = Tempo.Holidays.holidays(:AU, include: :public)
+iex> {:ok, australia} = Tempo.Holidays.add(public, "1st friday in December", name: "Company Day")
+iex> {:ok, december} = Tempo.to_interval(australia, within: ~o"2026-12")
+iex> Tempo.IntervalSet.map(december, &Tempo.metadata(&1).name)
+["Company Day", "Christmas Day", "Boxing Day"]
 
-{:ok, brazil} = Tempo.Holidays.holidays(:BR, include: [:public, :bank])
-{:ok, anbima} = Tempo.Holidays.remove(brazil, "Election Day")
+iex> import Tempo.Sigils
+iex> {:ok, brazil} = Tempo.Holidays.holidays(:BR, include: [:public, :bank])
+iex> {:ok, anbima} = Tempo.Holidays.remove(brazil, "Election Day")
+iex> {:ok, october} = Tempo.to_interval(anbima, within: ~o"2026-10")
+iex> Tempo.IntervalSet.map(october, &Tempo.metadata(&1).name)
+["Our Lady of Aparecida"]
 ```
 
 > *"Australia's **public holidays**, with the **company day** added; Brazil's public and bank holidays **without Election Day**, ANBIMA's list."*
@@ -142,13 +166,37 @@ config :tempo_holidays,
 
 A configured holiday is one of the territory's, selected by type as the dataset's are: the optional Company Day above is left out of `holidays(:AU, include: :public)`. A territory's apply to its subdivisions too, and a subdivision's come after its territory's; `Tempo.Holidays.add/3` and `Tempo.Holidays.remove/2` then change what they give. The configuration is read at each request, so nothing needs to be started for it.
 
+## Business days
+
+A territory's weekend and its holidays are both Tempo values, so its business days are what is left of a period once both are taken away, and `Tempo.count/3` counts them in days.
+
+```elixir
+iex> import Tempo.Sigils
+iex> {:ok, brazil} = Tempo.Holidays.holidays(:BR, include: [:public, :bank])
+iex> {:ok, anbima} = Tempo.Holidays.remove(brazil, "Election Day")
+iex> {:ok, weekends} = Tempo.weekends(:BR)
+iex> {:ok, business_days} = Tempo.difference(~o"2026-01-02/2026-03-31", [weekends, anbima])
+iex> Tempo.count(business_days, :day)
+{:ok, 61}
+```
+
+> *"Brazil's public and bank holidays **without Election Day** are ANBIMA's calendar. The **business days** from the 2nd of January to the 31st of March are those days **less** the weekends and **less** those holidays: 61 of them."*
+
+A period written to dates holds both its first day and its last, so the count above includes the 31st of March. `Tempo.workdays/2` takes the holidays as its `:except`, for the business day five days after another (`Tempo.add_workdays/3`) or whether a day is one (`Tempo.workday?/2`).
+
 ## Day starts
 
 An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just a day; `Tempo.Holidays.day_start/2` projects the occurrences of a holiday of those calendars, which it tells by the `:calendar` in their metadata, onto the evening their day begins.
 
 ```elixir
-{:ok, evenings} = Tempo.Holidays.day_start(this_year, {:evening, "Asia/Riyadh"})
-# Eid al-Fitr now begins at 18:00 on 18 March 2026 in Riyadh
+iex> import Tempo.Sigils
+iex> {:ok, saudi} = Tempo.Holidays.holidays(:SA, include: :public)
+iex> {:ok, this_year} = Tempo.to_interval(saudi, within: ~o"2026")
+iex> {:ok, evenings} = Tempo.Holidays.day_start(this_year, {:evening, "Asia/Riyadh"})
+iex> eid = Enum.find(Tempo.IntervalSet.members(evenings), &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
+iex> {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(eid))
+iex> {DateTime.to_date(begins), DateTime.to_time(begins)}
+{~D[2026-03-18], ~T[18:00:00]}
 ```
 
 > *"Saudi Arabia's holidays this year, each beginning on the **evening** its day begins."*
