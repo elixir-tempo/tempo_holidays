@@ -16,7 +16,7 @@ defmodule Tempo.Holidays.DateHolidays do
 
   `compile_days/2` turns that into holidays, keeping each rule string with
   its dataset dates where `Tempo.DateRule.parse/2` reads it, and dropping the
-  entries it does not (the Bengali calendar's). It is the source-agnostic
+  entries it does not (an `if equal` clause). It is the source-agnostic
   core the `mix tempo.holidays.update` task feeds a downloaded, parsed bundle
   into.
 
@@ -63,7 +63,7 @@ defmodule Tempo.Holidays.DateHolidays do
 
       iex> days = %{
       ...>   "12-25" => %{"name" => %{"en" => "Christmas Day"}},
-      ...>   "bengali-revised 1-1" => %{"name" => %{"en" => "Bengali New Year"}}
+      ...>   "2nd sunday after 05-01 if equal easter 49 then 3rd sunday after 05-01" => %{"name" => %{"en" => "A moved Sunday"}}
       ...> }
       iex> holidays = Tempo.Holidays.DateHolidays.compile_days(days)
       iex> Enum.map(holidays, & &1.name)

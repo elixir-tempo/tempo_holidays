@@ -9,13 +9,15 @@ defmodule Tempo.Holidays.DateHolidaysTest do
     test "keeps the rules Tempo.DateRule reads and drops the rest" do
       # A slice of a date-holidays `days` map: rules of its grammar, one it
       # writes no other way (`last monday in May` is `monday before 06-01`),
-      # a calendar Calendrical does not have, and no rule at all.
+      # a rule Tempo.DateRule does not read yet (`if equal`), and no rule at all.
       days = %{
         "12-25" => %{"_name" => "12-25"},
         "4th thursday in November" => %{"name" => %{"en" => "Thanksgiving Day"}},
         "monday before 06-01" => %{"name" => %{"en" => "Memorial Day"}},
         "last monday in May" => %{"name" => %{"en" => "Memorial Day, written otherwise"}},
-        "bengali-revised 1-1" => %{"name" => %{"en" => "Bengali New Year"}},
+        "2nd sunday after 05-01 if equal easter 49 then 3rd sunday after 05-01" => %{
+          "name" => %{"en" => "A moved Sunday"}
+        },
         "1st day of Ramadan" => %{"name" => %{"en" => "Ramadan"}}
       }
 
@@ -42,6 +44,17 @@ defmodule Tempo.Holidays.DateHolidaysTest do
       refute holidays["Independence Day"].substitute
       assert holidays["Observed"].substitute
       assert holidays["easter"].type == :observance
+    end
+
+    test "keeps a date of the Bangla calendar, as date-holidays writes Bangladesh's days" do
+      days = %{
+        "bengali-revised 9-2" => %{"name" => %{"en" => "Victory Day"}},
+        "bengali-revised 1-1" => %{"name" => %{"en" => "Bengali New Year's Day"}}
+      }
+
+      rules = days |> DateHolidays.compile_days() |> Enum.map(& &1.rule) |> Enum.sort()
+
+      assert rules == ["bengali-revised 1-1", "bengali-revised 9-2"]
     end
 
     test "picks a localized name, falling back to English then the reference" do

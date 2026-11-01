@@ -125,8 +125,8 @@ defmodule Tempo.Holidays.MixProject do
       # Tempo.day_start/1 places a day of a sunset calendar. It requires
       # Calendrical 2.4, whose day_bounds/1 gives that day's sunsets, and
       # Astro 2.10, whose sunsets they are.
-      {:ex_tempo, "~> 2.3"},
-      {:calendrical, "~> 2.4"},
+      {:ex_tempo, path: "../tempo", override: true},
+      {:calendrical, path: "../../localize/calendrical", override: true},
       {:astro, "~> 2.10"},
       # Tz, which Tempo brings and asks where nothing else is configured: an
       # equinox or solstice in a named IANA zone (Chile's solstice `in
@@ -135,7 +135,7 @@ defmodule Tempo.Holidays.MixProject do
       {:tz, "~> 0.28"},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
-      {:localize, "~> 1.4"},
+      {:localize, path: "../../localize/localize", override: true},
       # Holiday names the data lacks in a language come from a Gettext
       # catalog of MF2 messages, read through Localize's interpolator.
       {:gettext, "~> 1.0"},

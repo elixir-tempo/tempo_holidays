@@ -10,15 +10,13 @@ The corpus is large, so the test is opt-in:
 mix test --include conformance
 ```
 
-It downloads and caches the pinned date-holidays tarball. Then, for each territory and year of the fixtures, it asks `Tempo.Holidays.holidays/2` for the territory's holidays with `dates: :both` (a substituted holiday on its own date and on its substitute, as date-holidays lists them) and converts them over the year. For each rule of the fixture, the days our occurrences of that rule start on must hold every date the fixture gives the rule, and lie among the dates the fixture gives the year. A holiday is counted in the year it starts in, as date-holidays counts it, so a period date-holidays splits at the year end, and which we hold as one period, matches its January half by the period begun in December. Results are grouped into five buckets.
+It downloads and caches the pinned date-holidays tarball. Then, for each territory and year of the fixtures, it asks `Tempo.Holidays.holidays/2` for the territory's holidays with `dates: :both` (a substituted holiday on its own date and on its substitute, as date-holidays lists them) and converts them over the year. For each rule of the fixture, the days our occurrences of that rule start on must hold every date the fixture gives the rule, and lie among the dates the fixture gives the year. A holiday is counted in the year it starts in, as date-holidays counts it, so a period date-holidays splits at the year end, and which we hold as one period, matches its January half by the period begun in December. Results are grouped into four buckets.
 
 ## The buckets
 
 * **matched** — our dates agree with date-holidays. Over 99% of rules.
 
 * **unsupported** — a rule of the fixture our data does not hold. This must stay at zero; it does.
-
-* **known unsupported** — a rule `Tempo.DateRule` does not read yet: the Bengali (revised) calendar, for which Calendrical has no implementation. These are dropped, not wrong.
 
 * **mismatched** — a rule we read but compute the wrong dates for. This is the number that must stay at zero; it does.
 

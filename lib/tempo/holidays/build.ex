@@ -196,7 +196,7 @@ defmodule Tempo.Holidays.Build do
   It downloads a release's bundle, so it is shown rather than run:
 
       Tempo.Holidays.Build.build(version: "3.38.0", directory: "priv/holidays")
-      #=> {:ok, 207, ["bengali-revised 1-1", "bengali-revised 1-18", ...]}
+      #=> {:ok, 207, []}
 
   """
   @spec build(keyword()) :: {:ok, non_neg_integer(), [String.t()]} | {:error, error()}

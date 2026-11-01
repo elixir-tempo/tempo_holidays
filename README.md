@@ -20,7 +20,7 @@ Public holidays for every territory as [Tempo](https://hexdocs.pm/ex_tempo) recu
 
 * **Day starts** — `Tempo.Holidays.day_start/1` places an Islamic or Hebrew holiday from the sunset of the evening before to its own, at its calendar's place (Mecca, Jerusalem), through `Tempo.day_start/1`.
 
-* **Conformance** — 169,799 of the 170,818 checks of date-holidays' own fixture corpus agree, none disagree, and the rest are accepted reference differences; the eight Bangladeshi rules of the Bengali calendar are not read yet.
+* **Conformance** — 169,919 of the 170,818 checks of date-holidays' own fixture corpus agree, none disagree, and the rest are accepted reference differences; every rule of the dataset is read, Bangladesh's Bengali-calendar days among them.
 
 * **Data you can update** — the data of date-holidays 3.38.0 ships in the package, and `mix tempo.holidays.update` builds a newer release into an application.
 

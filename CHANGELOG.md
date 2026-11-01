@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.3.0] — Unreleased
+
+### Added
+
+* Bangladesh's national days written in the Bengali calendar (Victory Day, Independence Day, Pohela Boishakh and five more) are read, through Tempo 2.4 and Calendrical 2.5's Bangla calendar; every rule of the dataset is now read, and 169,919 of the 170,818 conformance checks agree.
+
 ## [v0.2.0] — 2026-11-01
 
 ### Breaking changes

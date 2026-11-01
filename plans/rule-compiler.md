@@ -84,7 +84,7 @@ What does not compile, by production:
 
 * **A time written `T16`:** `03-12T16`.
 
-* **Bengali:** no Bengali calendar in Calendrical (`TODO.md`, blocked).
+* **Bengali:** no Bengali calendar in Calendrical then; read since Calendrical 2.5's Bangla calendars and Tempo 2.4 (2026-11-01).
 
 * **A defect:** the Islamic month 11 is spelled `Dhu al-Qadah` in the compiler and `Dhu al-Qidah` in the grammar, so `4 Dhu al-Qidah` is refused. No rule in the dataset uses the month.
 

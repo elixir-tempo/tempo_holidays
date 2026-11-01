@@ -19,7 +19,6 @@ defmodule Tempo.Holidays.Conformance do
           rules: non_neg_integer(),
           matched: non_neg_integer(),
           unsupported: %{atom() => non_neg_integer()},
-          known_unsupported: %{atom() => non_neg_integer()},
           mismatched: %{atom() => non_neg_integer()},
           divergent: %{atom() => non_neg_integer()},
           samples: [map()]
@@ -55,7 +54,6 @@ defmodule Tempo.Holidays.Conformance do
       rules: acc.rules + stats.rules,
       matched: acc.matched + stats.matched,
       unsupported: summed(acc.unsupported, stats.unsupported),
-      known_unsupported: summed(acc.known_unsupported, stats.known_unsupported),
       mismatched: summed(acc.mismatched, stats.mismatched),
       divergent: summed(acc.divergent, stats.divergent),
       samples: samples
@@ -71,7 +69,6 @@ defmodule Tempo.Holidays.Conformance do
       rules: 0,
       matched: 0,
       unsupported: %{},
-      known_unsupported: %{},
       mismatched: %{},
       divergent: %{},
       samples: []
@@ -251,18 +248,10 @@ defmodule Tempo.Holidays.Conformance do
     end)
   end
 
-  # A rule our data does not hold is a defect unless it is an accepted gap
-  # (`accepted_unsupported?/1`), which is tracked in its own bucket — the way
-  # `divergent` sits apart from `mismatched`.
+  # A rule our data does not hold is a defect: every rule of the dataset is
+  # read, the Bengali calendar's since Calendrical's Bangla calendars.
   defp record_unsupported(acc, rule) do
-    bucket = if accepted_unsupported?(rule), do: :known_unsupported, else: :unsupported
-    bump(acc, bucket, feature(rule))
-  end
-
-  # The rules `Tempo.DateRule` does not read: the Bengali calendar, which
-  # needs a Bengali calendar in Calendrical. A gap, not a defect.
-  defp accepted_unsupported?(rule) do
-    String.starts_with?(rule, "bengali")
+    bump(acc, :unsupported, feature(rule))
   end
 
   defp record(acc, context, detail) do
@@ -340,7 +329,6 @@ defmodule Tempo.Holidays.Conformance do
   @spec summary(stats()) :: String.t()
   def summary(stats) do
     unsupported = stats.unsupported |> Map.values() |> Enum.sum()
-    known_unsupported = stats.known_unsupported |> Map.values() |> Enum.sum()
     mismatched = stats.mismatched |> Map.values() |> Enum.sum()
     divergent = stats.divergent |> Map.values() |> Enum.sum()
 
@@ -348,7 +336,6 @@ defmodule Tempo.Holidays.Conformance do
     rules checked:     #{stats.rules}
     matched:           #{stats.matched}
     unsupported:       #{unsupported}  #{inspect(sorted(stats.unsupported))}
-    known unsupported: #{known_unsupported}  #{inspect(sorted(stats.known_unsupported))}  (accepted gap: the Bengali calendar)
     mismatched:        #{mismatched}  #{inspect(sorted(stats.mismatched))}
     divergent:         #{divergent}  #{inspect(sorted(stats.divergent))}  (accepted reference differences)
     """
