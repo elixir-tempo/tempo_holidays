@@ -35,7 +35,7 @@ Add `tempo_holidays` to the dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tempo_holidays, "~> 0.1"}
+    {:tempo_holidays, "~> 0.2"}
   ]
 end
 ```
@@ -87,4 +87,4 @@ Full API documentation is available on [HexDocs](https://hexdocs.pm/tempo_holida
 
 ## License
 
-The code is licensed under the Apache License 2.0, and the holiday data, which derives from [date-holidays](https://github.com/commenthol/date-holidays), is redistributed under CC-BY-SA-3.0; [LICENSE.md](https://github.com/elixir-tempo/tempo_holidays/blob/v0.1.0/LICENSE.md) gives both.
+The code is licensed under the Apache License 2.0, and the holiday data, which derives from [date-holidays](https://github.com/commenthol/date-holidays), is redistributed under CC-BY-SA-3.0; [LICENSE.md](https://github.com/elixir-tempo/tempo_holidays/blob/v0.2.0/LICENSE.md) gives both.

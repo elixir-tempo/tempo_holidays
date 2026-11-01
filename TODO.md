@@ -4,7 +4,7 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## In progress
 
-* [ ] **Release 0.2.0 on published upstreams** — `mix.exs` names ex_tempo and Calendrical on path dependencies; restore `{:ex_tempo, "~> 2.3"}` and `{:calendrical, "~> 2.4"}` once both are published.
+* [ ] **Release 0.2.0** — on ex_tempo 2.3 and Calendrical 2.4 from hex. Reviewed 2026-11-01, every gate green; it waits on its commit, tag and publish.
 
 ## Blocked
 

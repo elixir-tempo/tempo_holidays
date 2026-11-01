@@ -3,7 +3,7 @@
 ```elixir
 Mix.install(
   [
-    {:tempo_holidays, "~> 0.1"},
+    {:tempo_holidays, "~> 0.2"},
     {:kino, "~> 0.14"}
   ],
   config: [elixir: [time_zone_database: Tz.TimeZoneDatabase]]

@@ -1,7 +1,7 @@
 defmodule Tempo.Holidays.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/elixir-tempo/tempo_holidays"
 
   def project do
@@ -121,16 +121,13 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # Tempo 2.1, whose Tempo.DateRule reads the dataset's rules. It requires
-      # Calendrical 2.2, whose lunisolar calendars name a year by its
-      # sexagenary cycle.
-      # Development against the local Tempo and Calendrical, for
-      # Tempo.day_start/1 and Calendrical's day_bounds/1 (Tempo's decision
-      # 91): restore {:ex_tempo, "~> 2.3"} and {:calendrical, "~> 2.4"} once
-      # both are published, before any tempo_holidays release.
-      {:ex_tempo, path: "../tempo", override: true},
-      {:calendrical, path: "../../localize/calendrical", override: true},
-      {:astro, "~> 2.9"},
+      # Tempo 2.3, whose Tempo.DateRule reads the dataset's rules and whose
+      # Tempo.day_start/1 places a day of a sunset calendar. It requires
+      # Calendrical 2.4, whose day_bounds/1 gives that day's sunsets, and
+      # Astro 2.10, whose sunsets they are.
+      {:ex_tempo, "~> 2.3"},
+      {:calendrical, "~> 2.4"},
+      {:astro, "~> 2.10"},
       # Tz, which Tempo brings and asks where nothing else is configured: an
       # equinox or solstice in a named IANA zone (Chile's solstice `in
       # America/Santiago`) resolves through it. Named here as the tests name

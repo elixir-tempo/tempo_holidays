@@ -136,6 +136,14 @@ defmodule Tempo.Holidays.Build do
 
   * `{:error, reason}` as `build/1` returns it.
 
+  ### Examples
+
+  It reads the network only where the data is not yet built, so it is
+  shown rather than run:
+
+      Tempo.Holidays.Build.ensure_built()
+      #=> :noop
+
   """
   @spec ensure_built() :: :noop | :ok | {:error, error()}
   def ensure_built do
@@ -182,6 +190,13 @@ defmodule Tempo.Holidays.Build do
   * `{:error, reason}`: `{:invalid_version, version}`, `{:directory,
     directory, posix}`, `{:download_failed, url, reason}`, or an application
     that cannot be started. `message/1` says each in words.
+
+  ### Examples
+
+  It downloads a release's bundle, so it is shown rather than run:
+
+      Tempo.Holidays.Build.build(version: "3.38.0", directory: "priv/holidays")
+      #=> {:ok, 207, ["bengali-revised 1-1", "bengali-revised 1-18", ...]}
 
   """
   @spec build(keyword()) :: {:ok, non_neg_integer(), [String.t()]} | {:error, error()}
@@ -280,6 +295,16 @@ defmodule Tempo.Holidays.Build do
   ### Returns
 
   * A list of `t:Tempo.Holidays.Holiday.t/0`.
+
+  ### Examples
+
+      iex> bundle = %{"holidays" => %{"XX" => %{"days" => %{"01-01" => %{"name" => %{"en" => "New Year's Day"}}}}}}
+      iex> [holiday] = Tempo.Holidays.Build.holidays_from_bundle(bundle, "XX", "en")
+      iex> {holiday.name, holiday.rule}
+      {"New Year's Day", "01-01"}
+
+      iex> Tempo.Holidays.Build.holidays_from_bundle(%{"holidays" => %{}}, "XX", "en")
+      []
 
   """
   @spec holidays_from_bundle(map(), String.t(), String.t()) :: [Holiday.t()]
