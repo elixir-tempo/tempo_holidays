@@ -14,8 +14,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 * [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2) → 223 s on the public path (`holidays/2`, each territory read once). Then: harness parallelism.
 
-* [ ] **Lunations** — Astro (2 lunations per new-moon search, was 6), Calendrical (each new year and new moon once per question) and Tempo (swaps share a candidate's day numbers) take the lunisolar workload from 53.1 s to 2.07 s, results identical. Left: Tempo's traditional-month ordinal builds a whole date through `new/3`, awaiting a Calendrical traditional→ordinal API.
-
 ## Blocked
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
@@ -29,6 +27,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Lunations** — the lunisolar workload from 53.1 s to 2.07 s, results identical; Tempo finds a traditional month's ordinal with Calendrical's `month_from_traditional`, which reads the year's leap month and builds no date. 2026-11-01.
 
 * [x] **Release review for v0.1.0** — the README in the house structure, the user guide's and the README's examples run as doctests (`test/tempo/guides_test.exs`), the user guide's business days and its `:locale` sentence corrected, the CHANGELOG's Highlights, `Build.build/1` returning errors where it raised, `Build` documented to the template, the package metadata and STATUS current; the package (207 territories' data, 124 KB) built and read. 2026-10-28.
 
