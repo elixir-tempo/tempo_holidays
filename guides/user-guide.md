@@ -203,24 +203,23 @@ A period written to dates holds both its first day and its last, so the count ab
 
 ## Day starts
 
-An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just a day; `Tempo.Holidays.day_start/2` projects the occurrences of a holiday of those calendars, which it tells by the `:calendar` in their metadata, onto the evening their day begins.
+An Islamic or Hebrew day begins at sunset, not midnight. A day in Tempo is just a day; `Tempo.Holidays.day_start/1` places the occurrences of a holiday of those calendars, which it tells by the `:calendar` in their metadata, from the sunset their day begins at to the sunset it ends at.
 
 ```elixir
 iex> import Tempo.Sigils
 iex> {:ok, saudi} = Tempo.Holidays.holidays(:SA, include: :public)
 iex> {:ok, this_year} = Tempo.to_interval(saudi, within: ~o"2026")
-iex> {:ok, evenings} = Tempo.Holidays.day_start(this_year, {:evening, "Asia/Riyadh"})
+iex> {:ok, evenings} = Tempo.Holidays.day_start(this_year)
 iex> eid = Enum.find(Tempo.IntervalSet.members(evenings), &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
 iex> {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(eid))
-iex> {DateTime.to_date(begins), DateTime.to_time(begins)}
-{~D[2026-03-18], ~T[18:00:00]}
+iex> begins = DateTime.convert!(begins, Calendar.ISO)
+iex> {DateTime.to_date(begins), DateTime.to_time(begins), begins.time_zone}
+{~D[2026-03-18], ~T[18:31:01], "Asia/Riyadh"}
 ```
 
-> *"Saudi Arabia's holidays this year, each beginning on the **evening** its day begins."*
+> *"Saudi Arabia's holidays this year, each beginning at **sunset** on the evening its day begins."*
 
-A set is of one frame, so the other holidays become the days they are where the day start is read — Founding Day a day in Riyadh. Where no holiday is projected, every day is left as it is. A lazy set needs a location, since its sunset holidays are not known ahead.
-
-`:sunset` (true sunset) and `:evening` (an 18:00 proxy) begin the day the evening before, at the calendar's reference place (Mecca, Jerusalem) or at a location of your own, `{:sunset, location}` or `{:evening, location}`, a zone id or a `{longitude, latitude}` point. `:midnight` leaves the occurrences as they are. See `Tempo.Holidays.DayStart`.
+The day start is the calendar's own, through `Tempo.day_start/1` and Calendrical: its boundary, sunset, and its place, Mecca for an Umm al-Qura holiday and Jerusalem for a Hebrew one, so nothing but the occurrences is given. A set is of one frame, so the other holidays become the days they are in the zone of that place — Founding Day a day in Riyadh. Where no holiday's day begins at sunset, every day is left as it is, and a lazy set stays lazy.
 
 ## Updating the holiday data
 

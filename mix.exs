@@ -104,7 +104,6 @@ defmodule Tempo.Holidays.MixProject do
       ],
       groups_for_modules: [
         Holidays: [
-          Tempo.Holidays.DayStart,
           Tempo.Holidays.Locale,
           Tempo.Holidays.Names,
           Tempo.Holidays.Gettext
@@ -125,20 +124,18 @@ defmodule Tempo.Holidays.MixProject do
       # Tempo 2.1, whose Tempo.DateRule reads the dataset's rules. It requires
       # Calendrical 2.2, whose lunisolar calendars name a year by its
       # sexagenary cycle.
-      {:ex_tempo, "~> 2.1"},
-      {:calendrical, "~> 2.2"},
+      # Development against the local Tempo and Calendrical, for
+      # Tempo.day_start/1 and Calendrical's day_bounds/1 (Tempo's decision
+      # 91): restore {:ex_tempo, "~> 2.3"} and {:calendrical, "~> 2.4"} once
+      # both are published, before any tempo_holidays release.
+      {:ex_tempo, path: "../tempo", override: true},
+      {:calendrical, path: "../../localize/calendrical", override: true},
       {:astro, "~> 2.9"},
       # Tz, which Tempo brings and asks where nothing else is configured: an
       # equinox or solstice in a named IANA zone (Chile's solstice `in
       # America/Santiago`) resolves through it. Named here as the tests name
       # `Tz.TimeZoneDatabase`.
       {:tz, "~> 0.28"},
-      # Optional: resolves a `{lng, lat}` location to an IANA zone for the
-      # `day_start: :evening` projection. A zone id needs no resolver, and
-      # `:sunset` returns a UTC instant, so tz_world is only pulled in when a
-      # caller projects an evening day-start from a location. 2.5 is the floor:
-      # its SpatialIndex lookups are about 1,500 times faster.
-      {:tz_world, "~> 2.5", optional: true},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
       {:localize, "~> 1.4"},

@@ -47,7 +47,7 @@ defmodule Tempo.Holidays do
 
   """
 
-  alias Tempo.Holidays.{Data, DayStart, Holiday, Locale, Names}
+  alias Tempo.Holidays.{Data, Holiday, Locale, Names}
   alias Tempo.Interval
   alias Tempo.IntervalSet
   alias Tempo.RecurrenceSet
@@ -84,16 +84,9 @@ defmodule Tempo.Holidays do
 
   @config_options [:add, :remove]
 
-  # The calendars whose day begins at sunset, so `day_start/2` projects their
-  # holidays onto the evening before.
-  @sunset_calendar_types [
-    :hebrew,
-    :islamic,
-    :islamic_civil,
-    :islamic_rgsa,
-    :islamic_tbla,
-    :islamic_umalqura
-  ]
+  # The occurrences of a set read as it is walked that `day_start/1` reads for
+  # the place of its sunset holidays: more than a year's holidays anywhere.
+  @lookahead 500
 
   @doc """
   Returns a territory's holidays as a recurrence set.
@@ -995,163 +988,155 @@ defmodule Tempo.Holidays do
   end
 
   @doc """
-  Projects holiday occurrences onto the evening their day begins.
+  Places holiday occurrences on the evening their day begins.
 
   A day in Tempo is just a day: an Islamic or Hebrew holiday converts to a day
-  in its own calendar, which carries no day-start convention. That calendar's
-  day begins at sunset, so on the Gregorian timeline the holiday begins the
-  evening before. `day_start/2` projects each occurrence of a holiday of such a
-  calendar onto the datetime interval from the boundary that begins its first
-  day to the one that begins the day after its last. A set of occurrences is
-  in one calendar, so a holiday is told by the `:calendar` its metadata
-  carries, the calendar its rule is in, and an occurrence that carries none by
-  the calendar its own day is in.
+  in its own calendar. That calendar's day begins at sunset, so on the
+  Gregorian timeline the holiday begins the evening before. `day_start/1`
+  places each occurrence of a holiday of such a calendar from the sunset its
+  first day begins at to the sunset its last day ends at, through
+  `Tempo.day_start/1`: the day start is the calendar's own, its boundary and
+  its place (Jerusalem for a Hebrew holiday, Mecca for an Umm al-Qura one),
+  so nothing but the occurrences is given. A set of occurrences is in one
+  calendar, so a holiday is told by the `:calendar` its metadata carries, the
+  calendar its rule is in, and an occurrence that carries none by the calendar
+  its own day is in.
 
   A set is of one frame, so every other occurrence becomes the civil day it
-  is where the day start is read: in the zone it names, at its location, or,
-  for a bare `:evening` or `:sunset`, at the reference place of the set's
-  sunset holidays. Where no holiday is projected, as for a set of Gregorian
-  holidays alone, every occurrence is left as it is.
+  is in the zone of the sunset holidays' place. Where no holiday's day begins
+  at sunset, as for a set of Gregorian holidays alone, every occurrence is
+  left as it is.
 
   ### Arguments
 
   * `occurrences` is a set (a `t:Tempo.t/0`) of holiday occurrences, as
     `Tempo.to_interval/2` converts the set `holidays/2` returns.
 
-  * `day_start` is how the day begins, a `t:Tempo.Holidays.DayStart.t/0`:
-
-    * `:midnight` — leaves the occurrences as they are.
-
-    * `:evening` or `:sunset` — 18:00, or sunset, at the calendar's reference
-      place: Mecca for an Islamic date, Jerusalem for a Hebrew one.
-
-    * `{:evening, location}` or `{:sunset, location}` — the same at a location
-      of your own, an IANA zone id (`"Asia/Kuala_Lumpur"`) or a `{longitude,
-      latitude}` point.
-
   ### Returns
 
-  * `{:ok, interval_set}` — the occurrences, each projected one a datetime
-    interval and each other one a day in the day start's zone, keeping their
-    metadata. A lazy set stays lazy.
+  * `{:ok, interval_set}` — the occurrences, each placed one a datetime
+    interval and each other one a day in the place's zone, keeping their
+    metadata. A lazy set stays lazy, its first #{@lookahead} occurrences read
+    for its sunset holidays' place.
 
-  * `{:error, {:invalid_day_start, day_start}}`,
-    `{:error, {:invalid_occurrences, occurrences}}`, or
-    `{:error, {:location_required, day_start}}` for a lazy set and a bare
-    `:evening` or `:sunset`, since a set read as it is walked cannot be looked
-    through for the reference place of its sunset holidays.
+  * `{:error, {:invalid_occurrences, occurrences}}` for a value that is not a
+    set of occurrences, or the error `Tempo.day_start/1` returns for an
+    occurrence it cannot place.
 
   ### Examples
 
       iex> import Tempo.Sigils
       iex> {:ok, holidays} = Tempo.Holidays.holidays(:SA, include: :public)
       iex> {:ok, this_year} = Tempo.to_interval(holidays, within: ~o"2026")
-      iex> {:ok, evenings} = Tempo.Holidays.day_start(this_year, {:evening, "Asia/Riyadh"})
+      iex> {:ok, evenings} = Tempo.Holidays.day_start(this_year)
       iex> eid = Enum.find(Tempo.IntervalSet.members(evenings), &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
       iex> {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(eid))
-      iex> {DateTime.to_date(begins), DateTime.to_time(begins)}
-      {~D[2026-03-18], ~T[18:00:00]}
+      iex> begins = DateTime.convert!(begins, Calendar.ISO)
+      iex> {DateTime.to_date(begins), DateTime.to_time(begins), begins.time_zone}
+      {~D[2026-03-18], ~T[18:31:01], "Asia/Riyadh"}
 
   """
-  @spec day_start(Tempo.t(), DayStart.t()) :: {:ok, Tempo.t()} | {:error, term()}
-  def day_start(%Tempo{} = occurrences, day_start) do
-    with {:ok, day_start} <- DayStart.validate(day_start) do
-      project_day_start(occurrences, day_start)
-    end
-  end
-
-  def day_start(occurrences, _day_start), do: {:error, {:invalid_occurrences, occurrences}}
-
-  # A day is just a day until it is projected onto the Gregorian timeline. Each
-  # occurrence of a holiday of a sunset-starting calendar (Islamic, Hebrew) is
-  # projected to the datetime interval that begins when its day begins, keeping
-  # its metadata; every other occurrence, and `:midnight`, is left as the civil
-  # day it already is. A lazy set is projected as it is walked.
-  defp project_day_start(occurrences, :midnight), do: {:ok, occurrences}
-
-  # A set is of one frame, so the civil days beside the projected ones are
-  # days where the day start is read: in the zone it names, at its location,
-  # or for a bare boundary at the reference place of the set's sunset
-  # holidays, and with none of those nothing is projected (decision 41 of
-  # Tempo). A set read as it is walked cannot be looked through for its
-  # sunset holidays, so it is given a location.
-  defp project_day_start(occurrences, day_start) do
+  @spec day_start(Tempo.t()) :: {:ok, Tempo.t()} | {:error, term()}
+  def day_start(%Tempo{} = occurrences) do
     metadata = Tempo.metadata(occurrences)
 
-    if Tempo.bounded?(occurrences),
-      do: project_members(IntervalSet.members(occurrences), day_start, metadata),
-      else: project_stream(occurrences, day_start, metadata)
-  end
-
-  defp project_members(members, day_start, metadata) do
-    case DayStart.civil_zone(day_start, sunset_calendar_of(members)) do
-      {:ok, zone} ->
-        members
-        |> Enum.map(&(&1 |> project_occurrence(day_start) |> as_day_in(zone)))
-        |> IntervalSet.new(metadata: metadata)
-
-      :none ->
-        IntervalSet.new(members, metadata: metadata)
+    if Tempo.bounded?(occurrences) do
+      place_members(IntervalSet.members(occurrences), metadata)
+    else
+      place_stream(occurrences, metadata)
     end
   end
 
-  defp project_stream(_occurrences, day_start, _metadata) when day_start in [:evening, :sunset],
-    do: {:error, {:location_required, day_start}}
+  def day_start(occurrences), do: {:error, {:invalid_occurrences, occurrences}}
 
-  defp project_stream(occurrences, day_start, metadata) do
-    zone = DayStart.civil_zone(day_start, nil)
+  defp place_members(members, metadata) do
+    zone = sunset_zone(members)
 
-    projected =
-      occurrences
-      |> IntervalSet.walk()
-      |> Stream.map(&(&1 |> project_occurrence(day_start) |> as_day_in(zone)))
-
-    {:ok, IntervalSet.from_stream(projected, metadata: metadata)}
-  end
-
-  # The first calendar of a holiday whose day begins at sunset, if any.
-  defp sunset_calendar_of(members) do
-    Enum.find_value(members, fn member ->
-      calendar = holiday_calendar(member)
-      if sunset_calendar?(calendar), do: calendar
-    end)
-  end
-
-  # A civil day, one no projection reached, as the day it is in the zone.
-  defp as_day_in(occurrence, :none), do: occurrence
-  defp as_day_in(occurrence, {:ok, zone}), do: as_day_in(occurrence, zone)
-
-  defp as_day_in(occurrence, zone) when is_binary(zone) do
-    if Tempo.zoned?(occurrence) do
-      occurrence
+    if is_nil(zone) do
+      IntervalSet.new(members, metadata: metadata)
     else
-      case Tempo.in_zone(occurrence, zone) do
-        {:ok, placed} -> placed
-        {:error, _} -> occurrence
+      with {:ok, placed} <- each_placed(members, zone) do
+        IntervalSet.new(placed, metadata: metadata)
       end
     end
   end
 
-  # An occurrence of a holiday of a calendar whose day begins at sunset is
-  # projected; any other, and one that cannot be, is left as it is.
-  defp project_occurrence(interval, day_start) do
-    calendar = holiday_calendar(interval)
+  defp each_placed(members, zone) do
+    members
+    |> Enum.reduce_while({:ok, []}, fn member, {:ok, done} ->
+      case placed(member, zone) do
+        {:ok, placed} -> {:cont, {:ok, [placed | done]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> reversed()
+  end
 
-    if sunset_calendar?(calendar) do
-      interval
-      |> DayStart.project(calendar, day_start)
-      |> projected_or_as_is(interval)
+  defp reversed({:ok, placed}), do: {:ok, Enum.reverse(placed)}
+  defp reversed(error), do: error
+
+  # A set read as it is walked is placed as it is walked: the place of its
+  # sunset holidays is read from its first occurrences, and an occurrence that
+  # cannot be placed raises its error then, as a walk does.
+  defp place_stream(occurrences, metadata) do
+    zone =
+      occurrences
+      |> IntervalSet.walk()
+      |> Enum.take(@lookahead)
+      |> sunset_zone()
+
+    if is_nil(zone) do
+      {:ok, occurrences}
     else
-      interval
+      placed =
+        occurrences
+        |> IntervalSet.walk()
+        |> Stream.map(&placed!(&1, zone))
+
+      {:ok, IntervalSet.from_stream(placed, metadata: metadata)}
     end
   end
 
-  defp projected_or_as_is({:ok, projected}, interval) do
-    Tempo.put_metadata(projected, Tempo.metadata(interval))
+  defp placed!(occurrence, zone) do
+    case placed(occurrence, zone) do
+      {:ok, placed} -> placed
+      {:error, exception} -> raise exception
+    end
   end
 
-  defp projected_or_as_is({:error, _reason}, interval) do
-    interval
+  # An occurrence of a holiday whose day begins at sunset is placed in its
+  # holiday's own calendar; any other is the civil day it is in the zone.
+  defp placed(occurrence, zone) do
+    calendar = holiday_calendar(occurrence)
+
+    if sunset_calendar?(calendar) do
+      with {:ok, own} <- Tempo.to_calendar(occurrence, calendar),
+           {:ok, placed} <- Tempo.day_start(own) do
+        {:ok, Tempo.put_metadata(placed, Tempo.metadata(occurrence))}
+      end
+    else
+      as_day_in(occurrence, zone)
+    end
+  end
+
+  defp as_day_in(occurrence, zone) do
+    if Tempo.zoned?(occurrence) do
+      {:ok, occurrence}
+    else
+      Tempo.in_zone(occurrence, zone)
+    end
+  end
+
+  # The zone of the place the first sunset holiday among occurrences begins
+  # its days at: the zone civil days beside them are days in (decision 41).
+  defp sunset_zone(occurrences) do
+    Enum.find_value(occurrences, fn occurrence ->
+      calendar = holiday_calendar(occurrence)
+
+      if sunset_calendar?(calendar) do
+        calendar.time_zone()
+      end
+    end)
   end
 
   # The calendar that says how an occurrence's day begins: the one its
@@ -1162,9 +1147,11 @@ defmodule Tempo.Holidays do
     Map.get(Tempo.metadata(interval), :calendar, calendar)
   end
 
+  # A calendar whose day begins at sunset is one that bounds its days
+  # (Calendrical's `day_bounds/1`, decision 91 of Tempo): the calendar says.
   defp sunset_calendar?(calendar) when is_atom(calendar) do
-    Code.ensure_loaded?(calendar) and function_exported?(calendar, :cldr_calendar_type, 0) and
-      calendar.cldr_calendar_type() in @sunset_calendar_types
+    Code.ensure_loaded?(calendar) and function_exported?(calendar, :day_bounds, 1) and
+      function_exported?(calendar, :time_zone, 0)
   end
 
   defp sunset_calendar?(_calendar), do: false

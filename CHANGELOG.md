@@ -2,7 +2,13 @@
 
 ## [v0.2.0] — Unreleased
 
+### Breaking changes
+
+* `Tempo.Holidays.day_start/1` replaces `day_start/2`: a day start is its calendar's, sunset at its own place (Mecca, Jerusalem), through `Tempo.day_start/1`, so `:evening`, `:sunset` and located day starts are gone, with `Tempo.Holidays.DayStart` and the optional `tz_world`.
+
 ### Added
+
+* Requires ex_tempo 2.3 and Calendrical 2.4.
 
 * Holiday names in the request's locale (`Tempo.Holidays.Names`): the dataset's in 77 languages, a Gettext catalog of MF2 messages (`Tempo.Holidays.Gettext`), then English, then the territory's own languages.
 
@@ -15,6 +21,8 @@
 * A removal configured by name removes a holiday by its name in any language the dataset gives.
 
 ### Fixed
+
+* A Hebrew holiday written with a traditional month is placed by its day start, where it was left a whole day without a word.
 
 * A holiday the dataset names in no English reads in the territory's language (Glarus' `"Näfelser Fahrt"`), where its name was its rule; Czech, Japanese, Georgian, Latin and Norwegian names are kept under CLDR's codes.
 
@@ -34,7 +42,7 @@ First release: public holidays for every territory in the [date-holidays](https:
 
 * **Holidays of your own** — `Tempo.Holidays.compile/2` reads a rule into a holiday, `add/3` and `remove/2` change a set, and `config :tempo_holidays, holidays:` changes a territory's for every request.
 
-* **Day starts** — `Tempo.Holidays.day_start/2` begins a holiday whose day begins at sunset on the evening before, at the calendar's reference place or a location of your own.
+* **Day starts** — `day_start/2` (since 0.2.0 `day_start/1`) begins a holiday whose day begins at sunset on the evening before, at the calendar's reference place or a location of your own.
 
 * **School terms** — `Tempo.Holidays.SchoolTerms.NSW`, New South Wales' public school terms, holidays and development days, matching every calendar published for 2016–2030.
 

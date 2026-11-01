@@ -36,13 +36,19 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  # The single interval a one-holiday set converts to that year, under a
-  # `day_start` projection.
-  defp single_interval(holidays, year, day_start) do
+  # The single interval a one-holiday set converts to that year, placed by
+  # its calendar's day start.
+  defp single_interval(holidays, year) do
     {:ok, occurrences} = holidays_in(holidays, year)
-    {:ok, projected} = Holidays.day_start(occurrences, day_start)
-    [interval] = IntervalSet.members(projected)
+    {:ok, placed} = Holidays.day_start(occurrences)
+    [interval] = IntervalSet.members(placed)
     interval
+  end
+
+  defp utc_iso(instant) do
+    instant
+    |> DateTime.convert!(Calendar.ISO)
+    |> DateTime.shift_zone!("Etc/UTC")
   end
 
   # A recurrence set of hand-written holidays, each member tagged as
@@ -161,7 +167,6 @@ defmodule Tempo.HolidaysTest do
 
   doctest Tempo.Holidays
   doctest Tempo.Holidays.Data
-  doctest Tempo.Holidays.DayStart
   doctest Tempo.Holidays.Names
 
   describe "holidays/2" do
@@ -1148,81 +1153,58 @@ defmodule Tempo.HolidaysTest do
     end
   end
 
-  describe "day_start/2 (a day is just a day until projected)" do
-    test ":midnight leaves the in-calendar day untouched" do
-      eid = holiday_set("1 Shawwal", "Eid al-Fitr")
-      interval = single_interval(eid, ~o"2025", :midnight)
+  describe "day_start/1 (a day is just a day until placed)" do
+    test "an Islamic holiday runs sunset to sunset at Mecca, on Riyadh's clock" do
+      interval = single_interval(holiday_set("1 Shawwal", "Eid al-Fitr"), ~o"2025")
+      {:ok, own} = Tempo.day_start(~o"1446Y10M1D[u-ca=islamic-umalqura]")
 
-      assert Tempo.Interval.from(interval) == ~o"1446Y10M1D[u-ca=islamic-umalqura]"
-      # identical to the occurrence as it converts
-      {:ok, occurrences} = holidays_in(eid, ~o"2025")
-      assert [plain] = IntervalSet.members(occurrences)
-      assert plain == interval
+      assert Tempo.Interval.from(interval) == Tempo.Interval.from(own)
+      assert Tempo.Interval.to(interval) == Tempo.Interval.to(own)
+
+      {:ok, {from, to}} = Tempo.Interval.instants(interval)
+      assert {from.time_zone, to.time_zone} == {"Asia/Riyadh", "Asia/Riyadh"}
+      assert DateTime.to_date(DateTime.convert!(from, Calendar.ISO)) == ~D[2025-03-29]
     end
 
-    test "an evening in a zone begins at 18:00 the evening before" do
-      # 1 Shawwal 1446 is 30 March 2025; its evening begins 18:00 the 29th.
-      interval =
-        single_interval(
-          holiday_set("1 Shawwal", "Eid al-Fitr"),
-          ~o"2025",
-          {:evening, "Asia/Riyadh"}
-        )
+    test "a Hebrew holiday runs sunset to sunset at Jerusalem, as Calendrical bounds it" do
+      passover = single_interval(holiday_set("15 Nisan", "Pesach"), ~o"2026")
+      {:ok, nisan_15} = Date.convert(~D[2026-04-02], Calendrical.Hebrew)
+      {:ok, {start, stop}} = Calendrical.Hebrew.day_bounds(nisan_15)
+      {:ok, {from, to}} = Tempo.Interval.instants(passover)
 
-      # An exact structural comparison — no configured zone database needed to
-      # read the named-zone value back.
-      {:ok, expected} =
-        DateTime.new(~D[2025-03-29], ~T[18:00:00], "Asia/Riyadh", Tz.TimeZoneDatabase)
+      assert {utc_iso(from), utc_iso(to)} ==
+               {DateTime.truncate(start, :second), DateTime.truncate(stop, :second)}
 
-      assert Tempo.Interval.from(interval) == Tempo.from_elixir!(expected)
+      assert from.time_zone == "Asia/Jerusalem"
     end
 
-    test "a canonical sunset projects to a datetime interval, sunset to sunset" do
-      interval = single_interval(holiday_set("1 Shawwal", "Eid al-Fitr"), ~o"2025", :sunset)
+    test "every Hebrew holiday of a year is placed, none left a whole day" do
+      {:ok, holidays} = Holidays.holidays(:IL)
+      {:ok, in_2026} = Tempo.to_interval(holidays, within: ~o"2026")
+      {:ok, placed} = Holidays.day_start(in_2026)
 
-      assert {:ok, from} = Tempo.to_elixir(Tempo.Interval.from(interval))
-      assert {:ok, to} = Tempo.to_elixir(Tempo.Interval.to(interval))
-      # sunset the evening before 1 Shawwal, through sunset the evening before 2 Shawwal
-      assert DateTime.to_date(from) == ~D[2025-03-29]
-      assert DateTime.to_date(to) == ~D[2025-03-30]
-      assert from.time_zone == "Etc/UTC"
+      hebrew =
+        placed
+        |> IntervalSet.members()
+        |> Enum.filter(&(Tempo.metadata(&1)[:calendar] == Calendrical.Hebrew))
+
+      assert [_ | _] = hebrew
+
+      for holiday <- hebrew do
+        assert {:ok, {%DateTime{time_zone: "Asia/Jerusalem"} = from, _to}} =
+                 Tempo.Interval.instants(holiday)
+
+        refute DateTime.to_time(from) == ~T[00:00:00]
+      end
     end
 
-    test "a sunset at a point resolves from its coordinates alone (no tz_world)" do
-      interval =
-        single_interval(
-          holiday_set("1 Shawwal", "Eid al-Fitr"),
-          ~o"2025",
-          {:sunset, {101.6869, 3.139}}
-        )
-
-      assert %Tempo{} = interval
-      assert {:ok, from} = Tempo.to_elixir(Tempo.Interval.from(interval))
-      assert DateTime.to_date(from) == ~D[2025-03-29]
-    end
-
-    test "an evening from a location falls back to the day when tz_world is unavailable" do
-      # No tz_world backend runs in the suite, so the location's zone cannot be
-      # resolved and the occurrence stays the in-calendar day rather than crashing.
-      interval =
-        single_interval(
-          holiday_set("1 Shawwal", "Eid al-Fitr"),
-          ~o"2025",
-          {:evening, {101.6869, 3.139}}
-        )
-
-      assert Tempo.Interval.from(interval) == ~o"1446Y10M1D[u-ca=islamic-umalqura]"
-    end
-
-    test "a Gregorian-calendar holiday is untouched by day_start" do
-      # Christmas is a civil-calendar day; sunset projection applies only to the
-      # sunset-starting calendars (Islamic, Hebrew).
-      interval = single_interval(holiday_set("12-25", "Christmas"), ~o"2025", :sunset)
+    test "a Gregorian-calendar holiday is untouched" do
+      interval = single_interval(holiday_set("12-25", "Christmas"), ~o"2025")
 
       assert Tempo.Interval.from(interval) == ~o"2025Y12M25D"
     end
 
-    test "a holiday of a sunset calendar is told by its rule's calendar, in a set of one calendar" do
+    test "a holiday of a sunset calendar is told by its rule's calendar, the civil days beside it in its place's zone" do
       # A set of occurrences is in one calendar, so Eid al-Fitr beside the
       # Gregorian Founding Day is a Gregorian day. Its rule's calendar, which
       # each member carries, is what says its day begins the evening before.
@@ -1241,65 +1223,60 @@ defmodule Tempo.HolidaysTest do
       founding_day = Enum.find(occurrences, &(Tempo.metadata(&1).name =~ "Founding"))
 
       assert Tempo.Interval.from(eid).calendar == Calendar.ISO
-      assert Tempo.metadata(eid).calendar == Calendrical.Islamic.UmmAlQura
       refute Map.has_key?(Tempo.metadata(founding_day), :calendar)
 
-      {:ok, evenings} = Holidays.day_start(in_2026, {:evening, "Asia/Riyadh"})
-      projected = IntervalSet.members(evenings)
-      eid_evening = Enum.find(projected, &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
+      {:ok, evenings} = Holidays.day_start(in_2026)
+      placed = IntervalSet.members(evenings)
+      eid_evening = Enum.find(placed, &(Tempo.metadata(&1).name =~ "Eid al-Fitr"))
 
-      {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(eid_evening))
+      {:ok, {begins, _ends}} = Tempo.Interval.instants(eid_evening)
+      begins = DateTime.convert!(begins, Calendar.ISO)
 
-      assert {DateTime.to_date(begins), DateTime.to_time(begins)} ==
-               {Date.add(greg_date(eid), -1), ~T[18:00:00]}
+      assert {DateTime.to_date(begins), begins.time_zone} ==
+               {Date.add(greg_date(eid), -1), "Asia/Riyadh"}
 
       # A Gregorian holiday is the day it is, in Riyadh.
-      founding_evening = Enum.find(projected, &(Tempo.metadata(&1).name =~ "Founding"))
-      assert {:ok, placed} = Tempo.in_zone(founding_day, "Asia/Riyadh")
-      assert founding_evening == placed
+      founding_evening = Enum.find(placed, &(Tempo.metadata(&1).name =~ "Founding"))
+      assert {:ok, in_riyadh} = Tempo.in_zone(founding_day, "Asia/Riyadh")
+      assert founding_evening == in_riyadh
     end
 
     test "an occurrence that carries no calendar is told by the calendar its day is in" do
       {:ok, day} = Tempo.to_interval(~o"1447Y10M1D[u-ca=islamic-umalqura]")
       {:ok, set} = IntervalSet.new([day])
-      {:ok, evenings} = Holidays.day_start(set, {:evening, "Asia/Riyadh"})
+      {:ok, evenings} = Holidays.day_start(set)
       [evening] = IntervalSet.members(evenings)
 
-      {:ok, begins} = Tempo.to_elixir(Tempo.Interval.from(evening))
-      assert DateTime.to_time(begins) == ~T[18:00:00]
+      {:ok, {begins, _ends}} = Tempo.Interval.instants(evening)
+      assert begins.time_zone == "Asia/Riyadh"
     end
 
-    test "a lazy set stays lazy" do
+    test "a lazy set stays lazy, its place read from its first occurrences" do
       {:ok, holidays} = Holidays.holidays(:SA, include: :public)
       {:ok, from_2026} = Tempo.select(~o"2026/..", holidays)
-      {:ok, evenings} = Holidays.day_start(from_2026, {:evening, "Asia/Riyadh"})
+      {:ok, evenings} = Holidays.day_start(from_2026)
 
       refute Tempo.bounded?(evenings)
-      assert [_founding_day, eid | _rest] = evenings |> IntervalSet.walk() |> Enum.take(3)
+      assert [founding_day, eid | _rest] = evenings |> IntervalSet.walk() |> Enum.take(3)
 
-      {:ok, expected} =
-        DateTime.new(~D[2026-03-18], ~T[18:00:00], "Asia/Riyadh", Tz.TimeZoneDatabase)
+      {:ok, {begins, _ends}} = Tempo.Interval.instants(eid)
+      begins = DateTime.convert!(begins, Calendar.ISO)
 
-      assert Tempo.Interval.from(eid) == Tempo.from_elixir!(expected)
+      assert {DateTime.to_date(begins), DateTime.to_time(begins), begins.time_zone} ==
+               {~D[2026-03-18], ~T[18:31:01], "Asia/Riyadh"}
+
+      assert Tempo.zoned?(founding_day)
     end
 
-    test "a lazy set needs a location, its sunset holidays not known ahead" do
-      {:ok, holidays} = Holidays.holidays(:SA, include: :public)
+    test "a lazy set of no sunset holidays is left as it is" do
+      {:ok, holidays} = Holidays.holidays(:AU)
       {:ok, from_2026} = Tempo.select(~o"2026/..", holidays)
 
-      assert Holidays.day_start(from_2026, :evening) ==
-               {:error, {:location_required, :evening}}
+      assert Holidays.day_start(from_2026) == {:ok, from_2026}
     end
 
-    test "an unknown day start, or a value that is not occurrences, is an error" do
-      {:ok, occurrences} = holidays_in(:SA, ~o"2026")
-
-      for day_start <- [:dusk, nil, {:sunset, {200, 0}}, {:evening, ""}, {:sunset, :mecca}] do
-        assert {:error, {:invalid_day_start, ^day_start}} =
-                 Holidays.day_start(occurrences, day_start)
-      end
-
-      assert {:error, {:invalid_occurrences, :nope}} = Holidays.day_start(:nope, :sunset)
+    test "a value that is not occurrences is an error" do
+      assert {:error, {:invalid_occurrences, :nope}} = Holidays.day_start(:nope)
     end
   end
 

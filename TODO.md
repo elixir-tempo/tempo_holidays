@@ -2,11 +2,11 @@
 
 Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more than a line here. Conformance against the full date-holidays fixture corpus (`mix test --include conformance`) holds every rule `Tempo.DateRule` reads to correct dates (zero mismatched), with the Bengali calendar the one accepted `known_unsupported` gap and the `divergent` differences the Conformance guide lists.
 
+## In progress
+
+* [ ] **Release 0.2.0 on published upstreams** — `mix.exs` names ex_tempo and Calendrical on path dependencies; restore `{:ex_tempo, "~> 2.3"}` and `{:calendrical, "~> 2.4"}` once both are published.
+
 ## Blocked
-
-* [ ] **Day-start projection through Tempo** — `day_start/2` projects through `Tempo.day_start/1`, over Calendrical's `day_bounds/1` (Tempo's decision 91, `tempo/plans/day-start.md`): a day start is the calendar's, so its astronomy, evening clock, canonical places, `{:evening, …}`, `{:sunset, location}` and `tz_world` go, and the holiday-set logic stays. Blocked on `Tempo.day_start/1`, itself blocked on Calendrical.
-
-* [ ] **Hebrew holidays are not projected by `day_start/2`** — `Tempo.to_elixir/1` refuses an interval whose ends are written with a traditional month (`5786Y7m15D/7m15D[u-ca=hebrew]`), so `DayStart.project/3` errors and `projected_or_as_is/2` returns the day unprojected, silently. Fixed in Tempo (`to_elixir/1`, 2.2.1 unreleased); blocked on ex_tempo 2.2.1. Then narrow the fallback, which hides any projection error, not only an absent `tz_world`, and add the `DayStart` tests.
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
@@ -19,6 +19,10 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Day-start projection through Tempo** — `day_start/1` places a holiday of a sunset calendar through `Tempo.day_start/1` and Calendrical's `day_bounds/1`, calendar-relative; `DayStart` and `tz_world` removed. Built on path dependencies to ex_tempo and Calendrical until they are published. 2026-11-01.
+
+* [x] **Hebrew holidays placed by their day start** — fixed by Tempo's `to_elixir/1` (2.3.0) and the narrowed fallback, which now returns any error. 2026-11-01.
 
 * [x] **Localized names (MF2)** — names in the request's locale: the dataset's (77 languages, under CLDR codes), a Gettext MF2 catalog (`mix tempo.holidays.gettext` writes its template), English, the territory's own languages. 2026-11-01.
 

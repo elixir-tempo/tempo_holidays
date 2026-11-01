@@ -18,7 +18,7 @@ Public holidays for every territory as [Tempo](https://hexdocs.pm/ex_tempo) recu
 
 * **Business days** — a territory's weekend and its holidays are Tempo values, so its business days are a period less both, counted with `Tempo.count/3`.
 
-* **Day starts** — `Tempo.Holidays.day_start/2` begins an Islamic or Hebrew holiday the evening before, at sunset or at 18:00, at the calendar's reference place or a location of your own.
+* **Day starts** — `Tempo.Holidays.day_start/1` places an Islamic or Hebrew holiday from the sunset of the evening before to its own, at its calendar's place (Mecca, Jerusalem), through `Tempo.day_start/1`.
 
 * **Conformance** — 169,799 of the 170,818 checks of date-holidays' own fixture corpus agree, none disagree, and the rest are accepted reference differences; the eight Bangladeshi rules of the Bengali calendar are not read yet.
 
