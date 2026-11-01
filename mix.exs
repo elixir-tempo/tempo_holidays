@@ -13,17 +13,19 @@ defmodule Tempo.Holidays.MixProject do
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       # Excluded from coverage:
-      #  * `Mix.Tasks.Compile.Holidays`, `Mix.Tasks.Tempo.Holidays.Update`
-      #    and `Tempo.Holidays.Build` — the compiler that writes
-      #    priv/holidays from the pinned date-holidays bundle, and its task
-      #    to fetch a new one. They run when the data is built, not in the
-      #    test suite, which reads what they wrote.
+      #  * `Mix.Tasks.Compile.Holidays`, `Mix.Tasks.Tempo.Holidays.Update`,
+      #    `Mix.Tasks.Tempo.Holidays.Gettext` and `Tempo.Holidays.Build` —
+      #    the compiler that writes priv/holidays from the pinned
+      #    date-holidays bundle, its task to fetch a new one, and the task
+      #    that writes the catalog's template from it. They run when the data
+      #    is built, not in the test suite, which reads what they wrote.
       #  * `Tempo.Holidays.Conformance` and `Tempo.Holidays.Fixtures` —
       #    test-support modules under test/support.
       test_coverage: [
         ignore_modules: [
           Mix.Tasks.Compile.Holidays,
           Mix.Tasks.Tempo.Holidays.Update,
+          Mix.Tasks.Tempo.Holidays.Gettext,
           Tempo.Holidays.Build,
           Tempo.Holidays.Conformance,
           Tempo.Holidays.Fixtures
@@ -71,6 +73,7 @@ defmodule Tempo.Holidays.MixProject do
       files: [
         "lib",
         "priv/holidays",
+        "priv/gettext",
         "mix.exs",
         "README*",
         "CHANGELOG*",
@@ -100,7 +103,12 @@ defmodule Tempo.Holidays.MixProject do
         "CHANGELOG.md"
       ],
       groups_for_modules: [
-        Holidays: [Tempo.Holidays.DayStart, Tempo.Holidays.Locale],
+        Holidays: [
+          Tempo.Holidays.DayStart,
+          Tempo.Holidays.Locale,
+          Tempo.Holidays.Names,
+          Tempo.Holidays.Gettext
+        ],
         "School terms": [Tempo.Holidays.SchoolTerms.NSW],
         "date-holidays": [Tempo.Holidays.DateHolidays],
         Internals: [
@@ -134,6 +142,9 @@ defmodule Tempo.Holidays.MixProject do
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
       {:localize, "~> 1.4"},
+      # Holiday names the data lacks in a language come from a Gettext
+      # catalog of MF2 messages, read through Localize's interpolator.
+      {:gettext, "~> 1.0"},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

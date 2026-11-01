@@ -162,6 +162,7 @@ defmodule Tempo.HolidaysTest do
   doctest Tempo.Holidays
   doctest Tempo.Holidays.Data
   doctest Tempo.Holidays.DayStart
+  doctest Tempo.Holidays.Names
 
   describe "holidays/2" do
     test "returns the AU holidays as a recurrence set, one member per holiday" do
@@ -232,7 +233,7 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "a selection never changes a date: Näfelser Fahrt still moves off Maundy Thursday" do
-      name = "Thursday after 04-02 if is observance holiday then next Thursday"
+      name = "Näfelser Fahrt"
       {:ok, public} = holidays_in(:CH, ~o"2026", subdivision: "GL", include: :public)
 
       assert dates_of(public, name) == [~o"2026Y4M9D"]
@@ -762,7 +763,9 @@ defmodule Tempo.HolidaysTest do
       assert ~o"2026Y5M25D" in dates_of(holidays, "Memorial Day")
       # 4 July 2026 is a Saturday, so Friday the 3rd is observed alongside it.
       assert ~o"2026Y7M3D" in dates_of(holidays, "Independence Day")
-      assert ~o"2026Y9M7D" in dates_of(holidays, "Labour Day")
+      # The test process's locale is `en`, which is `en-US`: the dataset's
+      # American name.
+      assert ~o"2026Y9M7D" in dates_of(holidays, "Labor Day")
       assert ~o"2026Y10M12D" in dates_of(holidays, "Columbus Day")
       assert ~o"2026Y11M11D" in dates_of(holidays, "Veterans Day")
       assert ~o"2026Y11M26D" in dates_of(holidays, "Thanksgiving Day")
@@ -1418,9 +1421,9 @@ defmodule Tempo.HolidaysTest do
     end
 
     test "Glarus moves its Thursday off Maundy Thursday to the next Thursday" do
-      # date-holidays names Näfelser Fahrt only in German, so its English name is
-      # its rule.
-      name = "Thursday after 04-02 if is observance holiday then next Thursday"
+      # date-holidays names Näfelser Fahrt in German and French only, so an
+      # English reader sees it in Glarus' own language.
+      name = "Näfelser Fahrt"
 
       {:ok, holidays_2026} = holidays_in(:CH, ~o"2026", subdivision: "GL")
       assert ~o"2026Y4M2D" in dates_of(holidays_2026, "Maundy Thursday")

@@ -1,0 +1,7 @@
+msgid ""
+msgstr ""
+"Language: eo\n"
+
+#. US: 06-19
+msgid "Juneteenth"
+msgstr "Tago de la Liberigo"

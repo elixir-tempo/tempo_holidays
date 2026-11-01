@@ -4,6 +4,8 @@ Public holidays for every territory as [Tempo](https://hexdocs.pm/ex_tempo) recu
 
 ## Features
 
+* **Names in a locale's language** — the dataset's names in seventy-seven languages, a Gettext catalog of MF2 messages for the rest, then English, then the territory's own (`locale: "de-AT"` gives `"Neujahr"`).
+
 * **Every territory and subdivision** — a CLDR territory code (`:AU`) or a BCP 47 locale (`"en-US-u-sd-usca"`), with a subdivision found at whichever level the data holds it: a state, or a region within it.
 
 * **Holidays as rules, not lists** — each holiday is a recurrence tagged with its id, name and type; `Tempo.to_interval/2` gives the days in any window, and a set operation meets a diary, a calendar or another territory's holidays.

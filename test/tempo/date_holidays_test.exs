@@ -90,6 +90,30 @@ defmodule Tempo.Holidays.DateHolidaysTest do
       assert holidays["Mother Teresa Day"].active == [{~D[2004-01-01], nil}]
     end
 
+    test "keeps every name under CLDR's code, the CLDR code's where the dataset writes both" do
+      meta = %{
+        "name" => %{
+          "en" => "New Year's Day",
+          "cs" => "Nový rok",
+          "cz" => "Novy rok",
+          "jp" => "元日"
+        },
+        "type" => "public"
+      }
+
+      [holiday] = DateHolidays.compile_day("01-01", meta, "en")
+
+      assert holiday.names == %{"en" => "New Year's Day", "cs" => "Nový rok", "ja" => "元日"}
+    end
+
+    test "drops a key of a name map that is no language" do
+      meta = %{"name" => %{"en" => "Bank Holiday", "type" => "bank"}}
+
+      [holiday] = DateHolidays.compile_day("1st monday in August", meta, "en")
+
+      assert holiday.names == %{"en" => "Bank Holiday"}
+    end
+
     test "resolves a _name reference against the bundle's names table" do
       days = %{"01-01" => %{"_name" => "01-01"}}
       names = %{"01-01" => %{"name" => %{"en" => "New Year's Day", "fr" => "Nouvel An"}}}

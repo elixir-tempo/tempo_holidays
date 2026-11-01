@@ -1,0 +1,5430 @@
+msgid ""
+msgstr ""
+
+#. DE: 4th sunday before 12-25
+msgid "1. Advent"
+msgstr ""
+
+#. DE: 3th sunday before 12-25
+msgid "2. Advent"
+msgstr ""
+
+#. RU: 2026-08-05
+msgid "25th Anniversary of the Canonization of Righteous Warrior Fyodor Ushakov"
+msgstr ""
+
+#. BA: 05-02 and if sunday then next monday
+msgid "2nd day of the Labour Day"
+msgstr ""
+
+#. BA: 01-02 and if sunday then next monday
+msgid "2nd day of the New Year"
+msgstr ""
+
+#. DE: 2nd sunday before 12-25
+msgid "3. Advent"
+msgstr ""
+
+#. EG: 06-30
+msgid "30 June Day"
+msgstr ""
+
+#. DE: 1st sunday before 12-25
+msgid "4. Advent"
+msgstr ""
+
+#. DE: 2028-06-17
+msgid "75th anniversary of the GDR uprising"
+msgstr ""
+
+#. AU: 1st friday before October
+msgid "AFL Grand Final Friday"
+msgstr ""
+
+#. NZ, TO: 04-25 and if saturday,sunday then next monday
+msgid "ANZAC Day"
+msgstr ""
+
+#. BL, FR, GF, GP, MF, MQ, MU, RE, YT: 10-09
+msgid "Abolition of Slavery"
+msgstr ""
+
+#. BH: 12-17
+msgid "Accession Day"
+msgstr ""
+
+#. AU: 2nd monday in March
+msgid "Adelaide Cup Day"
+msgstr ""
+
+#. BR: 08-15
+msgid "Adesão do Grão-Pará à independência do Brasil"
+msgstr ""
+
+#. BR: 07-28
+msgid "Adesão do Maranhão à independência do Brasil"
+msgstr ""
+
+#. LK: 05-30
+msgid "Adhi Poson Full Moon Poya Day"
+msgstr ""
+
+#. AS, GU, PR, US, VI: wednesday before 04-28
+msgid "Administrative Professionals Day"
+msgstr ""
+
+#. RU: 09-20
+msgid "Adyghe (Circassian) Day"
+msgstr ""
+
+#. GM, GN, MG, MR, NA, ZW: 05-25
+msgid "Africa Day"
+msgstr ""
+
+#. LS: 05-25
+msgid "Africa Day/ Heroes' Day"
+msgstr ""
+
+#. ZM: 05-25 and if sunday then next monday
+msgid "African Freedom Day"
+msgstr ""
+
+#. ST: 09-30 and if Saturday then previous Friday if Sunday then next Monday
+msgid "Agricultural Reform Day"
+msgstr ""
+
+#. CK: 10-26 and if Saturday, Sunday then next Monday
+msgid "Aitutaki Gospel Day"
+msgstr ""
+
+#. US: 10-18
+msgid "Alaska Day"
+msgstr ""
+
+#. IL: 10 Nisan
+msgid "Aliyah Day"
+msgstr ""
+
+#. AD, AT, BA, BE, BF, BI, BJ, BL, BO, CF, CG, CH, CI, CL, CO, CV, DE, ES, FI, FR, GA, GF, GP, GT, HR, HT, HU, IC, IT, LI, LT, LU, MC, ME, MF, MG, MK, MQ, MU, NC, NL, NO, PE, PF, PH, PL, PM, PT, RE, SC, SE, SJ, SK, SM, SN, TD, TG, VA, VE, WF, YT: 11-01
+msgid "All Saints' Day"
+msgstr ""
+
+#. AO, BA, BE, BO, BR, DE, EC, EE, GT, GU, HT, LT, MX, NL, PH, SV, UY, VA, VE: 11-02
+msgid "All Souls' Day"
+msgstr ""
+
+#. AL: 11-22
+msgid "Alphabet Day"
+msgstr ""
+
+#. BR: 03-08
+msgid "Alusivo ao Dia Internacional da Mulher"
+msgstr ""
+
+#. DZ: 01-12
+msgid "Amazigh New Year"
+msgstr ""
+
+#. IN: 04-14
+msgid "Ambedkar Jayanti"
+msgstr ""
+
+#. PR: 03-02 since 2017
+msgid "American Citizenship Day"
+msgstr ""
+
+#. AS: 04-17 and if sunday then next monday
+msgid "American Samoa Flag Day"
+msgstr ""
+
+#. HT: 01-02
+msgid "Ancestry Day"
+msgstr ""
+
+#. BO: 06-21
+msgid "Andean Amazonian Chaqueño New Year"
+msgstr ""
+
+#. BO: substitutes 06-21 if sunday then next monday
+msgid "Andean Amazonic Chacoan New Year (substitutes)"
+msgstr ""
+
+#. AD: 1st friday in August P4D since 2024 and prior to 2026
+msgid "Andorra La Vella Festival"
+msgstr ""
+
+#. AI: 05-30
+msgid "Anguilla Day"
+msgstr ""
+
+#. BR: 06-15
+msgid "Aniversário do estado"
+msgstr ""
+
+#. NF: 06-08 if saturday,sunday then next monday
+msgid "Anniversary (Bounty) Day"
+msgstr ""
+
+#. SH: 08-14
+msgid "Anniversary Day"
+msgstr ""
+
+#. MY: 03-04
+msgid "Anniversary of Installation of the Sultan of Terengganu"
+msgstr ""
+
+#. IR: 22 Bahman
+msgid "Anniversary of Islamic Revolution"
+msgstr ""
+
+#. CD: 01-16 and if sunday then next tuesday
+msgid "Anniversary of President Laurent Kabila"
+msgstr ""
+
+#. CD: 01-17 and if sunday then next monday
+msgid "Anniversary of Prime Minister Patrice Emery Lumumba"
+msgstr ""
+
+#. BF: 01-03
+msgid "Anniversary of the 1966 Upper Voltan coup d'état"
+msgstr ""
+
+#. SM: 03-25
+msgid "Anniversary of the Arengo"
+msgstr ""
+
+#. TO: 12-04 if thursday,friday,saturday,sunday then next monday and if tuesday then previous monday
+msgid "Anniversary of the Coronation of H.M. King George Tupou I"
+msgstr ""
+
+#. MA: 11-06
+msgid "Anniversary of the Green March"
+msgstr ""
+
+#. MA: 01-11
+msgid "Anniversary of the Independence Manifesto"
+msgstr ""
+
+#. AR: 08-17 if tuesday,wednesday then previous monday if thursday,friday then next monday
+msgid "Anniversary of the Passing to Immortality of General José de San Martín"
+msgstr ""
+
+#. AR: 3rd monday in June
+msgid "Anniversary of the Passing to Immortality of General Manuel Belgrano"
+msgstr ""
+
+#. AR: 06-17 if tuesday,wednesday then previous monday if thursday,friday then next monday
+msgid "Anniversary of the Passing to Immortality of General Martín Miguel de Güemes"
+msgstr ""
+
+#. MA: 08-14
+msgid "Anniversary of the Recovery Oued Ed-Dahab"
+msgstr ""
+
+#. MA: 08-20
+msgid "Anniversary of the Revolution of the King and the People"
+msgstr ""
+
+#. PL: 09-17
+msgid "Anniversary of the Soviet invasion of Poland"
+msgstr ""
+
+#. EE: 02-02
+msgid "Anniversary of the Tartu Peace Treaty"
+msgstr ""
+
+#. HT: 10-17
+msgid "Anniversary of the death of Dessalines"
+msgstr ""
+
+#. VA: 04-19 since 2005 and prior to 2013
+msgid "Anniversary of the election of Pope Benedict XVI"
+msgstr ""
+
+#. VA: 03-13 since 2013 and prior to 2026
+msgid "Anniversary of the election of Pope Francis"
+msgstr ""
+
+#. VA: 10-16
+msgid "Anniversary of the election of Pope John Paul II"
+msgstr ""
+
+#. VA: 05-08 since 2026
+msgid "Anniversary of the election of Pope Leo XIV"
+msgstr ""
+
+#. VA: 02-11
+msgid "Anniversary of the foundation of Vatican City"
+msgstr ""
+
+#. PL: 09-01
+msgid "Anniversary of the outbreak of the Second World War in Poland"
+msgstr ""
+
+#. SE: 03-25 prior to 1990
+msgid "Annunciation Day"
+msgstr ""
+
+#. CY, GR: 03-25
+msgid "Annunciation, Anniversary of 1821 Revolution"
+msgstr ""
+
+#. HR: 06-22
+msgid "Anti-Fascist Struggle Day"
+msgstr ""
+
+#. AU, CC, CK, CX, NF: 04-25
+msgid "Anzac Day"
+msgstr ""
+
+#. AL, NO, SJ: 04-01
+msgid "April Fools' Day"
+msgstr ""
+
+#. BH, DJ, ES, LY, MY: 9 Dhu al-Hijjah
+msgid "Arafat Day"
+msgstr ""
+
+#. IR: 20 Safar
+msgid "Arbaeen-e Hosseini"
+msgstr ""
+
+#. TW, US: 03-12
+msgid "Arbor Day"
+msgstr ""
+
+#. UG: 02-16
+msgid "Archbishop Janan Luwum Day"
+msgstr ""
+
+#. BD, BN, EG, GQ, LR, SL, ST, TW: 11-21
+msgid "Armed Forces Day"
+msgstr ""
+
+#. HN: 10-21
+msgid "Armed forces Day"
+msgstr ""
+
+#. BE, BL, CA, FR, GF, GP, MF, MQ, NC, PF, PM, RE, RS, WF, YT: 11-11
+msgid "Armistice Day"
+msgstr ""
+
+#. AM, CL, CN, GT, ML: 01-28
+msgid "Army Day"
+msgstr ""
+
+#. GY: 05-05
+msgid "Arrival Day"
+msgstr ""
+
+#. MU: 11-02
+msgid "Arrival of Indentured Labourers"
+msgstr ""
+
+#. TH: 2010-07-25
+msgid "Asalha Puja"
+msgstr ""
+
+#. AT, AW, AX, BE, BF, BI, BJ, BL, BQ, BW, CF, CG, CH, CI, CM, CO, CW, DE, DK, FI, FO, FR, GF, GL, GP, HT, ID, IS, LI, LS, LU, MC, MF, MG, MQ, NA, NC, NL, NO, PF, PM, RE, RO, SE, SH, SJ, SN, SX, SZ, TG, VA, VU, WF, YT: easter 39
+msgid "Ascension Day"
+msgstr ""
+
+#. CY: orthodox -48
+msgid "Ash Sunday"
+msgstr ""
+
+#. BL, CV, DE, FR, HT, IS, JM, KY, NL, NO, PL, SJ, UG: easter -46
+msgid "Ash Wednesday"
+msgstr ""
+
+#. IR: 10 Muharram
+msgid "Ashoura"
+msgstr ""
+
+#. PK: 9 Muharram P2D
+msgid "Ashura"
+msgstr ""
+
+#. BR: 11-17
+msgid "Assinatura do Tratado de Petrópolis"
+msgstr ""
+
+#. AD, AT, BA, BE, BF, BI, BJ, BL, BR, CF, CG, CH, CI, CL, CM, CO, CV, CY, DE, ES, FR, GA, GF, GM, GN, GP, GR, GT, HR, HT, IC, IT, LT, LU, MC, ME, MF, MG, MK, MQ, MT, NC, PF, PL, PM, PT, PY, RE, RO, RW, SC, SI, SM, SN, TG, VA, VE, VU, WF, YT: 08-15
+msgid "Assumption"
+msgstr ""
+
+#. CK: 07-19 and if Saturday, Sunday then next Monday
+msgid "Atiu Gospel Day"
+msgstr ""
+
+#. DE: 08-08
+msgid "Augsburg Peace Festival"
+msgstr ""
+
+#. SH: monday before 09-01
+msgid "August Bank Holiday"
+msgstr ""
+
+#. AI: 1st monday in August
+msgid "August Monday"
+msgstr ""
+
+#. VN: 08-19
+msgid "August Revolution Commemoration Day"
+msgstr ""
+
+#. AI: 1st thursday in August
+msgid "August Thursday"
+msgstr ""
+
+#. GD: 10-15 P5D
+msgid "Aunty Tek Spice Word Festival"
+msgstr ""
+
+#. AU, CC, CX, NF: 01-26 if saturday,sunday then next monday
+msgid "Australia Day"
+msgstr ""
+
+#. BR: 03-18
+msgid "Autonomia do Estado"
+msgstr ""
+
+#. AX: 06-09
+msgid "Autonomy Day"
+msgstr ""
+
+#. HU: 2023-11-02
+msgid "Autumn school holiday"
+msgstr ""
+
+#. JP: september equinox in +09:00
+msgid "Autumnal Equinox Day"
+msgstr ""
+
+#. AZ: 06-26 and if saturday,sunday then next monday
+msgid "Azerbaijan Armed Forces Day"
+msgstr ""
+
+#. IN: 04-05
+msgid "Babu Jagjivan Ram Jayanti"
+msgstr ""
+
+#. LK: 04-01
+msgid "Bak Full Moon Poya Day"
+msgstr ""
+
+#. GT: 07-01 if tuesday,saturday then previous friday if sunday then next monday
+msgid "Bank Employee Day"
+msgstr ""
+
+#. AU: 1st monday in August
+msgid "Bank Holiday"
+msgstr ""
+
+#. PL: 04-14 since 2019
+msgid "Baptism of Poland Day"
+msgstr ""
+
+#. IN: 04-30
+msgid "Basava Jayanti"
+msgstr ""
+
+#. BL, FR, GF, GP, MF, MQ, NC, PF, PM, RE, WF, YT: 07-14
+msgid "Bastille Day"
+msgstr ""
+
+#. PE: 10-08
+msgid "Battle of Angamos"
+msgstr ""
+
+#. CL: 06-07
+msgid "Battle of Arica"
+msgstr ""
+
+#. PE: 06-07 since 2024
+msgid "Battle of Arica and Flag Day"
+msgstr ""
+
+#. PE: 12-09 since 2022
+msgid "Battle of Ayacucho"
+msgstr ""
+
+#. CO: 08-07
+msgid "Battle of Boyacá"
+msgstr ""
+
+#. VE: 06-24
+msgid "Battle of Carabobo"
+msgstr ""
+
+#. PE: 08-06 since 2022
+msgid "Battle of Junín"
+msgstr ""
+
+#. UY: 05-18 if tuesday,wednesday then previous monday if thursday,friday then next monday
+msgid "Battle of Las Piedras"
+msgstr ""
+
+#. NI: 09-14
+msgid "Battle of San Jacinto"
+msgstr ""
+
+#. HT: 11-18
+msgid "Battle of Vertières Day"
+msgstr ""
+
+#. GB: 07-12
+msgid "Battle of the Boyne (Orangemen’s Day)"
+msgstr ""
+
+#. GE: 01-02
+msgid "Bedoba"
+msgstr ""
+
+#. IL: 6 Kislev if Saturday then next Sunday
+msgid "Ben-Gurion Day"
+msgstr ""
+
+#. IN: 04-15
+msgid "Bengali New Year"
+msgstr ""
+
+#. BO: 11-18
+msgid "Beni Day"
+msgstr ""
+
+#. BO: substitutes 11-18 if sunday then next monday
+msgid "Beni Day (substitutes)"
+msgstr ""
+
+#. MX: 03-21
+msgid "Benito Juárez's birthday"
+msgstr ""
+
+#. US: 3rd monday in August
+msgid "Bennington Battle Day"
+msgstr ""
+
+#. LI: 01-02
+msgid "Berchtold Day"
+msgstr ""
+
+#. CH: 01-02
+msgid "Berchtoldstag"
+msgstr ""
+
+#. BM: friday before 06-01
+msgid "Bermuda Day"
+msgstr ""
+
+#. AW: 01-25
+msgid "Betico Croes Day"
+msgstr ""
+
+#. IN: 07-13
+msgid "Bhanu Jayanti / Martyrs' Day"
+msgstr ""
+
+#. AR: 2013-01-31
+msgid "Bicentennial of the Assembly of the Year XIII"
+msgstr ""
+
+#. AR: 2013-02-20
+msgid "Bicentennial of the Battle of Salta"
+msgstr ""
+
+#. AR: 2012-09-24
+msgid "Bicentennial of the Battle of Tucumán"
+msgstr ""
+
+#. AR: 2012-02-27
+msgid "Bicentennial of the Creation and First Oath of Allegiance to the Argentine Flag"
+msgstr ""
+
+#. IN: 03-22
+msgid "Bihar Day"
+msgstr ""
+
+#. LK: 09-26
+msgid "Binara Full Moon Poya Day"
+msgstr ""
+
+#. RU: 2026-05-31
+msgid "Birthday of Buddha Shakyamuni"
+msgstr ""
+
+#. NO, SJ: 07-20
+msgid "Birthday of Crown Prince Haakon Magnus"
+msgstr ""
+
+#. NO, SJ: 08-19
+msgid "Birthday of Crown Princess Mette-Marit"
+msgstr ""
+
+#. PR: 3rd Monday in July
+msgid "Birthday of Don Luis Muñoz Rivera"
+msgstr ""
+
+#. PR: 07-27
+msgid "Birthday of Dr. José Celso Barbosa"
+msgstr ""
+
+#. PR: 2nd Monday in January
+msgid "Birthday of Eugenio María de Hostos"
+msgstr ""
+
+#. TO: 09-17
+msgid "Birthday of His Royal Highness The Crown Prince Tupotoʻa-ʻUlukalala"
+msgstr ""
+
+#. IR: 13 Rajab
+msgid "Birthday of Imam Ali"
+msgstr ""
+
+#. IR: 15 Shaban
+msgid "Birthday of Imam Mahdi"
+msgstr ""
+
+#. UY: 06-19
+msgid "Birthday of José Gervasio Artigas and Never Again Day"
+msgstr ""
+
+#. PR: 04-16
+msgid "Birthday of José de Diego"
+msgstr ""
+
+#. NO, SJ: 02-21
+msgid "Birthday of King Harald V"
+msgstr ""
+
+#. SZ: 04-19 and if Saturday, Sunday then next Monday
+msgid "Birthday of King Mswati III"
+msgstr ""
+
+#. PR: 02-18
+msgid "Birthday of Luis Muñoz Marín"
+msgstr ""
+
+#. AE, BA, BD, BF, BH, BJ, BN, CI, DJ, DZ, EG, EH, ER, ET, FJ, GM, GN, ID, KM, LY, MA, ME, ML, MR, MY, NE, NG, PH, PK, SD, SN, SO, TD, TG, TN: 12 Rabi al-awwal
+msgid "Birthday of Muhammad (Mawlid)"
+msgstr ""
+
+#. IR: 17 Rabi al-awwal
+msgid "Birthday of Muhammad Prophet"
+msgstr ""
+
+#. NO, SJ: 01-21
+msgid "Birthday of Princess Ingrid Alexandra"
+msgstr ""
+
+#. NO, SJ: 07-04
+msgid "Birthday of Queen Sonja"
+msgstr ""
+
+#. NI: 01-18
+msgid "Birthday of Rubén Darío"
+msgstr ""
+
+#. VE: 07-24
+msgid "Birthday of Simón Bolívar"
+msgstr ""
+
+#. HK: chinese 04-0-08 not on Sunday
+msgid "Birthday of the Buddha"
+msgstr ""
+
+#. SZ: 07-22 and if Saturday, Sunday then next Monday
+msgid "Birthday of the late King Sobhuza"
+msgstr ""
+
+#. BR: 11-20
+msgid "Black Awareness Day"
+msgstr ""
+
+#. CF: 03-29
+msgid "Boganda Day"
+msgstr ""
+
+#. BO: 10-11
+msgid "Bolivian Woman's Day"
+msgstr ""
+
+#. IS: easter -48
+msgid "Bolludagur"
+msgstr ""
+
+#. BQ: 09-06
+msgid "Bonaire Day"
+msgstr ""
+
+#. PH: 11-30
+msgid "Bonifacio Day"
+msgstr ""
+
+#. PY: 09-29
+msgid "Boqueron Battle Victory Day"
+msgstr ""
+
+#. BW: 09-30
+msgid "Botswana Day"
+msgstr ""
+
+#. AD, AG, AI, AT, AU, AW, AX, BA, BB, BE, BG, BM, BQ, BS, BZ, CA, CC, CH, CK, CW, CX, CY, CZ, DE, DK, DM, EE, FI, FJ, FO, FR, GB, GD, GG, GH, GI, GL, GR, GY, HR, HU, IM, IS, IT, JE, JM, KE, KN, KY, LC, LI, LS, LT, LU, LV, ME, MS, NF, NG, NL, NO, NZ, PL, RO, RW, SE, SH, SJ, SK, SL, SM, SR, SX, SZ, TC, TO, TT, UG, US, VA, VC, VG, ZW: 12-26
+msgid "Boxing Day"
+msgstr ""
+
+#. PL: 09-30
+msgid "Boy's Day"
+msgstr ""
+
+#. AR: 2022-11-21
+msgid "Bridge Day"
+msgstr ""
+
+#. CA: 1st monday in August
+msgid "British Columbia Day"
+msgstr ""
+
+#. LV: 2023-05-29
+msgid "Bronze medal of the Latvian hockey team at the 2023 World Hockey Championship"
+msgstr ""
+
+#. BD, KR, TW, VN: 05-19
+msgid "Buddha's Birthday"
+msgstr ""
+
+#. TH: 2014-07-12
+msgid "Buddhist Lent"
+msgstr ""
+
+#. BG: 05-24
+msgid "Bulgarian Education and Culture, and Slavonic Literature Day"
+msgstr ""
+
+#. CH: 08-01
+msgid "Bundesfeiertag"
+msgstr ""
+
+#. US: 06-17
+msgid "Bunker Hill Day"
+msgstr ""
+
+#. IS: friday after 01-18
+msgid "Bóndadagur"
+msgstr ""
+
+#. GY: monday after 07-01
+msgid "CARICOM Day"
+msgstr ""
+
+#. MD: 11-21
+msgid "Cahul Day"
+msgstr ""
+
+#. GD: 12-04 P3D
+msgid "Camerhogne Folk Festival"
+msgstr ""
+
+#. CA: 07-01
+msgid "Canada Day"
+msgstr ""
+
+#. ES, IC: 05-30
+msgid "Canary Islands Day"
+msgstr ""
+
+#. AU: 2nd monday in March
+msgid "Canberra Day"
+msgstr ""
+
+#. DE, LI: 02-02
+msgid "Candlemas"
+msgstr ""
+
+#. KZ: 07-06 and if saturday,sunday then next monday
+msgid "Capital City Day"
+msgstr ""
+
+#. VN: 10-10
+msgid "Capital Liberation Day"
+msgstr ""
+
+#. MD: 10-14
+msgid "Capital's Day"
+msgstr ""
+
+#. NL: 04-01
+msgid "Capture of Brielle"
+msgstr ""
+
+#. AG: easter 47 P4D
+msgid "Caribana"
+msgstr ""
+
+#. BR: easter -47
+msgid "Carnaval"
+msgstr ""
+
+#. BR, EC, LC, NL, NO, SI, SJ, SX, UY, VE: easter -46 PT14H
+msgid "Carnival"
+msgstr ""
+
+#. KN: 01-02
+msgid "Carnival Day"
+msgstr ""
+
+#. BQ, CW, DM, GD, VC: easter -48
+msgid "Carnival Monday"
+msgstr ""
+
+#. DM, GD, VC: easter -47
+msgid "Carnival Tuesday"
+msgstr ""
+
+#. GD: 04-24 P3D
+msgid "Carriacou Maroon and String Band Music Festival"
+msgstr ""
+
+#. US: 1st monday in March
+msgid "Casimir Pulaski Day"
+msgstr ""
+
+#. NA: 05-04
+msgid "Cassinga Day"
+msgstr ""
+
+#. AL: easter
+msgid "Catholic Easter"
+msgstr ""
+
+#. SV: 08-06
+msgid "Celebración del Divino Salvador del Mundo"
+msgstr ""
+
+#. AI: 2nd monday in June
+msgid "Celebration of the Birthday of Her Majesty the Queen"
+msgstr ""
+
+#. SM: 10-01
+msgid "Cerimonia di investitura dei Capitani Reggenti"
+msgstr ""
+
+#. US: 03-31
+msgid "Cesar Chavez Day"
+msgstr ""
+
+#. PY: 06-12
+msgid "Chaco Armistice"
+msgstr ""
+
+#. TH: 04-06
+msgid "Chakri Memorial Day"
+msgstr ""
+
+#. MX: 12-01 every 6 years since 1934
+msgid "Change of Federal Government"
+msgstr ""
+
+#. KM: 03-18
+msgid "Cheikh Al Maarouf Day"
+msgstr ""
+
+#. TW: chinese 05-0-13 #1
+msgid "Cheng Huang's Birthday"
+msgstr ""
+
+#. AL, BO, CN, CV, HN, JP, KR, NG, NI, PL, RO, TW: 06-01
+msgid "Children's Day"
+msgstr ""
+
+#. BN, CC, CX, ID, MY, PH, SG, SR, TW: chinese 01-0-01
+msgid "Chinese New Year"
+msgstr ""
+
+#. CC: chinese 01-0-02 and if sunday then next tuesday if saturday then next monday
+msgid "Chinese New Year (2nd Day)"
+msgstr ""
+
+#. TW: chinese 01-0-01 if Monday then next Friday if Tuesday then next Saturdayif Wednesday then next Sunday if Thursday then next Monday if Friday then next Tuesday if Saturday then next Wednesday if Sunday then next Thursday
+msgid "Chinese New Year Holiday"
+msgstr ""
+
+#. TW: chinese 01-0-00
+msgid "Chinese New Year's Eve"
+msgstr ""
+
+#. MU: chinese 01-0-01
+msgid "Chinese Spring Festival"
+msgstr ""
+
+#. HK: chinese 5-01 solarterm not on Sunday
+msgid "Ching Ming Festival"
+msgstr ""
+
+#. NZ: friday after 2nd tuesday in November
+msgid "Christchurch Show Day"
+msgstr ""
+
+#. AD, AG, AI, AL, AM, AO, AR, AS, AT, AU, AW, AX, BA, BB, BE, BF, BG, BI, BJ, BL, BM, BN, BO, BQ, BR, BS, BW, BY, BZ, CA, CC, CD, CF, CG, CH, CI, CK, CL, CM, CO, CR, CU, CV, CW, CX, CY, CZ, DE, DJ, DK, DM, DO, EC, EE, EG, ER, ES, ET, FI, FJ, FO, FR, GA, GB, GD, GF, GG, GH, GI, GL, GM, GN, GP, GQ, GR, GT, GU, GW, GY, HK, HN, HR, HT, HU, IC, ID, IE, IM, IN, IS, IT, JE, JM, JP, KE, KN, KR, KY, LC, LI, LK, LR, LS, LT, LU, LV, MC, MD, ME, MF, MG, MK, ML, MQ, MS, MT, MU, MW, MX, MY, NA, NC, NE, NF, NG, NI, NL, NO, NZ, PA, PE, PF, PH, PL, PM, PR, PT, PY, RE, RO, RS, RU, RW, SC, SD, SE, SG, SH, SI, SJ, SK, SL, SM, SN, SR, SS, ST, SV, SX, SZ, TC, TD, TG, TO, TT, TZ, UA, UG, US, UY, VA, VC, VE, VG, VI, VU, WF, XK, YT, ZA, ZM, ZW: 12-25
+msgid "Christmas Day"
+msgstr ""
+
+#. BO: substitutes 12-25 if sunday then next monday
+msgid "Christmas Day (substitutes)"
+msgstr ""
+
+#. AD, AL, AR, AS, AT, AU, AX, BG, BR, CH, CZ, DE, DK, EE, FI, FO, GL, GT, GU, HU, IS, LI, LT, LV, ME, MY, NI, NO, PH, PL, PR, PT, SE, SJ, SK, US, UY, VE, VI: 12-24
+msgid "Christmas Eve"
+msgstr ""
+
+#. HK: chinese 09-0-09 not on Sunday
+msgid "Chung Yeung Festival"
+msgstr ""
+
+#. BO: 05-25
+msgid "Chuquisaca Day"
+msgstr ""
+
+#. BO: substitutes 05-25 if sunday then next monday
+msgid "Chuquisaca Day (substitutes)"
+msgstr ""
+
+#. JP: 09-22 if 09-21 and 09-23 is public holiday
+msgid "Citizens' Holiday"
+msgstr ""
+
+#. BR: 01-25
+msgid "City Birthday"
+msgstr ""
+
+#. CA: 1st monday in August
+msgid "Civic Holiday"
+msgstr ""
+
+#. CY, GR: orthodox -47
+msgid "Clean Monday"
+msgstr ""
+
+#. BO: 09-14
+msgid "Cochabamba Day"
+msgstr ""
+
+#. BO: substitutes 09-14 if sunday then next monday
+msgid "Cochabamba Day (substitutes)"
+msgstr ""
+
+#. AS, CL, CO, CR, GU, HN, PR, US, UY: 2nd monday in October
+msgid "Columbus Day"
+msgstr ""
+
+#. PA: 11-05 and if sunday then next monday
+msgid "Colón Day"
+msgstr ""
+
+#. JP: 2nd monday in January
+msgid "Coming of Age Day"
+msgstr ""
+
+#. BY: orthodox +9
+msgid "Commemoration Day"
+msgstr ""
+
+#. US: 2026-02-16
+msgid "Commemoration of America's 250th Birthday"
+msgstr ""
+
+#. TR: 05-19
+msgid "Commemoration of Atatürk, Youth and Sports Day"
+msgstr ""
+
+#. CU: 07-26
+msgid "Commemoration of the Assault of the Moncada garrison"
+msgstr ""
+
+#. VG: 2021-11-08
+msgid "Commemoration of the Great March of 1949"
+msgstr ""
+
+#. SM: 11-02
+msgid "Commemoration of the deceased"
+msgstr ""
+
+#. IS: 1st monday in August
+msgid "Commerce Day"
+msgstr ""
+
+#. GI, TC, VG: 2nd monday in March
+msgid "Commonwealth Day"
+msgstr ""
+
+#. VN: 02-03
+msgid "Communist Party of Viet Nam Foundation Anniversary"
+msgstr ""
+
+#. NE: 04-24
+msgid "Concord Day"
+msgstr ""
+
+#. US: 01-19
+msgid "Confederate Heroes Day"
+msgstr ""
+
+#. US: monday before 05-01
+msgid "Confederate Memorial Day"
+msgstr ""
+
+#. AD, AI, AM, AZ, CK, DK, DO, FJ, FO, GH, GQ, JP, KR, KY, KZ, MX, NO, PH, PL, RO, SJ, SK, SX, TH, TW, UA, UY, UZ, VU, XK: 03-14
+msgid "Constitution Day"
+msgstr ""
+
+#. RU: 03-23
+msgid "Constitution Day of the Chechen Republic"
+msgstr ""
+
+#. RU: 07-26
+msgid "Constitution Day of the Republic of Dagestan"
+msgstr ""
+
+#. RU: 11-06
+msgid "Constitution Day of the Republic of Tatarstan"
+msgstr ""
+
+#. RU: 2024-05-06
+msgid "Constitution Day of the Republic of Tuva"
+msgstr ""
+
+#. TO: 11-04 if thursday,friday,saturday,sunday then next monday if tuesday,wednesday then previous monday
+msgid "Constitutional Day"
+msgstr ""
+
+#. SD: julian 12-25
+msgid "Coptic Christmas"
+msgstr ""
+
+#. SD: orthodox
+msgid "Coptic Easter"
+msgstr ""
+
+#. JP, TH: 2019-05-01
+msgid "Coronation Day"
+msgstr ""
+
+#. AT, BA, BO, BR, CH, CO, DE, DO, ES, GD, GQ, HR, HT, LC, LI, MC, PL, PT, SC, SM, TT, VA: easter 60
+msgid "Corpus Christi"
+msgstr ""
+
+#. BR: 09-13
+msgid "Criação do Território Federal"
+msgstr ""
+
+#. BR: 10-11
+msgid "Criação do estado"
+msgstr ""
+
+#. KN: 1st Tuesday in August
+msgid "Culturama Day"
+msgstr ""
+
+#. JP: substitutes 11-03 and if sunday then next monday
+msgid "Culture Day"
+msgstr ""
+
+#. CW: 10-10
+msgid "Curaçao Day"
+msgstr ""
+
+#. CY: 10-01
+msgid "Cyprus Independence Day"
+msgstr ""
+
+#. CY: 04-01
+msgid "Cyprus National Day"
+msgstr ""
+
+#. US: 03-31 and if sunday then next monday
+msgid "César Chávez Day"
+msgstr ""
+
+#. BR: 03-25
+msgid "Data magna do estado"
+msgstr ""
+
+#. US: friday after 4th thursday in November
+msgid "Day After Thanksgiving"
+msgstr ""
+
+#. US: 12-26
+msgid "Day after Christmas"
+msgstr ""
+
+#. CK, NZ: 01-02 and if Saturday then next Monday if Monday, Sunday then next Tuesday
+msgid "Day after New Year's Day"
+msgstr ""
+
+#. US: friday after 4th thursday in November
+msgid "Day after Thanksgiving"
+msgstr ""
+
+#. AS, GU, PR, US, VI: friday after 4th thursday in November
+msgid "Day after Thanksgiving Day"
+msgstr ""
+
+#. CU: 07-27
+msgid "Day after the Commemoration of the Assault of the Moncada garrison"
+msgstr ""
+
+#. LK: 04-13
+msgid "Day before Sinhala and Tamil New Year"
+msgstr ""
+
+#. CU: 07-25
+msgid "Day before the Commemoration of the Assault of the Moncada garrison"
+msgstr ""
+
+#. LK: 05-02
+msgid "Day following Vesak Full Moon Poya Day"
+msgstr ""
+
+#. AR: 06-10
+msgid "Day of Affirmation of Argentine Rights over the Malvinas, Islands and Antarctic Sector"
+msgstr ""
+
+#. BD, BH, DZ, GM, SN, SO: 10 Muharram
+msgid "Day of Ashura"
+msgstr ""
+
+#. IL: 10 Tishrei
+msgid "Day of Atonement (Yom Kippur)"
+msgstr ""
+
+#. EE: 11-16
+msgid "Day of Declaration of Sovereignty"
+msgstr ""
+
+#. ZA: 12-26
+msgid "Day of Goodwill"
+msgstr ""
+
+#. VE: 10-12
+msgid "Day of Indigenous Resistance"
+msgstr ""
+
+#. ET: 03-28
+msgid "Day of Lament"
+msgstr ""
+
+#. SR: 02-25
+msgid "Day of Liberation and Innovation"
+msgstr ""
+
+#. UZ: 05-09 and if saturday,sunday then next monday
+msgid "Day of Memory and Honour"
+msgstr ""
+
+#. EE: 06-14
+msgid "Day of Mourning and Commemoration"
+msgstr ""
+
+#. AR: 4th monday in November
+msgid "Day of National Sovereignty"
+msgstr ""
+
+#. EH, HU: 06-17
+msgid "Day of National Unity"
+msgstr ""
+
+#. MY: 17 Ramadan
+msgid "Day of Nuzul Al-Quran"
+msgstr ""
+
+#. SK: 09-15 prior to 2026
+msgid "Day of Our Lady of the Seven Sorrows"
+msgstr ""
+
+#. DE: wednesday before 11-23
+msgid "Day of Prayer and Repentance"
+msgstr ""
+
+#. GT: 10-12 if saturday then previous friday if sunday then next monday
+msgid "Day of Race"
+msgstr ""
+
+#. ZA: 12-16
+msgid "Day of Reconciliation"
+msgstr ""
+
+#. AR: 03-24
+msgid "Day of Remembrance for Truth and Justice"
+msgstr ""
+
+#. SI: 11-01
+msgid "Day of Remembrance for the Dead"
+msgstr ""
+
+#. RU: 05-21
+msgid "Day of Remembrance of the Adyghe (Circassian) Victims of the Russian-Caucasian War"
+msgstr ""
+
+#. RU: orthodox 9
+msgid "Day of Remembrance of the Departed (Radonitsa)"
+msgstr ""
+
+#. RU: 12-28
+msgid "Day of Remembrance of the Victims of the Deportation of the Kalmyk People"
+msgstr ""
+
+#. AR: 2nd monday in October
+msgid "Day of Respect for Cultural Diversity"
+msgstr ""
+
+#. EE: 08-20
+msgid "Day of Restoration of Independence"
+msgstr ""
+
+#. LT: 03-11
+msgid "Day of Restoration of Independence of Lithuania"
+msgstr ""
+
+#. LT: 02-16
+msgid "Day of Restoration of the State of Lithuania"
+msgstr ""
+
+#. RU: 03-18
+msgid "Day of Sevastopol's Return to Russia"
+msgstr ""
+
+#. PL: 08-31 since 2005
+msgid "Day of Solidarity and Freedom"
+msgstr ""
+
+#. RU: orthodox 9
+msgid "Day of Special Remembrance of the Departed (Radonitsa)"
+msgstr ""
+
+#. PL: 06-12 since 2017
+msgid "Day of Struggle and Martyrdom of the Polish Villages"
+msgstr ""
+
+#. RU: 09-15
+msgid "Day of Unity of the Peoples of Dagestan"
+msgstr ""
+
+#. SI: 04-27
+msgid "Day of Uprising Against Occupation"
+msgstr ""
+
+#. PH: 04-09
+msgid "Day of Valor"
+msgstr ""
+
+#. AZ: 05-09 and if saturday,sunday then next monday
+msgid "Day of Victory over Fascism"
+msgstr ""
+
+#. VN: 04-30
+msgid "Day of liberating the South for national reunification"
+msgstr ""
+
+#. MK: 11-22
+msgid "Day of the Albanian Alphabet"
+msgstr ""
+
+#. RU: 06-24
+msgid "Day of the Chuvash Republic"
+msgstr ""
+
+#. HR: 10-08
+msgid "Day of the Croatian Parliament"
+msgstr ""
+
+#. BA: 03-08
+msgid "Day of the Establishment of the District"
+msgstr ""
+
+#. BE: 07-11
+msgid "Day of the Flemish Community"
+msgstr ""
+
+#. RU: 07-03
+msgid "Day of the Formation of the Altai Republic"
+msgstr ""
+
+#. BE: 11-15
+msgid "Day of the German-speaking Community"
+msgstr ""
+
+#. HU: 06-19
+msgid "Day of the Independent Hungary"
+msgstr ""
+
+#. MK: 10-23 and if sunday then next monday
+msgid "Day of the Macedonian Revolutionary Struggle"
+msgstr ""
+
+#. AR: 1983-04-02
+msgid "Day of the Malvinas, South Georgia and South Sandwich Islands"
+msgstr ""
+
+#. SR: 10-10
+msgid "Day of the Maroons"
+msgstr ""
+
+#. CD, EH, TG: 01-04 and if sunday then next monday
+msgid "Day of the Martyrs"
+msgstr ""
+
+#. AR: 05-25
+msgid "Day of the May Revolution"
+msgstr ""
+
+#. MK: 08-02 and if sunday then next monday
+msgid "Day of the Republic"
+msgstr ""
+
+#. RU: 03-18
+msgid "Day of the Reunification of Crimea with Russia"
+msgstr ""
+
+#. RU: 03-28
+msgid "Day of the Revival of the Balkar People"
+msgstr ""
+
+#. RU: 05-03
+msgid "Day of the Revival of the Karachay People"
+msgstr ""
+
+#. RO: Sunday before 06-01
+msgid "Day of the Romanians Everywhere, Romanian Businessperson Day"
+msgstr ""
+
+#. NO, SJ: 02-06
+msgid "Day of the Sami people"
+msgstr ""
+
+#. BO: 03-23
+msgid "Day of the Sea"
+msgstr ""
+
+#. RO: 01-24
+msgid "Day of the Unification of the Romanian Principalities"
+msgstr ""
+
+#. AR: 04-02 if tuesday,wednesday then previous monday if thursday,friday then next monday
+msgid "Day of the Veterans and the Fallen in the Malvinas War"
+msgstr ""
+
+#. MX: 12-12
+msgid "Day of the Virgin of Guadalupe"
+msgstr ""
+
+#. SK: 05-08 prior to 2026
+msgid "Day of victory over fascism"
+msgstr ""
+
+#. RU: 2022-05-03
+msgid "Day off (transferred from January 1)"
+msgstr ""
+
+#. RU: 2022-05-10
+msgid "Day off (transferred from January 2)"
+msgstr ""
+
+#. RU: 2022-06-13
+msgid "Day off (transferred from June 12)"
+msgstr ""
+
+#. RU: 2022-03-07
+msgid "Day off (transferred from March 5)"
+msgstr ""
+
+#. RU: 2022-05-02
+msgid "Day off (transferred from May 1)"
+msgstr ""
+
+#. BA: 11-21
+msgid "Dayton Agreement Day"
+msgstr ""
+
+#. IN: 08-16
+msgid "De Jure Transfer Day"
+msgstr ""
+
+#. MY: 07-07
+msgid "Declaration of George Town as World Heritage Site"
+msgstr ""
+
+#. VE: 04-19
+msgid "Declaration of Independence"
+msgstr ""
+
+#. EC: 08-10
+msgid "Declaration of Independence of Quito"
+msgstr ""
+
+#. MY: 04-15
+msgid "Declaration of Malacca City as Historical City"
+msgstr ""
+
+#. AU: 2020-04-27
+msgid "Declared public holiday"
+msgstr ""
+
+#. LR: 2nd Wednesday in March
+msgid "Decoration Day"
+msgstr ""
+
+#. GY, MY, SG, SR, TT: 2015-11-11
+msgid "Deepavali"
+msgstr ""
+
+#. LK: 11-08
+msgid "Deepavali Festival Day"
+msgstr ""
+
+#. ZW: 2nd tuesday in August
+msgid "Defence Forces Day"
+msgstr ""
+
+#. KZ, RU: 05-07 and if saturday,sunday then next monday since 2013
+msgid "Defender of the Fatherland Day"
+msgstr ""
+
+#. UA: 10-01 and if saturday, sunday then next monday since 2023
+msgid "Defenders of Ukraine Day"
+msgstr ""
+
+#. MZ: 09-25
+msgid "Defense Force’s Day"
+msgstr ""
+
+#. AX: 03-30
+msgid "Demilitarization Day"
+msgstr ""
+
+#. IR: 28 Safar
+msgid "Demise of Prophet Muhammad and Imam Hassan (Mujtaba)"
+msgstr ""
+
+#. CV, NG: 01-13
+msgid "Democracy Day"
+msgstr ""
+
+#. TR: 07-15
+msgid "Democracy and National Unity Day"
+msgstr ""
+
+#. AW: 06-24
+msgid "Dera Gai"
+msgstr ""
+
+#. ET: 05-28
+msgid "Derg Downfall Day"
+msgstr ""
+
+#. BR: 09-05
+msgid "Dia da Amazônia"
+msgstr ""
+
+#. BR: 11-20
+msgid "Dia da Consciência Negra"
+msgstr ""
+
+#. ES: 09-11
+msgid "Dia de Cataluña"
+msgstr ""
+
+#. BR: easter 8
+msgid "Dia de Nossa Senhora da Penha"
+msgstr ""
+
+#. BR: 08-11
+msgid "Dia de Santa Catarina"
+msgstr ""
+
+#. BR: 11-25
+msgid "Dia de Santa Catarina de Alexandria"
+msgstr ""
+
+#. BR: 04-23
+msgid "Dia de São Jorge"
+msgstr ""
+
+#. BR: 03-19
+msgid "Dia de São José"
+msgstr ""
+
+#. BR: 01-20
+msgid "Dia de São Sebastião"
+msgstr ""
+
+#. BR: 3rd tuesday in October
+msgid "Dia do Comércio"
+msgstr ""
+
+#. BR: 11-30
+msgid "Dia do Evangélico"
+msgstr ""
+
+#. CV: 05-19
+msgid "Dia do Município da Praia"
+msgstr ""
+
+#. BR: 10-19
+msgid "Dia do Piauí"
+msgstr ""
+
+#. BR: 01-12
+msgid "Dia do evangélico"
+msgstr ""
+
+#. VN: 05-07
+msgid "Dien Bien Phu Victory Day"
+msgstr ""
+
+#. CA, HT, KY: 06-24
+msgid "Discovery Day"
+msgstr ""
+
+#. PR: 11-19
+msgid "Discovery of Puerto Rico"
+msgstr ""
+
+#. MU: 11-01 since 2020 prior to 2050
+msgid "Divali"
+msgstr ""
+
+#. FJ: 2014-10-22
+msgid "Diwali"
+msgstr ""
+
+#. NZ: 4th monday in September
+msgid "Dominion Day"
+msgstr ""
+
+#. TW: december solstice
+msgid "Dongzhi Festival"
+msgstr ""
+
+#. TW: chinese 09-0-09
+msgid "Double Ninth Festival"
+msgstr ""
+
+#. US: 3rd monday in January
+msgid "Dr. Martin Luther King Jr./ Civil Rights Day"
+msgstr ""
+
+#. US: 3rd monday in January
+msgid "Dr. Martin Luther King Jr./Robert E. Lee's Birthdays"
+msgstr ""
+
+#. CN, TW: 2021-06-13
+msgid "Dragon Boat Festival"
+msgstr ""
+
+#. DO: 01-26 if tuesday,wednesday then previous monday if thursday,friday then next monday
+msgid "Duarte's Birthday"
+msgstr ""
+
+#. BD: 10-08
+msgid "Durga Puja"
+msgstr ""
+
+#. LK: 01-03
+msgid "Duruthu Full Moon Poya Day"
+msgstr ""
+
+#. ES: 02-28
+msgid "Día de Andalucía"
+msgstr ""
+
+#. ES: 04-23
+msgid "Día de Aragón"
+msgstr ""
+
+#. VE: 09-14
+msgid "Día de Barquisimeto"
+msgstr ""
+
+#. VE: 01-14
+msgid "Día de La Divina Pastora"
+msgstr ""
+
+#. ES: 06-09
+msgid "Día de La Rioja"
+msgstr ""
+
+#. VE: 12-07
+msgid "Día de Maturin"
+msgstr ""
+
+#. ES: 05-02 if Sunday then next Monday
+msgid "Día de la Comunidad de Madrid"
+msgstr ""
+
+#. ES, IC: 12-06
+msgid "Día de la Constitución Española"
+msgstr ""
+
+#. SV: 03-08
+msgid "Día de la Mujer"
+msgstr ""
+
+#. VE: 11-18
+msgid "Día de la Virgen de la Chinita"
+msgstr ""
+
+#. VE: 11-13
+msgid "Día de la Virgen del Socorro"
+msgstr ""
+
+#. HN: 04-14
+msgid "Día de las Américas"
+msgstr ""
+
+#. ES: 03-01
+msgid "Día de les Illes Balears"
+msgstr ""
+
+#. SV: 06-22
+msgid "Día del Maestro"
+msgstr ""
+
+#. PH: 02-25 since 2002 prior to 2024
+msgid "EDSA Revolution Anniversary"
+msgstr ""
+
+#. GB, GG, IM, JE: 1st monday in May
+msgid "Early May bank holiday"
+msgstr ""
+
+#. GB, GG, IM, JE: 2020-05-08
+msgid "Early May bank holiday (VE day)"
+msgstr ""
+
+#. TW: chinese 02-0-02
+msgid "Earth God's Birthday"
+msgstr ""
+
+#. AM: 12-07
+msgid "Earthquake Remembrance Day"
+msgstr ""
+
+#. AD, AG, AI, AT, AU, AW, AX, BA, BB, BE, BF, BG, BJ, BL, BQ, BS, BW, BZ, CA, CC, CF, CG, CH, CI, CK, CW, CY, CZ, DE, DK, DM, ES, FI, FJ, FO, FR, GA, GB, GD, GE, GF, GG, GH, GI, GL, GM, GN, GP, GR, GY, HK, HR, HU, IE, IM, IS, IT, JE, JM, KE, KN, KY, LC, LI, LS, LT, LU, LV, MC, MD, MF, MG, MK, ML, MQ, MS, MW, NA, NC, NE, NF, NG, NL, NO, NZ, PF, PL, PM, RE, RO, RS, RW, SC, SE, SH, SI, SJ, SK, SL, SM, SN, SR, SX, SZ, TC, TD, TG, TO, TT, TZ, UG, VA, VC, VG, VI, VU, WF, YT, ZM, ZW: easter 1
+msgid "Easter Monday"
+msgstr ""
+
+#. AT, AU, BW, BZ, CZ, FJ, GE, GT, PH, PL, SC, SE, SV, VA: easter -1
+msgid "Easter Saturday"
+msgstr ""
+
+#. AD, AG, AI, AO, AS, AT, AU, AW, AX, BA, BB, BE, BF, BG, BJ, BL, BQ, BR, BS, BW, BY, BZ, CH, CL, CO, CR, CV, CW, CY, CZ, DE, DK, DM, EC, EE, ES, ET, FI, FJ, FO, FR, GB, GD, GE, GG, GH, GI, GL, GM, GR, GT, GU, HN, HR, HT, HU, IC, IE, IM, IS, IT, JE, JM, KE, KN, KY, LI, LT, LU, LV, MC, MD, ME, MG, MW, NA, NG, NL, NO, NZ, PE, PH, PL, PR, PT, RO, RS, SC, SE, SH, SI, SJ, SK, SM, SR, SV, SX, SZ, TC, TT, TZ, UG, US, UY, VA, VC, VE, VG, VI, XK, ZA, ZW: easter
+msgid "Easter Sunday"
+msgstr ""
+
+#. GY: 10 Dhu al-Hijjah
+msgid "Eid Ul Adha"
+msgstr ""
+
+#. MW: 1 Shawwal and if saturday,sunday then next monday
+msgid "Eid al Fitri"
+msgstr ""
+
+#. KZ, UZ: 10 Dhu al-Hijjah
+msgid "Eid al-Adha"
+msgstr ""
+
+#. RU: 10 Dhu al-Hijjah
+msgid "Eid al-Adha (Ghurba)"
+msgstr ""
+
+#. UZ: 1 Shawwal and if saturday,sunday then next monday
+msgid "Eid al-Fitr"
+msgstr ""
+
+#. RU: 1 Shawwal
+msgid "Eid al-Fitr (Markhash)"
+msgstr ""
+
+#. IR: 18 Dhu al-Hijjah
+msgid "Eid al-Ghadeer"
+msgstr ""
+
+#. MU: 1 Shawwal
+msgid "Eid-Ul-Fitr"
+msgstr ""
+
+#. AU: 2nd monday in March
+msgid "Eight Hours Day"
+msgstr ""
+
+#. AS, BR, GU, IL, PR, US, VI: tuesday after 1st monday in November every 4 years since 1848
+msgid "Election Day"
+msgstr ""
+
+#. BR: 09-05
+msgid "Elevação do Amazonas à categoria de província"
+msgstr ""
+
+#. BB, BM, BQ, BS, BZ, DM, GD, GY, JM, KN, LC, MS, PR, SR, SX, TC, TO, TT, US, VC, VI: 08-01
+msgid "Emancipation Day"
+msgstr ""
+
+#. US: 06-19
+msgid "Emancipation Day In Texas"
+msgstr ""
+
+#. VG: 1st Monday in August
+msgid "Emancipation Monday"
+msgstr ""
+
+#. VG: Tuesday after 1st Monday in August
+msgid "Emancipation Tuesday"
+msgstr ""
+
+#. VG: Wednesday after 1st Monday in August
+msgid "Emancipation Wednesday"
+msgstr ""
+
+#. BR: 09-16
+msgid "Emancipação política"
+msgstr ""
+
+#. BR: 07-08
+msgid "Emancipação política de Sergipe"
+msgstr ""
+
+#. BR: 12-19
+msgid "Emancipação política do estado do Paraná"
+msgstr ""
+
+#. JP: 12-23 and if sunday then next monday
+msgid "Emperor's Birthday"
+msgstr ""
+
+#. AD: 06-20 since 2026 and prior to 2027
+msgid "Encamp Town Festival"
+msgstr ""
+
+#. AE, AL, AZ, BA, BD, BF, BH, BI, BJ, BN, CF, CI, CM, CX, DJ, DZ, EG, EH, ER, ES, ET, GA, GH, GN, GW, HR, ID, IR, KE, KM, LY, MA, ME, MG, MK, ML, MR, MY, NE, PH, PK, RS, RW, SA, SD, SN, SO, SR, SS, TD, TG, TN, TR, TT, TZ, UG, XK: 1 Shawwal P3D
+msgid "End of Ramadan (Eid al-Fitr)"
+msgstr ""
+
+#. JP: 2019-10-22
+msgid "Enthronement Ceremony Day"
+msgstr ""
+
+#. AD, AT, AX, BA, BE, CH, CO, CY, DE, DO, EE, ER, ES, ET, FI, GL, GR, HR, HT, IC, IS, IT, LI, MK, NL, PL, PR, RO, SE, SK, SM, UY, VA, VE: 01-06
+msgid "Epiphany"
+msgstr ""
+
+#. BB: 01-21
+msgid "Errol Barrow Day"
+msgstr ""
+
+#. LK: 07-29
+msgid "Esala Full Moon Poya Day"
+msgstr ""
+
+#. LU, PL, XK: 05-09
+msgid "Europe Day"
+msgstr ""
+
+#. EE: 08-23
+msgid "European Day of Remembrance for Victims of Stalinism and Nazism"
+msgstr ""
+
+#. US: 03-17
+msgid "Evacuation Day"
+msgstr ""
+
+#. IL: 4 Iyyar if Thursday,Friday then previous Wednesday if Sunday then next Monday
+msgid "Fallen Soldiers and Victims of Terrorism Remembrance Day (Yom HaZikaron)"
+msgstr ""
+
+#. BW, CA, MZ, NA, US, ZA: 12-26
+msgid "Family Day"
+msgstr ""
+
+#. TW: 02-04
+msgid "Farmer's Day"
+msgstr ""
+
+#. GH: 1st Friday in December since 1988
+msgid "Farmers Day"
+msgstr ""
+
+#. ZM: 1st monday in August
+msgid "Farmers' Day"
+msgstr ""
+
+#. LR: 2nd Friday in April
+msgid "Fast and Prayer Day"
+msgstr ""
+
+#. IL: 13 AdarII if Saturday then previous Thursday
+msgid "Fast of Esther"
+msgstr ""
+
+#. IL: 3 Tishrei if Saturday then next Sunday
+msgid "Fast of Gedaliah (Tzom Gedalya)"
+msgstr ""
+
+#. DK: easter -48
+msgid "Fastelavn"
+msgstr ""
+
+#. PL: Thursday before easter -46
+msgid "Fat Thursday"
+msgstr ""
+
+#. AS, AU, BO, BQ, BR, CA, CW, EE, FI, GB, GG, GI, GT, GU, HN, IE, IM, JE, LT, NF, NI, NL, NO, PL, PR, SJ, SV, TW, US, VI, ZA, ZW: 3rd sunday in June
+msgid "Father's Day"
+msgstr ""
+
+#. SM: 02-05
+msgid "Feast of Saint Agatha"
+msgstr ""
+
+#. MT: 02-10
+msgid "Feast of Saint Paul's Shipwreck in Malta"
+msgstr ""
+
+#. IN: 12-03
+msgid "Feast of St. Francis Xavier"
+msgstr ""
+
+#. IL: 15 Tishrei
+msgid "Feast of Tabernacles (Sukkot)"
+msgstr ""
+
+#. PH: 12-08
+msgid "Feast of the Immaculate Conception of the Blessed Virgin Mary"
+msgstr ""
+
+#. AE, AL, AZ, BA, BD, BF, BH, BI, BJ, BN, CF, CI, CM, CX, DJ, DZ, EG, EH, ER, ES, ET, GA, GH, GN, GW, HR, ID, IR, KE, KM, LY, MA, ME, MG, MK, ML, MR, MY, NE, PH, PK, RS, RW, SA, SD, SN, SO, SR, SS, TD, TG, TN, TR, TZ, UG, XK: 10 Dhu al-Hijjah P3D
+msgid "Feast of the Sacrifice (Eid al-Adha)"
+msgstr ""
+
+#. MA: 07-30
+msgid "Feast of the Throne"
+msgstr ""
+
+#. BO: 02-02
+msgid "Feast of the Virgin of Candelaria"
+msgstr ""
+
+#. CH: 3rd sunday after 09-01
+msgid "Federal Day of Thanksgiving, Repentance and Prayer"
+msgstr ""
+
+#. MY: 02-01
+msgid "Federal Territory Day"
+msgstr ""
+
+#. LI: easter 40
+msgid "Feiertagsbrücke"
+msgstr ""
+
+#. ER: 02-10
+msgid "Fenkil Day"
+msgstr ""
+
+#. MS: 12-31 and if Saturday then next Monday if Sunday then next Tuesday
+msgid "Festival Day"
+msgstr ""
+
+#. PE: 06-24
+msgid "Festival of the Sun"
+msgstr ""
+
+#. ES, IC: 10-12
+msgid "Fiesta Nacional de España"
+msgstr ""
+
+#. SV: 08-03
+msgid "Fiestas Agostinas"
+msgstr ""
+
+#. FJ: 10-10 and if Sunday then next Monday
+msgid "Fiji Day"
+msgstr ""
+
+#. ET: 09-27 in non-leap years
+msgid "Finding of the True Cross"
+msgstr ""
+
+#. SV: 01-16
+msgid "Firma de los Acuerdos de Paz"
+msgstr ""
+
+#. PL: 03-21
+msgid "First Day of Spring / Truant's Day"
+msgstr ""
+
+#. IS: thursday after 04-18
+msgid "First Day of Summer"
+msgstr ""
+
+#. IS: saturday after 10-21
+msgid "First Day of Winter"
+msgstr ""
+
+#. EH: 03-08
+msgid "First Martyr"
+msgstr ""
+
+#. IE: 1st monday in August
+msgid "First Monday in August"
+msgstr ""
+
+#. IE: 1st monday in June
+msgid "First Monday in June"
+msgstr ""
+
+#. IE: 1st monday in May
+msgid "First Monday in May"
+msgstr ""
+
+#. RU: 2026-11-23
+msgid "First Monday of the Uastyrdzhi (Djeorguiba) Festival"
+msgstr ""
+
+#. PH: 01-23
+msgid "First Philippine Republic Day"
+msgstr ""
+
+#. KZ: 12-01 and if saturday,sunday then next monday since 2012 and prior to 2022
+msgid "First President's Day"
+msgstr ""
+
+#. NO, SJ: 4th sunday before 12-25
+msgid "First Sunday of Advent"
+msgstr ""
+
+#. AE, BN, ET, ME, MY: 1 Ramadan
+msgid "First day of Ramadan"
+msgstr ""
+
+#. AZ, BO, CW, EC, FO, LR, PA, PL, RO, US, VE: 11-09 and if saturday,sunday then next monday
+msgid "Flag Day"
+msgstr ""
+
+#. HT: 05-18
+msgid "Flag and Universities' Day"
+msgstr ""
+
+#. AT: 05-04
+msgid "Florian"
+msgstr ""
+
+#. IN: 11-01
+msgid "Formation Day"
+msgstr ""
+
+#. JP, NF: 02-11
+msgid "Foundation Day"
+msgstr ""
+
+#. EC: 12-06
+msgid "Foundation of Quito"
+msgstr ""
+
+#. GH: 08-04 and if Saturday, Sunday then next Monday
+msgid "Founders Day"
+msgstr ""
+
+#. SA: 02-22 since 2022
+msgid "Founding Day"
+msgstr ""
+
+#. TW: 01-01 and if Saturday then previous Friday if Sunday then next Monday
+msgid "Founding of the Republic of China"
+msgstr ""
+
+#. NO, SJ: 1st sunday before 12-25
+msgid "Fourth Sunday of Advent"
+msgstr ""
+
+#. US: 1st monday in October
+msgid "Frances Xavier Cabrini Day"
+msgstr ""
+
+#. MT, ZA: 03-31
+msgid "Freedom Day"
+msgstr ""
+
+#. TD: 12-01 and if sunday then next monday
+msgid "Freedom and Democracy Day"
+msgstr ""
+
+#. BE: 09-27
+msgid "French Community Holiday"
+msgstr ""
+
+#. MK: orthodox 47
+msgid "Friday before Pentecost"
+msgstr ""
+
+#. BR: 07-26
+msgid "Fundação da Cidade de Goiás"
+msgstr ""
+
+#. BR: 04-21
+msgid "Fundação de Brasília"
+msgstr ""
+
+#. CG: 06-10
+msgid "Fête de la commémoration de la conférence nationale souveraine"
+msgstr ""
+
+#. IN: 10-02
+msgid "Gandhi Jayanti"
+msgstr ""
+
+#. MU: 09-01 since 2020 prior to 2050
+msgid "Ganesh Chaturthi"
+msgstr ""
+
+#. BZ: 11-19 if sunday then next monday
+msgid "Garifuna Settlement Day"
+msgstr ""
+
+#. MY: 06-01
+msgid "Gawai Dayak"
+msgstr ""
+
+#. ER: 09-11 in non-leap years
+msgid "Geez New Year"
+msgstr ""
+
+#. US: tuesday after 1st monday in November in even years
+msgid "General Election Day"
+msgstr ""
+
+#. CF: 06-30
+msgid "General Prayer Day"
+msgstr ""
+
+#. CH: thursday after 1st sunday after 09-01
+msgid "Genfer Bettag"
+msgstr ""
+
+#. RW: 04-07
+msgid "Genocide Memorial Day"
+msgstr ""
+
+#. BD: 03-25
+msgid "Genocide Remembrance Day"
+msgstr ""
+
+#. BZ: 01-15 if sunday then next monday
+msgid "George Price Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "George Washington Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "George Washington's Birthday/Daisy Gatson Bates Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "George Washington/Thomas Jefferson Birthday"
+msgstr ""
+
+#. CR: 04-11
+msgid "Gesta Heroica de Juan Santamaría"
+msgstr ""
+
+#. TW, VN: chinese 07-0-15
+msgid "Ghost Festival"
+msgstr ""
+
+#. GI: 09-10
+msgid "Gibraltar National Day"
+msgstr ""
+
+#. IN: 12-19
+msgid "Goa Liberation Day"
+msgstr ""
+
+#. TW: chinese 03-0-15
+msgid "God of Medicine's Birthday"
+msgstr ""
+
+#. CA: 3rd friday after 08-01
+msgid "Gold Cup Parade Day"
+msgstr ""
+
+#. AD, AG, AI, AO, AR, AT, AU, AW, AX, BB, BG, BL, BM, BO, BQ, BR, BS, BW, BZ, CA, CH, CK, CL, CM, CO, CR, CU, CV, CW, CX, CY, CZ, DE, DK, DM, DO, EC, EE, ES, ET, FI, FJ, FO, FR, GB, GD, GE, GG, GH, GI, GL, GM, GP, GQ, GR, GT, GU, GY, HK, HN, HT, HU, IC, ID, IE, IM, IN, IS, JE, JM, KE, KN, KY, LC, LI, LK, LS, LU, LV, MC, ME, MQ, MS, MT, MW, MX, MY, NA, NF, NG, NI, NL, NO, NZ, PA, PE, PF, PH, PL, PT, PY, RO, RS, RW, SC, SE, SG, SH, SJ, SK, SL, SR, SV, SX, SZ, TC, TO, TT, TZ, UG, US, UY, VA, VC, VE, VG, VI, VU, ZA, ZM, ZW: easter -2
+msgid "Good Friday"
+msgstr ""
+
+#. PL: 01-22
+msgid "Grandfather's Day"
+msgstr ""
+
+#. PL: 01-21
+msgid "Grandmother's Day"
+msgstr ""
+
+#. EE: 2nd sunday in September
+msgid "Grandparents Day"
+msgstr ""
+
+#. BG: 03-01
+msgid "Granny March Day"
+msgstr ""
+
+#. FO: easter 26
+msgid "Great Prayer Day"
+msgstr ""
+
+#. PL: 12-27 since 2021
+msgid "Greater Poland Uprising Remebrence Day"
+msgstr ""
+
+#. JP: 04-29 and if sunday then next monday #1
+msgid "Greenery Day"
+msgstr ""
+
+#. CA: 02-02
+msgid "Groundhog Day"
+msgstr ""
+
+#. GU: 1st monday in March
+msgid "Guam History and Chamorro Heritage Day"
+msgstr ""
+
+#. CR: 07-25
+msgid "Guanacaste Day"
+msgstr ""
+
+#. IN: 05-01
+msgid "Gujarat Day"
+msgstr ""
+
+#. IN: 12-18
+msgid "Guru Ghasidas Jayanti"
+msgstr ""
+
+#. IN: 01-05
+msgid "Guru Gobind Singh Jayanti"
+msgstr ""
+
+#. SE: 11-06
+msgid "Gustavus Adolphus Day"
+msgstr ""
+
+#. MC: 11-19 and if sunday then next monday
+msgid "H.S.H. the Sovereign Prince's Day"
+msgstr ""
+
+#. AS, CA, GU, NL, PR, SE, US, VI: 10-31 18:00
+msgid "Halloween"
+msgstr ""
+
+#. KR: 10-09
+msgid "Hangul Day"
+msgstr ""
+
+#. IL: 25 Kislev P8D
+msgid "Hanukkah"
+msgstr ""
+
+#. MY: 05-22
+msgid "Hari Hol of Pahang"
+msgstr ""
+
+#. MY: 6 Safar
+msgid "Hari Hol of Sultan Iskandar of Johor"
+msgstr ""
+
+#. CC: 12 Rabi al-awwal and if sunday then next monday
+msgid "Hari Maulaud Nabi"
+msgstr ""
+
+#. CC, SG: 10 Dhu al-Hijjah and if sunday then next monday
+msgid "Hari Raya Haji"
+msgstr ""
+
+#. CC, SG: 1 Shawwal and if sunday then next monday
+msgid "Hari Raya Puasa"
+msgstr ""
+
+#. US: 05-23
+msgid "Harvey Milk Day"
+msgstr ""
+
+#. CA, ZA: 1st monday in August
+msgid "Heritage Day"
+msgstr ""
+
+#. GW, RW: 01-20
+msgid "Heroes Day"
+msgstr ""
+
+#. CV, NA, PY, ZM, ZW: 01-20
+msgid "Heroes' Day"
+msgstr ""
+
+#. MZ: 02-03
+msgid "Heroes’ Day"
+msgstr ""
+
+#. VG: 2021-10-18
+msgid "Heroes’ and Forefathers Day"
+msgstr ""
+
+#. IL: 10 Iyyar if Saturday then next Sunday since 2004
+msgid "Herzl Day"
+msgstr ""
+
+#. IN: 04-15
+msgid "Himachal Day"
+msgstr ""
+
+#. SR: 2019-03-21
+msgid "Holi Phagwa"
+msgstr ""
+
+#. RS: 04-22
+msgid "Holocaust Remembrance Day"
+msgstr ""
+
+#. IL: 27 Nisan if Friday then previous Thursday if Sunday then next Monday
+msgid "Holocaust Remembrance Day (Yom HaShoah)"
+msgstr ""
+
+#. VE: easter -6 P7D
+msgid "Holy Week"
+msgstr ""
+
+#. IR: 2 Shawwal
+msgid "Holyday for Fetr Eeid"
+msgstr ""
+
+#. GB: 12-15
+msgid "Homecoming Day"
+msgstr ""
+
+#. BR: 07-26
+msgid "Homenagem à memória do ex-presidente João Pessoa"
+msgstr ""
+
+#. HK: 07-01 not on Sunday
+msgid "Hong Kong Special Administrative Region Establishment Day"
+msgstr ""
+
+#. NA, ZA: 12-10
+msgid "Human Rights Day"
+msgstr ""
+
+#. VN: vietnamese 3-0-10
+msgid "Hung Kings Commemorations"
+msgstr ""
+
+#. VI: 4th Monday in July
+msgid "Hurricane Supplication Day"
+msgstr ""
+
+#. VI: 10-25
+msgid "Hurricane Thanksgiving"
+msgstr ""
+
+#. IN: 09-17
+msgid "Hyderabad-Karnataka Liberation Day"
+msgstr ""
+
+#. IS: 11-16
+msgid "Icelandic Language Day"
+msgstr ""
+
+#. IS: 06-17
+msgid "Icelandic National Day"
+msgstr ""
+
+#. NG: 1 Shawwal P2D
+msgid "Id el Fitr"
+msgstr ""
+
+#. NG: 10 Dhu al-Hijjah P2D
+msgid "Id el Kabir"
+msgstr ""
+
+#. LK: 05-28
+msgid "Id-Ul-Alha (Hadji Festival Day)"
+msgstr ""
+
+#. LK: 03-21
+msgid "Id-Ul-Fitr (Ramazan Festival Day)"
+msgstr ""
+
+#. PH: 07-27
+msgid "Iglesia ni Cristo Day"
+msgstr ""
+
+#. LK: 11-24
+msgid "Il Full Moon Poya Day"
+msgstr ""
+
+#. IR: 14 Khordad
+msgid "Imam Khomeini's Demise"
+msgstr ""
+
+#. AD, AT, BR, CH, CL, CO, ES, GQ, GT, IC, IT, LI, MC, MT, NI, PE, PT, SC, SM, VA, VE: 12-08
+msgid "Immaculate Conception"
+msgstr ""
+
+#. AR: 12-08
+msgid "Immaculate Conception of Mary"
+msgstr ""
+
+#. PT: 10-05
+msgid "Implantação da República"
+msgstr ""
+
+#. VA: easter 2
+msgid "In Albis Tuesday"
+msgstr ""
+
+#. SM: 04-01
+msgid "Inauguration Ceremony"
+msgstr ""
+
+#. SZ: 12-28 P6D
+msgid "Incwala Festival"
+msgstr ""
+
+#. AG, AL, AM, AO, AR, AS, AX, AZ, BA, BB, BF, BG, BI, BO, BR, BS, BY, BZ, CD, CF, CI, CO, CR, CU, CV, DJ, DM, DO, DZ, EE, EH, ER, FI, GA, GD, GE, GH, GM, GN, GQ, GT, GU, GW, GY, HN, HR, HT, ID, IN, JM, KM, KN, KZ, LC, LR, LS, LY, MA, MD, ME, MG, MK, ML, MR, MT, MW, MX, MY, MZ, NA, NE, NG, NI, PA, PE, PH, PK, PL, PR, PY, RW, SC, SD, SL, SO, SR, SS, ST, SV, SZ, TD, TG, TT, TZ, UA, UG, US, UY, UZ, VC, VE, VI, VU, XK, ZM, ZW: 11-01 if saturday,sunday then next monday
+msgid "Independence Day"
+msgstr ""
+
+#. IL: 5 Iyyar if Friday,Saturday then previous Thursday if Monday then next Tuesday
+msgid "Independence Day (Yom HaAtzmaut)"
+msgstr ""
+
+#. BO: substitutes 08-06 if sunday then next monday
+msgid "Independence Day (substitutes)"
+msgstr ""
+
+#. KR: 03-01
+msgid "Independence Movement Day"
+msgstr ""
+
+#. SI: 12-26
+msgid "Independence and Unity Day"
+msgstr ""
+
+#. SO: 06-26
+msgid "Independence of British Somaliland"
+msgstr ""
+
+#. CO: monday after 11-11
+msgid "Independence of Cartagena"
+msgstr ""
+
+#. EC: 11-03
+msgid "Independence of Cuenca"
+msgstr ""
+
+#. EC: 09-10
+msgid "Independence of Guayaquil"
+msgstr ""
+
+#. CZ: 10-28
+msgid "Independent Czechoslovak State Day"
+msgstr ""
+
+#. BR: 07-02
+msgid "Independência da Bahia"
+msgstr ""
+
+#. TT: 05-30 and if Sunday then next Monday
+msgid "Indian Arrival Day"
+msgstr ""
+
+#. IN: 12-01
+msgid "Indigenous Faith Day"
+msgstr ""
+
+#. CL, SR: 06-21 since 2021 prior to 2022
+msgid "Indigenous People's Day"
+msgstr ""
+
+#. US: 08-09
+msgid "Indigenous Peoples' Day"
+msgstr ""
+
+#. BZ: 10-12 if friday,saturday,sunday then next monday if tuesday,wednesday,thursday then previous monday
+msgid "Indigenous People’s Resistance Day"
+msgstr ""
+
+#. NI: 10-12
+msgid "Indigenous Resistance Day"
+msgstr ""
+
+#. PF: 06-29
+msgid "Internal Autonomy Day"
+msgstr ""
+
+#. DE, VN: 09-20
+msgid "International Children's Day"
+msgstr ""
+
+#. MK: 09-28
+msgid "International Day of Bosniaks"
+msgstr ""
+
+#. PL: 04-22
+msgid "International Mother Earth Day"
+msgstr ""
+
+#. MK: 04-08
+msgid "International Roma Day"
+msgstr ""
+
+#. AZ: 12-31 and if saturday,sunday then next monday
+msgid "International Solidarity Day of Azerbaijanis"
+msgstr ""
+
+#. AO: 03-08
+msgid "International Woman's Day"
+msgstr ""
+
+#. AM, AZ, BF, BG, BJ, BY, CN, DE, ER, GE, GT, GW, HR, HU, KZ, MD, MG, NL, NO, PL, RU, SI, SJ, SL, SS, TW, UA, UG, UZ, VN: 03-08
+msgid "International Women's Day"
+msgstr ""
+
+#. PK: 11-09
+msgid "Iqbal Day"
+msgstr ""
+
+#. BE: 05-08
+msgid "Iris Festival"
+msgstr ""
+
+#. AE, BA, BH, BN, CC, DJ, DZ, EG, EH, ID, KM, LY, MA, ME, MR, MY, NE, NG, PH, SD, SO, TN: 1 Muharram
+msgid "Islamic New Year"
+msgstr ""
+
+#. IR: 12 Farvardin
+msgid "Islamic Republic Day"
+msgstr ""
+
+#. CA: 3rd monday after 02-01
+msgid "Islander Day"
+msgstr ""
+
+#. AG: 08-01
+msgid "J'Ouvert Morning"
+msgstr ""
+
+#. LR: 03-15
+msgid "J. J. Robert's Day"
+msgstr ""
+
+#. IL: 29 Tamuz if Saturday then next Sunday
+msgid "Jabotinsky Day"
+msgstr ""
+
+#. CH: 03-01
+msgid "Jahrestag Ausrufung der Republik"
+msgstr ""
+
+#. AI: 03-02
+msgid "James Ronald Webster Day"
+msgstr ""
+
+#. KE: 12-12 and if sunday then next monday
+msgid "Jamhuri Day"
+msgstr ""
+
+#. CZ: 07-06
+msgid "Jan Hus Day"
+msgstr ""
+
+#. GB, JP: 01-02
+msgid "January 2nd"
+msgstr ""
+
+#. JP: 01-03
+msgid "January 3rd"
+msgstr ""
+
+#. US: 1st monday in June
+msgid "Jefferson Davis' birthday"
+msgstr ""
+
+#. IL: 28 Iyyar
+msgid "Jerusalem Day (Yom Yerushalayim)"
+msgstr ""
+
+#. MW: 01-15 and if saturday,sunday then next monday
+msgid "John Chilembwe Day"
+msgstr ""
+
+#. PH: 2011-06-19
+msgid "José Rizal's birthday"
+msgstr ""
+
+#. NC: 01-01
+msgid "Jour de l'an"
+msgstr ""
+
+#. TW: 09-01
+msgid "Journalist' Day"
+msgstr ""
+
+#. CG: 11-28
+msgid "Journée nationale de la République"
+msgstr ""
+
+#. MT: 06-07
+msgid "June 7th"
+msgstr ""
+
+#. AS, GU, PR, US, VI: 06-19 and if sunday then next monday if saturday then previous friday since 2021
+msgid "Juneteenth"
+msgstr ""
+
+#. CH: 06-23
+msgid "Jura Plebiscite"
+msgstr ""
+
+#. BB: 1st monday in August
+msgid "Kadooment Day"
+msgstr ""
+
+#. US: 06-11 and if saturday then previous friday if sunday then next monday
+msgid "Kamehameha Day"
+msgstr ""
+
+#. MW: 05-14 and if saturday,sunday then next monday
+msgid "Kamuzu Day"
+msgstr ""
+
+#. IN: 11-08
+msgid "Kanakadasa Jayanti"
+msgstr ""
+
+#. IN: 11-01
+msgid "Karnataka Formation Day"
+msgstr ""
+
+#. TZ: 04-07
+msgid "Karume Day"
+msgstr ""
+
+#. PK: 02-05
+msgid "Kashmir Day"
+msgstr ""
+
+#. ZM: 04-28 since 2022 and if sunday then next monday
+msgid "Kenneth Kaunda Day"
+msgstr ""
+
+#. IN: 11-01
+msgid "Kerala Formation Day"
+msgstr ""
+
+#. NL: 07-01
+msgid "Ketikoti – Abolition of slavery"
+msgstr ""
+
+#. TH: 10-13
+msgid "King Bhumibol Adulyadej Memorial Day"
+msgstr ""
+
+#. TH: 12-05
+msgid "King Bhumibol Adulyadej's Birthday"
+msgstr ""
+
+#. GB, GG, GI, IM, JE: 2023-05-08
+msgid "King Charles III's Coronation"
+msgstr ""
+
+#. TH: 10-23
+msgid "King Chulalongkorn Day"
+msgstr ""
+
+#. LS: 07-17
+msgid "King Letsie III's Birthday"
+msgstr ""
+
+#. AU, NF, NZ, TH: 2nd monday in June #1
+msgid "King's Birthday"
+msgstr ""
+
+#. NL, SX: 04-27 if sunday then previous saturday since 2014
+msgid "King's Day"
+msgstr ""
+
+#. BE: 11-15
+msgid "King's Feast"
+msgstr ""
+
+#. BQ, NL: 12-15
+msgid "Kingdom Day"
+msgstr ""
+
+#. AW, BQ, CW: 04-27
+msgid "Kings Day"
+msgstr ""
+
+#. GD: 09-01
+msgid "Kirani Day"
+msgstr ""
+
+#. VN: vietnamese 12-0-23
+msgid "Kitchen guardians"
+msgstr ""
+
+#. CH: monday after 2nd saturday in September 13:00
+msgid "Knabenschiessen"
+msgstr ""
+
+#. AM: 09-01
+msgid "Knowledge, Literacy and Education Day"
+msgstr ""
+
+#. US: 08-24
+msgid "Kobe Bryant Day"
+msgstr ""
+
+#. KR: substitutes 2030-02-03 if Sunday then next Tuesday
+msgid "Korean New Year"
+msgstr ""
+
+#. KR: substitutes 2036-10-03 if Friday then next Monday #1
+msgid "Korean Thanksgiving"
+msgstr ""
+
+#. GM, SL: 1 Shawwal
+msgid "Korité"
+msgstr ""
+
+#. BD: 08-24
+msgid "Krishna Janmashtami"
+msgstr ""
+
+#. TW: chinese 05-0-13
+msgid "Kuan Kung's Birthday"
+msgstr ""
+
+#. TW: chinese 02-0-19
+msgid "Kuan Yin's Birthday"
+msgstr ""
+
+#. RU: 10 Dhu al-Hijjah
+msgid "Kurban-Bayram"
+msgstr ""
+
+#. GH: 09-21 and if Saturday, Sunday then next Monday
+msgid "Kwame Nkrumah Memorial Day"
+msgstr ""
+
+#. ES, IC: 09-07
+msgid "La Bajada de la Virgen del Socorro"
+msgstr ""
+
+#. BO: 07-16
+msgid "La Paz Day"
+msgstr ""
+
+#. BO: substitutes 07-16 if sunday then next monday
+msgid "La Paz Day (substitutes)"
+msgstr ""
+
+#. JP: 11-23
+msgid "Labor Thanksgiving Day"
+msgstr ""
+
+#. AD, AG, AI, AL, AM, AO, AR, AS, AU, AW, AX, BA, BE, BF, BG, BH, BI, BJ, BL, BM, BO, BQ, BR, BW, BY, BZ, CA, CC, CD, CF, CG, CH, CI, CL, CM, CN, CO, CR, CU, CV, CW, CX, CY, CZ, DE, DJ, DK, DM, DO, DZ, EC, EE, EG, ER, ES, FI, FR, GA, GD, GF, GH, GM, GN, GP, GQ, GR, GT, GU, GW, GY, HK, HN, HR, HT, HU, IC, ID, IN, IS, IT, JM, KE, KM, KN, LC, LI, LT, LU, LV, LY, MA, MC, MD, ME, MF, MG, MK, ML, MQ, MR, MS, MT, MU, MW, MX, MY, NC, NE, NI, NL, NO, NZ, PA, PE, PF, PH, PK, PL, PM, PR, PT, PY, RE, RO, RS, RW, SC, SE, SG, SI, SJ, SK, SM, SN, SO, SR, ST, SV, SX, SZ, TD, TG, TN, TT, TW, TZ, UA, UG, US, UY, VC, VE, VI, VN, VU, WF, XK, YT, ZM, ZW: 05-01
+msgid "Labour Day"
+msgstr ""
+
+#. BO: substitutes 05-01 if sunday then next monday
+msgid "Labour Day (substitutes)"
+msgstr ""
+
+#. LK: 05-01
+msgid "Labour Day and Vesak Full Moon Poya Day"
+msgstr ""
+
+#. TR: 05-01
+msgid "Labour and Solidarity Day"
+msgstr ""
+
+#. BL, FR: easter -21
+msgid "Laetare Sunday"
+msgstr ""
+
+#. IL: 18 Iyyar
+msgid "Lag BaOmer"
+msgstr ""
+
+#. GM: 23 Ramadan
+msgid "Lailat al-Qadr"
+msgstr ""
+
+#. UY: 04-19 if tuesday,wednesday then previous monday if thursday,friday then next monday
+msgid "Landing of the 33 Orientals"
+msgstr ""
+
+#. PH, TW, VN: chinese 01-0-15
+msgid "Lantern Festival"
+msgstr ""
+
+#. BR: 10-24
+msgid "Lançamento da pedra fundamental de Goiânia"
+msgstr ""
+
+#. PH: 04-27
+msgid "Lapu-Lapu Day"
+msgstr ""
+
+#. AG: 08-02
+msgid "Last Lap"
+msgstr ""
+
+#. IE: 1st Monday before 11-01
+msgid "Last Monday in October"
+msgstr ""
+
+#. GI: monday before September
+msgid "Late Summer Bank Holiday"
+msgstr ""
+
+#. ME: 15 Shaban
+msgid "Laylat al-Bara'at"
+msgstr ""
+
+#. AE, BN, DJ, ID, KM, ME, MY, SO: 27 Rajab
+msgid "Laylat al-Mi'raj"
+msgstr ""
+
+#. CI, GN, ME, NE: 27 Ramadan
+msgid "Laylat al-Qadr"
+msgstr ""
+
+#. AL: 03-02
+msgid "League of Lezhë day"
+msgstr ""
+
+#. US: friday before 3rd monday in January prior to 2021
+msgid "Lee–Jackson Day"
+msgstr ""
+
+#. AT: 11-15
+msgid "Leopoldi-Tag"
+msgstr ""
+
+#. AL, AO, BG, CD, CZ, GG, GU, JE, KR, LY, NL, NO, RW, SJ, TG, UG: 11-29 and if saturday,sunday then next monday
+msgid "Liberation Day"
+msgstr ""
+
+#. DE: 2020-05-08
+msgid "Liberation Day (75th Anniversary)"
+msgstr ""
+
+#. DE: 2025-05-08
+msgid "Liberation Day (80th Anniversary)"
+msgstr ""
+
+#. SM: 07-28
+msgid "Liberation from Fascism"
+msgstr ""
+
+#. IT: 04-25
+msgid "Liberation from Nazi-Fascism (1945)"
+msgstr ""
+
+#. PT: 04-25
+msgid "Liberty Day"
+msgstr ""
+
+#. US: 02-12
+msgid "Lincoln's Birthday"
+msgstr ""
+
+#. US: 4th friday in November
+msgid "Lincoln's Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Lincoln's and Washington's Birthday"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Lincoln/Washington Presidents' Day"
+msgstr ""
+
+#. TW: 05-04
+msgid "Literary Day"
+msgstr ""
+
+#. CA: 3rd monday after 02-01
+msgid "Louis Riel Day"
+msgstr ""
+
+#. BR: 06-12
+msgid "Lovers' Day"
+msgstr ""
+
+#. HK: chinese 01-0-01 not on Sunday
+msgid "Lunar New Year’s Day"
+msgstr ""
+
+#. HT: easter -48 14:00
+msgid "Lundi Gras"
+msgstr ""
+
+#. MZ: 09-07
+msgid "Lusaka Peace Agreement"
+msgstr ""
+
+#. US: 08-27
+msgid "Lyndon Baines Johnson Day"
+msgstr ""
+
+#. NG: 06-12 prior to 2018
+msgid "M.K.O Abiola Day"
+msgstr ""
+
+#. IN: 07-06
+msgid "MHIP Day"
+msgstr ""
+
+#. IR: 27 Rajab
+msgid "Mabaas of Muhammad"
+msgstr ""
+
+#. KE: 06-01 and if sunday then next monday
+msgid "Madaraka Day"
+msgstr ""
+
+#. LK: 03-02
+msgid "Madin Full Moon Poya Day"
+msgstr ""
+
+#. MU: 03-01 since 2020 prior to 2050
+msgid "Maha Shivaratree"
+msgstr ""
+
+#. IN: 09-22
+msgid "Maharaja Agrasen Jayanti"
+msgstr ""
+
+#. IN: 05-09
+msgid "Maharana Pratap Jayanti"
+msgstr ""
+
+#. IN: 05-01
+msgid "Maharashtra Day"
+msgstr ""
+
+#. IN: 10-07
+msgid "Maharishi Valmiki Jayanti"
+msgstr ""
+
+#. LK: 02-15
+msgid "Mahasivarathri Day"
+msgstr ""
+
+#. BS: 01-10 and if saturday,sunday then next monday
+msgid "Majority Rule Day"
+msgstr ""
+
+#. TH: 2015-03-04
+msgid "Makha Bucha"
+msgstr ""
+
+#. MY: 09-16
+msgid "Malaysia Day"
+msgstr ""
+
+#. US: 05-19
+msgid "Malcolm X Day"
+msgstr ""
+
+#. CK: 06-15 and if Saturday, Sunday then next Monday
+msgid "Mangaia Gospel Day"
+msgstr ""
+
+#. CK: 08-08 and if Saturday, Sunday then next Monday
+msgid "Manihiki Gospel Day"
+msgstr ""
+
+#. AS: 07-16
+msgid "Manu'a Cession Day"
+msgstr ""
+
+#. KM: 11-12
+msgid "Maore Day"
+msgstr ""
+
+#. PF: 11-20
+msgid "Maori New Year"
+msgstr ""
+
+#. HT, US: easter -47
+msgid "Mardi Gras"
+msgstr ""
+
+#. GT: 02-20
+msgid "Marimba Day"
+msgstr ""
+
+#. JP: 07-20
+msgid "Marine Day"
+msgstr ""
+
+#. LI: 09-08
+msgid "Mariä Geburt"
+msgstr ""
+
+#. JP: 1959-04-10
+msgid "Marriage of Crown Prince Akihito"
+msgstr ""
+
+#. JP: 1993-06-09
+msgid "Marriage of Crown Prince Naruhito"
+msgstr ""
+
+#. AS, GU, PR, US, VI: 3rd monday in January
+msgid "Martin Luther King Jr. Day"
+msgstr ""
+
+#. US: 3rd monday in January
+msgid "Martin Luther King's and Robert E. Lee's Birthdays"
+msgstr ""
+
+#. US: 3rd monday in January
+msgid "Martin Luther King, Jr./ Civil Rights Day"
+msgstr ""
+
+#. US: 3rd monday in January
+msgid "Martin Luther King, Jr./ Idaho Human Rights Day"
+msgstr ""
+
+#. AT: 11-11
+msgid "Martinstag"
+msgstr ""
+
+#. UG: 06-03
+msgid "Martyr's Day"
+msgstr ""
+
+#. IN: 07-31
+msgid "Martyrdom Day of Shaheed Udham Singh"
+msgstr ""
+
+#. IR: 3 Jumada al-thani
+msgid "Martyrdom of Fatima-Zahara"
+msgstr ""
+
+#. IR: 21 Ramadan
+msgid "Martyrdom of Imam Ali"
+msgstr ""
+
+#. IR: 8 Rabi al-awwal
+msgid "Martyrdom of Imam Hassan"
+msgstr ""
+
+#. IR: 25 Shawwal
+msgid "Martyrdom of Imam Jafar"
+msgstr ""
+
+#. IR: 30 Safar
+msgid "Martyrdom of Imam Reza"
+msgstr ""
+
+#. BD: 12-14
+msgid "Martyred Intellectuals Day"
+msgstr ""
+
+#. SS: 07-30
+msgid "Martyrs Day"
+msgstr ""
+
+#. AZ, ER, LY, MG, ML, MW, PA, ST: 01-20
+msgid "Martyrs' Day"
+msgstr ""
+
+#. KE: 10-20 and if sunday then next monday
+msgid "Mashujaa Day"
+msgstr ""
+
+#. NZ: 2041-07-19
+msgid "Matariki"
+msgstr ""
+
+#. TW: chinese 03-0-23
+msgid "Matsu's Birthday"
+msgstr ""
+
+#. TZ: 12 Rabi al-awwal
+msgid "Maulid Day"
+msgstr ""
+
+#. AD, AR, BO, CH, CO, CR, CZ, DE, DK, EC, ES, FO, GL, GT, HN, IC, IS, MX, NI, NL, NO, PE, PH, PL, PY, SE, SJ, SV, UY, VA, VE, VI: easter -3 14:00
+msgid "Maundy Thursday"
+msgstr ""
+
+#. CH: 09-22
+msgid "Mauritiustag"
+msgstr ""
+
+#. SL: 12 Rabi al-awwal and if Sunday then next Monday
+msgid "Mawlid"
+msgstr ""
+
+#. EH: 05-10
+msgid "May 20 Revolution"
+msgstr ""
+
+#. AU, BB, GI: 1st monday in May
+msgid "May Day"
+msgstr ""
+
+#. IN: 01-31
+msgid "Me-Dam-Me-Phi"
+msgstr ""
+
+#. MY: 08-24
+msgid "Melaka State Governor's Birthday"
+msgstr ""
+
+#. AU: 1st tuesday in November
+msgid "Melbourne Cup"
+msgstr ""
+
+#. AS, CA, DE, GU, KR, MD, PR, US, VI: monday before 06-01
+msgid "Memorial Day"
+msgstr ""
+
+#. HU: 10-06
+msgid "Memorial Day for the Martyrs of Arad"
+msgstr ""
+
+#. HU: 02-25
+msgid "Memorial Day for the Victims of the Communist Dictatorships"
+msgstr ""
+
+#. HU: 04-16
+msgid "Memorial Day for the Victims of the Holocaust"
+msgstr ""
+
+#. HU: 02-01
+msgid "Memorial Day of the Republic"
+msgstr ""
+
+#. PL: 03-10
+msgid "Men's Day"
+msgstr ""
+
+#. ER: 09-27 in non-leap years
+msgid "Meskel"
+msgstr ""
+
+#. CN, PH, TW, VN: chinese 08-0-15
+msgid "Mid-Autumn Festival"
+msgstr ""
+
+#. VN: vietnamese 5-0-5
+msgid "Mid-year Festival"
+msgstr ""
+
+#. NO, SJ: 06-23
+msgid "Midsummar Eve"
+msgstr ""
+
+#. LV: 06-24
+msgid "Midsummer"
+msgstr ""
+
+#. AX, EE, FI, SE: saturday after 06-20
+msgid "Midsummer Day"
+msgstr ""
+
+#. AX, FI, LV, SE: friday after 06-19
+msgid "Midsummer Eve"
+msgstr ""
+
+#. LK: 08-26
+msgid "Milad-Un-Nabi (Holy Prophet's Birthday)"
+msgstr ""
+
+#. IL: 21 Nisan
+msgid "Mimouna, Seventh day of Passover"
+msgstr ""
+
+#. PF: 03-05
+msgid "Missionary Day"
+msgstr ""
+
+#. CK: 07-21 and if Saturday, Sunday then next Monday
+msgid "Mitiaro Gospel Day"
+msgstr ""
+
+#. KE: 10-10 and if sunday then next monday
+msgid "Moi Day"
+msgstr ""
+
+#. CH: monday after 3rd sunday in September
+msgid "Monday after Federal Day of Thanksgiving, Repentance and Prayer"
+msgstr ""
+
+#. BR: 11-20
+msgid "Morte de Zumbi dos Palmares"
+msgstr ""
+
+#. LS: 03-11
+msgid "Moshoeshoe Day"
+msgstr ""
+
+#. AM: 02-21
+msgid "Mother Language Day"
+msgstr ""
+
+#. AL: 10-19 and if saturday,sunday then next monday
+msgid "Mother Teresa Day"
+msgstr ""
+
+#. AL, AM, AO, AS, AT, AU, BE, BL, BO, BQ, BR, BS, BW, CA, CH, CR, CW, CY, CZ, DE, DK, EE, ES, FI, FR, GB, GE, GF, GG, GI, GP, GR, GT, GU, HN, HR, HU, IC, IE, IM, IS, IT, JE, LI, LT, LV, MF, MQ, MW, MX, MZ, NC, NF, NI, NL, NO, PA, PF, PL, PM, PR, PT, RE, RO, SE, SJ, SK, SM, SS, SV, TW, US, VI, WF, YT, ZA, ZW: 03-08
+msgid "Mother's Day"
+msgstr ""
+
+#. AM: 04-07
+msgid "Motherhood and Beauty Day"
+msgstr ""
+
+#. JP: substitutes 08-11 and if sunday then next monday
+msgid "Mountain Day"
+msgstr ""
+
+#. BR: 10-03
+msgid "Mártires de Cunhaú e Uruaçu"
+msgstr ""
+
+#. RU: 2024-07-19
+msgid "Naadym"
+msgstr ""
+
+#. TZ: 08-08
+msgid "Nane Nane Day"
+msgstr ""
+
+#. CA: 1st monday in August
+msgid "Natal Day"
+msgstr ""
+
+#. VE: 05-28
+msgid "Natalicio de Jacinto Lara"
+msgstr ""
+
+#. VE: 11-14
+msgid "Natalicio de José Antonio Anzoátegui"
+msgstr ""
+
+#. VE: 10-24
+msgid "Natalicio de Rafael Urdaneta"
+msgstr ""
+
+#. RO: 07-29
+msgid "National Anthem Day"
+msgstr ""
+
+#. AW: 03-18 and if saturday then previous friday if sunday then next monday
+msgid "National Anthem and Flag Day"
+msgstr ""
+
+#. AR: 1980-10-22
+msgid "National Census 1980"
+msgstr ""
+
+#. AR: 1991-05-15
+msgid "National Census 1991"
+msgstr ""
+
+#. AR: 2001-11-17
+msgid "National Census 2001"
+msgstr ""
+
+#. AR: 2010-10-27
+msgid "National Census 2010"
+msgstr ""
+
+#. AR: 2022-05-18
+msgid "National Census 2022"
+msgstr ""
+
+#. PL: 03-01 since 2011
+msgid "National Cursed Soldiers Remembrance Day"
+msgstr ""
+
+#. AE, BH, BJ, BN, CM, CN, CV, GL, HK, HR, HU, LC, LK, MU, SA, SE, SG, VN: 12-02
+msgid "National Day"
+msgstr ""
+
+#. TW: 10-10 and if Sunday then next Monday
+msgid "National Day / Double Tenth Day"
+msgstr ""
+
+#. IT: 2011-03-17
+msgid "National Day 2011"
+msgstr ""
+
+#. CA: 09-30 since 2021
+msgid "National Day for Truth and Reconciliation"
+msgstr ""
+
+#. PL: 03-24 since 2018
+msgid "National Day for the Remembrance of Poles Rescuing Jews under German Occupation"
+msgstr ""
+
+#. MK: 05-23
+msgid "National Day of Authorities"
+msgstr ""
+
+#. DM: 11-04 if sunday then next monday if monday then next tuesday
+msgid "National Day of Community Service"
+msgstr ""
+
+#. AU, NF, NZ: 2022-09-22
+msgid "National Day of Mourning for Queen Elizabeth II"
+msgstr ""
+
+#. ZM: 10-18 and if sunday then next monday
+msgid "National Day of Prayers"
+msgstr ""
+
+#. PL: 10-19 since 2018
+msgid "National Day of Remembrance for Steadfast Clergy"
+msgstr ""
+
+#. IT: 10-04 since 2026
+msgid "National Day of Saint Francis of Assisi"
+msgstr ""
+
+#. TC: 4th Friday in November
+msgid "National Day of Thanksgiving"
+msgstr ""
+
+#. VN: 12-22
+msgid "National Defence Day"
+msgstr ""
+
+#. HU: 05-21
+msgid "National Defense Day"
+msgstr ""
+
+#. AR, EE, SZ: 06-20 #1
+msgid "National Flag Day"
+msgstr ""
+
+#. KR: substitutes 2036-10-03 if Friday then next Monday
+msgid "National Foundation Day"
+msgstr ""
+
+#. CK: 10-26 and if Saturday, Sunday then next Monday
+msgid "National Gospel Day"
+msgstr ""
+
+#. RW: 1st friday in August
+msgid "National Harvest Day"
+msgstr ""
+
+#. TC: 2nd Monday in October
+msgid "National Heritage Day"
+msgstr ""
+
+#. AO: 09-17
+msgid "National Hero Day"
+msgstr ""
+
+#. BB, BM, JM, KY, UG: 04-28
+msgid "National Heroes Day"
+msgstr ""
+
+#. BZ: 03-09 if friday,saturday,sunday then next monday if tuesday,wednesday,thursday then previous monday
+msgid "National Heroes and Benefactor Day"
+msgstr ""
+
+#. AI: 12-19
+msgid "National Heroes and Heroines Day"
+msgstr ""
+
+#. BS, KN, PH, TC: 10-12 and if saturday,sunday then next monday
+msgid "National Heroes' Day"
+msgstr ""
+
+#. VC: 03-14 and if Sunday then next Monday
+msgid "National Hero′s Day"
+msgstr ""
+
+#. AT, BE, CA, CL, CY, DE, GN, LU, SC, SN: 10-26
+msgid "National Holiday"
+msgstr ""
+
+#. AR: 2010-05-24
+msgid "National Holiday for the Bicentennial of the May Revolution"
+msgstr ""
+
+#. AR: 2022-12-20
+msgid "National Holiday for the World Football Champions in the FIFA World Cup QATAR 2022"
+msgstr ""
+
+#. CA: 06-21 since 2001
+msgid "National Indigenous Peoples Day"
+msgstr ""
+
+#. MD: 08-31
+msgid "National Language Day"
+msgstr ""
+
+#. PA: 12-20 and if sunday then next monday
+msgid "National Mourning Day"
+msgstr ""
+
+#. CA: monday before 05-25
+msgid "National Patriots' Day"
+msgstr ""
+
+#. CI: 11-15 since 1996
+msgid "National Peace Day"
+msgstr ""
+
+#. EG: 01-25
+msgid "National Police Day"
+msgstr ""
+
+#. AZ: 11-17
+msgid "National Revival Day"
+msgstr ""
+
+#. AZ: 06-15 and if saturday,sunday then next monday
+msgid "National Salvation Day"
+msgstr ""
+
+#. TR: 04-23
+msgid "National Sovereignty and Children's Day"
+msgstr ""
+
+#. LR: 05-14
+msgid "National Unification Day"
+msgstr ""
+
+#. GE: 04-09
+msgid "National Unity Day"
+msgstr ""
+
+#. PL: 05-08 since 2015
+msgid "National Victory Day"
+msgstr ""
+
+#. PL: 08-01 since 2009
+msgid "National Warsaw Uprising Remembrance Day"
+msgstr ""
+
+#. ZA: 08-09
+msgid "National Women's Day"
+msgstr ""
+
+#. NG, TC: 11-01 since 2020
+msgid "National Youth Day"
+msgstr ""
+
+#. CL, RO: 09-17 on friday, monday since 2017
+msgid "National holiday"
+msgstr ""
+
+#. IR: 29 Esfand
+msgid "Nationalization of the Iranian oil industry"
+msgstr ""
+
+#. US: 2nd monday in October #1
+msgid "Native American Day"
+msgstr ""
+
+#. US: friday after 4th thursday in November
+msgid "Native American Heritage Day"
+msgstr ""
+
+#. EE: 03-14
+msgid "Native Language Day"
+msgstr ""
+
+#. CL: 08-20
+msgid "Nativity of Liberator Bernardo O'Higgins"
+msgstr ""
+
+#. NL: 12-15 if sunday then next monday since 2008
+msgid "Naturalisation Day"
+msgstr ""
+
+#. KZ: 03-21 and if saturday then next monday if sunday then next tuesday
+msgid "Nauryz"
+msgstr ""
+
+#. LK: 02-01
+msgid "Navam Full Moon Poya Day"
+msgstr ""
+
+#. CL: 05-21
+msgid "Navy Day"
+msgstr ""
+
+#. BI: 10-21
+msgid "Ndadaye Day"
+msgstr ""
+
+#. ZA: 07-18
+msgid "Nelson Mandela Day"
+msgstr ""
+
+#. IN: 01-23
+msgid "Netaji Subhas Chandra Bose Jayanti"
+msgstr ""
+
+#. US: friday before 11-01
+msgid "Nevada Day"
+msgstr ""
+
+#. CA: 1st monday in August
+msgid "New Brunswick Day"
+msgstr ""
+
+#. NC: 09-24
+msgid "New Caledonia Day"
+msgstr ""
+
+#. UA: 01-01 and if saturday, sunday then next tuesday
+msgid "New Year"
+msgstr ""
+
+#. AL, MU, RU: 01-02 and if saturday then next monday if sunday then next tuesday
+msgid "New Year Holiday"
+msgstr ""
+
+#. AD, AE, AG, AI, AL, AM, AO, AR, AS, AT, AU, AW, AX, AZ, BA, BB, BE, BF, BG, BH, BI, BJ, BL, BM, BN, BO, BQ, BR, BS, BW, BY, BZ, CA, CC, CD, CF, CG, CH, CI, CK, CL, CM, CN, CO, CR, CV, CW, CX, CY, CZ, DE, DJ, DK, DM, DO, DZ, EC, EE, ER, ES, ET, FI, FJ, FO, FR, GA, GB, GD, GE, GF, GG, GH, GI, GL, GM, GN, GP, GQ, GR, GT, GU, GW, GY, HN, HR, HU, IC, ID, IE, IM, IN, IS, IT, JE, JM, JP, KE, KM, KN, KR, KY, KZ, LC, LI, LK, LR, LS, LT, LU, LV, MA, MC, MD, ME, MF, MG, MK, ML, MQ, MR, MS, MT, MU, MW, MX, MY, MZ, NA, NE, NF, NG, NI, NL, NO, NZ, PA, PE, PF, PH, PL, PM, PR, PT, PY, RE, RO, RS, RU, RW, SC, SE, SG, SH, SI, SJ, SK, SL, SM, SN, SO, SR, SS, ST, SV, SX, SZ, TC, TD, TG, TH, TN, TO, TR, TT, TZ, UG, US, UY, UZ, VC, VE, VG, VI, VN, VU, WF, XK, YT, ZA, ZM, ZW: 01-01
+msgid "New Year's Day"
+msgstr ""
+
+#. BO: substitutes 01-01 if sunday then next monday
+msgid "New Year's Day (substitutes)"
+msgstr ""
+
+#. AM, AR, AS, AT, AU, AX, BR, CH, CL, CW, DE, EC, FI, FO, GT, GU, HU, IS, JP, LI, LV, NG, NI, NL, NO, PH, PL, PR, PT, PY, SE, SJ, SM, SS, TH, US, UY, VA, VE, VI: 12-31
+msgid "New Year's Eve"
+msgstr ""
+
+#. BW: 01-02
+msgid "New Year's Holiday"
+msgstr ""
+
+#. LK: 08-27
+msgid "Nikini Full Moon Poya Day"
+msgstr ""
+
+#. PH: 08-21
+msgid "Ninoy Aquino Day"
+msgstr ""
+
+#. SE: 12-10
+msgid "Nobel Day"
+msgstr ""
+
+#. NF: 2nd monday in October
+msgid "Norfolk Island Agricultural Show"
+msgstr ""
+
+#. BR: 05-24
+msgid "Nossa Senhora Auxiliadora"
+msgstr ""
+
+#. BR: 09-08
+msgid "Nossa Senhora da Luz dos Pinhais"
+msgstr ""
+
+#. BR: 09-08
+msgid "Nossa Senhora da Natividade"
+msgstr ""
+
+#. BR: 08-05
+msgid "Nossa Senhora das Neves"
+msgstr ""
+
+#. BR: 07-16
+msgid "Nossa Senhora do Carmo"
+msgstr ""
+
+#. IR, UZ: 1 Farvardin
+msgid "Nowruz"
+msgstr ""
+
+#. BI: 04-06
+msgid "Ntaryamira Day"
+msgstr ""
+
+#. ES, IC: 10-05
+msgid "Nuestra Señora de Guadalupe"
+msgstr ""
+
+#. ES: 11-09 if sunday then next monday
+msgid "Nuestra Señora de la Almudena"
+msgstr ""
+
+#. ES: 09-24 if sunday then next monday
+msgid "Nuestra Señora de la Merced"
+msgstr ""
+
+#. ES: 2022-09-26
+msgid "Nuestra Señora de la Merced (traslado)"
+msgstr ""
+
+#. ES, IC: 09-18
+msgid "Nuestra Señora de la Peña"
+msgstr ""
+
+#. ES, IC: 08-05
+msgid "Nuestra Señora de las Nieves"
+msgstr ""
+
+#. ES, IC: 09-15
+msgid "Nuestra Señora de los Dolores"
+msgstr ""
+
+#. ES, IC: 09-24
+msgid "Nuestra Señora de los Reyes"
+msgstr ""
+
+#. ES, IC: 09-08
+msgid "Nuestra Señora del Pino"
+msgstr ""
+
+#. CA: 07-09
+msgid "Nunavut Day"
+msgstr ""
+
+#. BN: 17 Ramadan
+msgid "Nuzul Al-Quran"
+msgstr ""
+
+#. ID: 2019-03-07
+msgid "Nyepi"
+msgstr ""
+
+#. TZ: 10-14
+msgid "Nyerere Day"
+msgstr ""
+
+#. CH: Thursday after 04-02 if is observance holiday then next Thursday
+msgid "Näfelser Fahrt"
+msgstr ""
+
+#. BY: 11-07
+msgid "October Revolution Day"
+msgstr ""
+
+#. IN: 04-01
+msgid "Odisha Day"
+msgstr ""
+
+#. TO: 07-04
+msgid "Official Birthday of His Majesty King Tupou VI"
+msgstr ""
+
+#. JP: 1990-11-12
+msgid "Official Enthronement Ceremony of Emperor Heisei (Akihito)"
+msgstr ""
+
+#. GR: 10-28
+msgid "Ohi Day"
+msgstr ""
+
+#. NO, SJ: 07-29
+msgid "Olsok"
+msgstr ""
+
+#. TW: 06-03
+msgid "Opium Suppression Movement Day"
+msgstr ""
+
+#. CA: 07-12
+msgid "Orangemen's Day"
+msgstr ""
+
+#. BA, ER, GE, HR, KZ, MD, MK, RS, UA, XK: julian 12-25
+msgid "Orthodox Christmas"
+msgstr ""
+
+#. MK: julian 12-24
+msgid "Orthodox Christmas Eve"
+msgstr ""
+
+#. AL, BA, BY, ER, HR, MK, RS, RU, UA, XK: orthodox
+msgid "Orthodox Easter"
+msgstr ""
+
+#. HR, MK, RS: orthodox 1
+msgid "Orthodox Easter Monday"
+msgstr ""
+
+#. GE: 01-19
+msgid "Orthodox Epiphany"
+msgstr ""
+
+#. ER, MK, RS: orthodox -2
+msgid "Orthodox Good Friday"
+msgstr ""
+
+#. BA, ME: julian 01-01
+msgid "Orthodox New Year"
+msgstr ""
+
+#. BO: 02-10
+msgid "Oruro Day"
+msgstr ""
+
+#. BO: substitutes 02-10 if sunday then next monday
+msgid "Oruro Day (substitutes)"
+msgstr ""
+
+#. DO: 01-21
+msgid "Our Lady of Altagracia"
+msgstr ""
+
+#. BR: 10-12
+msgid "Our Lady of Aparecida"
+msgstr ""
+
+#. GU: 12-08 if sunday then next monday
+msgid "Our Lady of Camarin Day"
+msgstr ""
+
+#. VE: 09-11
+msgid "Our Lady of Coromoto"
+msgstr ""
+
+#. CR: 08-02
+msgid "Our Lady of Los Ángeles"
+msgstr ""
+
+#. AD: 09-08
+msgid "Our Lady of Meritxell"
+msgstr ""
+
+#. CL: 07-16
+msgid "Our Lady of Mount Carmel"
+msgstr ""
+
+#. DO: 09-24
+msgid "Our Lady of las Mercedes"
+msgstr ""
+
+#. TW: 10-21
+msgid "Overseas Chinese Day"
+msgstr ""
+
+#. PK: 03-23
+msgid "Pakistan Day"
+msgstr ""
+
+#. CO, IS, NO, PL, SJ: easter -7
+msgid "Palm Sunday"
+msgstr ""
+
+#. CK: 05-25 and if Saturday, Sunday then next Monday
+msgid "Palmerston Gospel Day"
+msgstr ""
+
+#. ID: 06-01
+msgid "Pancasila Day"
+msgstr ""
+
+#. BO: 09-24
+msgid "Pando Day"
+msgstr ""
+
+#. BO: substitutes 09-24 if sunday then next monday
+msgid "Pando Day (substitutes)"
+msgstr ""
+
+#. CD: 08-01 and if sunday then next monday
+msgid "Parents' Day"
+msgstr ""
+
+#. IL: 15 Nisan
+msgid "Passover (Pesach)"
+msgstr ""
+
+#. IL: 16 Nisan P5D
+msgid "Passover (intermediate days)"
+msgstr ""
+
+#. IN, US: 08-13
+msgid "Patriots' Day"
+msgstr ""
+
+#. SS: 01-09
+msgid "Peace Agreement Day"
+msgstr ""
+
+#. AO: 04-04
+msgid "Peace Day"
+msgstr ""
+
+#. RU: 04-16
+msgid "Peace Day in the Chechen Republic"
+msgstr ""
+
+#. TW: 02-28 and if Sunday then next Monday
+msgid "Peace Memorial Day"
+msgstr ""
+
+#. MZ: 10-04
+msgid "Peace and Reconciliation Day"
+msgstr ""
+
+#. MY: 2nd Saturday in July
+msgid "Penang State Governor's Birthday"
+msgstr ""
+
+#. CK: 05-13 and if Saturday, Sunday then next Monday
+msgid "Penrhyn Gospel Day"
+msgstr ""
+
+#. AD, AG, AI, AT, AX, BB, BE, BF, BJ, BL, BS, CG, CH, CY, DE, DK, DM, EE, ES, FI, FO, FR, GD, GF, GL, GR, HU, IC, IS, KN, LI, MF, MK, MQ, NC, NL, NO, PF, PL, PM, RE, RO, SE, SI, SJ, SX, UA, VA, VG, WF, YT: easter 49
+msgid "Pentecost"
+msgstr ""
+
+#. KZ: 05-01 and if saturday,sunday then next monday
+msgid "People's Unity Day"
+msgstr ""
+
+#. BJ: 02-28
+msgid "People’s Sovereignty Day"
+msgstr ""
+
+#. PE: 07-23 since 2023
+msgid "Peruvian Air Force Day"
+msgstr ""
+
+#. ME: 15 Nisan P2D
+msgid "Pesach"
+msgstr ""
+
+#. GY: 2019-03-21
+msgid "Phagwah"
+msgstr ""
+
+#. AU: 1st monday in August
+msgid "Picnic Day"
+msgstr ""
+
+#. GW: 08-03
+msgid "Pidjiguiti Day"
+msgstr ""
+
+#. US: 07-24
+msgid "Pioneer Day"
+msgstr ""
+
+#. BO: 01-22
+msgid "Plurinational State Foundation Day"
+msgstr ""
+
+#. BO: substitutes 01-22 if sunday then next monday
+msgid "Plurinational State Foundation Day (substitutes)"
+msgstr ""
+
+#. PL: 02-19 since 2020
+msgid "Polish Science Day"
+msgstr ""
+
+#. GT: 05-30
+msgid "Popol Vuh Day"
+msgstr ""
+
+#. PT: 06-10
+msgid "Portugal Day"
+msgstr ""
+
+#. LK: 06-29
+msgid "Poson Full Moon Poya Day"
+msgstr ""
+
+#. BO: 11-10
+msgid "Potosí Day"
+msgstr ""
+
+#. BO: substitutes 11-10 if sunday then next monday
+msgid "Potosí Day (substitutes)"
+msgstr ""
+
+#. DK, GL: easter 26 prior to 2024
+msgid "Prayer Day"
+msgstr ""
+
+#. AM: 01-03 P3D
+msgid "Pre-Christmas holidays"
+msgstr ""
+
+#. VN: 05-19
+msgid "President Ho Chi Minh's Birthday"
+msgstr ""
+
+#. GQ, US, VI: 06-05 and if sunday then next monday
+msgid "President's Day"
+msgstr ""
+
+#. SG: 2023-09-1
+msgid "Presidential Election Day"
+msgstr ""
+
+#. PA: 07-01 every 5 years since 2014
+msgid "Presidential Inauguration"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Presidents Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Presidents' Day"
+msgstr ""
+
+#. BW: 3rd monday in July
+msgid "President’s Day"
+msgstr ""
+
+#. BW: tuesday after 3rd monday in July
+msgid "President’s Day Holiday"
+msgstr ""
+
+#. SI: 02-08
+msgid "Prešeren Day, the Slovenian Cultural Holiday"
+msgstr ""
+
+#. US: 2nd tuesday in September
+msgid "Primary Election Day"
+msgstr ""
+
+#. PA: 11-10 and if sunday then next monday
+msgid "Primer Grito de Independencia"
+msgstr ""
+
+#. GT: easter -44
+msgid "Primer viernes de Cuaresma"
+msgstr ""
+
+#. SI: 06-08
+msgid "Primož Trubar Day"
+msgstr ""
+
+#. US: 03-26 and if saturday then previous friday if sunday then next monday
+msgid "Prince Jonah Kuhio Kalanianaole Day"
+msgstr ""
+
+#. NL: 3rd tuesday in September
+msgid "Prince's Day"
+msgstr ""
+
+#. NL: 08-31 since 1885 and prior to 1891
+msgid "Princess Day"
+msgstr ""
+
+#. BF, TD: 12-11
+msgid "Proclamation of the Republic"
+msgstr ""
+
+#. BR: 09-20
+msgid "Proclamação da República Rio-Grandense"
+msgstr ""
+
+#. RU: 07-12
+msgid "Prokhorovka Field Day - Russia's Third Military Field"
+msgstr ""
+
+#. NZ: 01-29 if tuesday,wednesday,thursday then previous monday if friday,saturday,sunday then next monday
+msgid "Provincial anniversary day"
+msgstr ""
+
+#. BB, BI, BW, CD, MZ, RW, VU, ZA: substitutes 12-25 if sunday then next tuesday
+msgid "Public Holiday"
+msgstr ""
+
+#. PR: 07-25
+msgid "Puerto Rico Constitution Day"
+msgstr ""
+
+#. CK: 12-06 and if Saturday, Sunday then next Monday
+msgid "Pukapuka Gospel Day"
+msgstr ""
+
+#. HN: 06-11
+msgid "Pupil's Day"
+msgstr ""
+
+#. IL: 14 AdarII P2D
+msgid "Purim"
+msgstr ""
+
+#. CN: 2021-04-05
+msgid "Qingming Festival"
+msgstr ""
+
+#. TW: chinese 07-0-07
+msgid "Qixi Festival"
+msgstr ""
+
+#. PK: 12-25
+msgid "Quaid-e-Azam Day"
+msgstr ""
+
+#. GB, GG, GI, IM, JE: 2022-09-19
+msgid "Queen Elizabeth's Funeral Day"
+msgstr ""
+
+#. TH: 06-03
+msgid "Queen Suthida's Birthday"
+msgstr ""
+
+#. AU, CK, GI, KY, NF, NZ, SH, TC: 2nd monday in June
+msgid "Queen's Birthday"
+msgstr ""
+
+#. MS: 2nd Monday after 06-02
+msgid "Queen's Birthday Celebration"
+msgstr ""
+
+#. NL: 04-30 if sunday then next monday since 1949 and prior to 1980
+msgid "Queen's Day"
+msgstr ""
+
+#. GB, GG, GI, IM, JE: 2012-06-05
+msgid "Queen’s Diamond Jubilee"
+msgstr ""
+
+#. GB, GG, GI, IM, JE: 2022-06-03
+msgid "Queen’s Platinum Jubilee"
+msgstr ""
+
+#. CK: 1st Friday in July
+msgid "Ra o te Ui Ariki (House of Ariki)"
+msgstr ""
+
+#. IL: 12 Cheshvan if Friday,Saturday then previous Thursday since 1997
+msgid "Rabin Day"
+msgstr ""
+
+#. IN: 05-08
+msgid "Rabindra Jayanti"
+msgstr ""
+
+#. BG: 05-07
+msgid "Radio and Television Day"
+msgstr ""
+
+#. RU: 2026-04-21
+msgid "Radonitsa - Day of Remembrance of the Departed"
+msgstr ""
+
+#. RU: 2026-04-21
+msgid "Radonitsa - Day of Special Remembrance of the Departed"
+msgstr ""
+
+#. MY: 07-17
+msgid "Raja of Perlis's Birthday"
+msgstr ""
+
+#. CK: 08-15 and if Saturday, Sunday then next Monday
+msgid "Rakahanga Gospel Day"
+msgstr ""
+
+#. BS: 1st friday in June
+msgid "Randol Fawkes Labour Day"
+msgstr ""
+
+#. CK: 07-25 and if Saturday, Sunday then next Monday
+msgid "Rarotonga Gospel Day"
+msgstr ""
+
+#. SH: 2012-04-23
+msgid "Ratting Day"
+msgstr ""
+
+#. GW: 11-14
+msgid "Readjustment Movement Day"
+msgstr ""
+
+#. PY: 2026-06-30
+msgid "Recognition of the historic victory of the Paraguayan national football team over Germany"
+msgstr ""
+
+#. AU: monday after 05-27
+msgid "Reconciliation Day"
+msgstr ""
+
+#. CL, DE, SI: 10-31 if wednesday then next friday if tuesday then previous friday
+msgid "Reformation Day"
+msgstr ""
+
+#. NL: 10-08
+msgid "Relief of Alkmaar"
+msgstr ""
+
+#. NL: 08-28
+msgid "Relief of Groningen"
+msgstr ""
+
+#. NL: 10-03
+msgid "Relief of Leiden"
+msgstr ""
+
+#. BJ, BM, CA, HR, VN: 01-16
+msgid "Remembrance Day"
+msgstr ""
+
+#. NL: 05-04
+msgid "Remembrance of the Dead"
+msgstr ""
+
+#. IN: 06-30
+msgid "Remna Ni"
+msgstr ""
+
+#. AM, AZ, BA, BR, CF, GY, IN, IT, KZ, LV, MT, NE, SS, TR, TT: 05-28
+msgid "Republic Day"
+msgstr ""
+
+#. RU: 10-05
+msgid "Republic of Adygea Formation Day"
+msgstr ""
+
+#. RU: 10-11
+msgid "Republic of Bashkortostan Day"
+msgstr ""
+
+#. RU: 07-05
+msgid "Republic of Kalmykia Day"
+msgstr ""
+
+#. RU: 06-08
+msgid "Republic of Karelia Day"
+msgstr ""
+
+#. RU: 08-22
+msgid "Republic of Komi Day"
+msgstr ""
+
+#. RU: 04-27
+msgid "Republic of Sakha (Yakutia) Day"
+msgstr ""
+
+#. RU: 08-30
+msgid "Republic of Tatarstan Day"
+msgstr ""
+
+#. RU: 08-15
+msgid "Republic of Tuva Day"
+msgstr ""
+
+#. EE: 09-22
+msgid "Resistance Fighting Day"
+msgstr ""
+
+#. JP: 3rd monday in September
+msgid "Respect-for-the-Aged Day"
+msgstr ""
+
+#. PT: 12-01
+msgid "Restauração da Independência"
+msgstr ""
+
+#. DO: 08-16
+msgid "Restoration Day"
+msgstr ""
+
+#. LV: 05-04 and if saturday,sunday then next monday
+msgid "Restoration of Independence day"
+msgstr ""
+
+#. SO: 05-18 P2D
+msgid "Restoration of Somaliland Sovereignty"
+msgstr ""
+
+#. CH: 12-31
+msgid "Restoration of the Republic"
+msgstr ""
+
+#. SI: 09-15
+msgid "Return of Primorska to the Motherland"
+msgstr ""
+
+#. BG: 11-01
+msgid "Revival Leaders' Day"
+msgstr ""
+
+#. IR: 15 Khordad
+msgid "Revolt of Khordad 15"
+msgstr ""
+
+#. DZ, EG, ER, GM, GT, LY, MK, MX, NI, SD: 11-01
+msgid "Revolution Day"
+msgstr ""
+
+#. EG: 01-25 since 2011
+msgid "Revolution Day 2011"
+msgstr ""
+
+#. BR: 07-09
+msgid "Revolução Constitucionalista"
+msgstr ""
+
+#. BR: 1st sunday in March
+msgid "Revolução Pernambucana de 1817"
+msgstr ""
+
+#. BQ: 04-30
+msgid "Rincon Day"
+msgstr ""
+
+#. PH: 12-30
+msgid "Rizal Day"
+msgstr ""
+
+#. US: friday after 4th thursday in November #1
+msgid "Robert E. Lee's Birthday"
+msgstr ""
+
+#. US: 3rd monday in January
+msgid "Robert E. Lee/Martin Luther King Birthday"
+msgstr ""
+
+#. ME: 1 Tishrei
+msgid "Rosh Hashanah"
+msgstr ""
+
+#. IL: 2 Tishrei
+msgid "Rosh Hashanah (Day 2)"
+msgstr ""
+
+#. IL: 1 Tishrei
+msgid "Rosh Hashanah (Yom Teruah)"
+msgstr ""
+
+#. SI: 11-23
+msgid "Rudolf Maister Day"
+msgstr ""
+
+#. ZA: 2023-12-15
+msgid "Rugby World Cup Win Public Holiday"
+msgstr ""
+
+#. AT: 09-24
+msgid "Rupert"
+msgstr ""
+
+#. RU: 06-12
+msgid "Russia Day"
+msgstr ""
+
+#. BI: 10-13
+msgid "Rwagasore Day"
+msgstr ""
+
+#. SS: 05-16
+msgid "SPLA Day"
+msgstr ""
+
+#. BQ: 1st friday in December
+msgid "Saba Day"
+msgstr ""
+
+#. TZ: 07-07
+msgid "Saba Saba Day"
+msgstr ""
+
+#. MY: 1st Saturday in October
+msgid "Sabah State Governor's Birthday"
+msgstr ""
+
+#. CO: easter 71
+msgid "Sacred Heart"
+msgstr ""
+
+#. IT: 12-07
+msgid "Saint Ambrose"
+msgstr ""
+
+#. GE: 05-12
+msgid "Saint Andrew the First-Called Day"
+msgstr ""
+
+#. BL, FR: 08-24
+msgid "Saint Barth"
+msgstr ""
+
+#. HR: 02-03
+msgid "Saint Blaise"
+msgstr ""
+
+#. VA: 11-04
+msgid "Saint Charles Borromeo - Name day of the Holy Father"
+msgstr ""
+
+#. MK: 12-08 and if sunday then next monday
+msgid "Saint Clement of Ohrid Day"
+msgstr ""
+
+#. MC: 01-27 and if sunday then next monday
+msgid "Saint Devota's Day"
+msgstr ""
+
+#. HR: 05-07
+msgid "Saint Domnius"
+msgstr ""
+
+#. VA: 04-23 since 2013 and prior to 2026
+msgid "Saint George - Name day of the Holy Father"
+msgstr ""
+
+#. CA, GE: 04-23
+msgid "Saint George's Day"
+msgstr ""
+
+#. SH: 05-21
+msgid "Saint Helena Day"
+msgstr ""
+
+#. IT: 06-24
+msgid "Saint John"
+msgstr ""
+
+#. RO: 01-07
+msgid "Saint John the Baptist"
+msgstr ""
+
+#. BR: 06-24
+msgid "Saint John's Day"
+msgstr ""
+
+#. AT, CH, CO, ES, IC, LI, MT, VA, VE: 03-19
+msgid "Saint Joseph"
+msgstr ""
+
+#. VA: 03-19 since 2005 and prior to 2013
+msgid "Saint Joseph - Name day of the Holy Father"
+msgstr ""
+
+#. VA: 05-01
+msgid "Saint Joseph the Worker"
+msgstr ""
+
+#. SE: 01-13
+msgid "Saint Knut's Day"
+msgstr ""
+
+#. CL: 08-10
+msgid "Saint Lawrence"
+msgstr ""
+
+#. SE: 12-13
+msgid "Saint Lucy's Day"
+msgstr ""
+
+#. DE, NL: 11-11
+msgid "Saint Martin"
+msgstr ""
+
+#. SE: 11-11
+msgid "Saint Martin's Day"
+msgstr ""
+
+#. GE: 08-28
+msgid "Saint Mary's Day"
+msgstr ""
+
+#. BE, HU, PL: 12-06
+msgid "Saint Nicholas"
+msgstr ""
+
+#. SI: 12-06
+msgid "Saint Nicholas Day"
+msgstr ""
+
+#. CH: 09-25
+msgid "Saint Nicholas of Flüe"
+msgstr ""
+
+#. CA, MS: 03-17
+msgid "Saint Patrick's Day"
+msgstr ""
+
+#. WF: 04-28
+msgid "Saint Pierre Chanel Day"
+msgstr ""
+
+#. VA: 09-17 since 2025
+msgid "Saint Robert Bellarmine - Name day of the Holy Father"
+msgstr ""
+
+#. IT: 07-15
+msgid "Saint Rosalia"
+msgstr ""
+
+#. RS: julian 01-14
+msgid "Saint Sava Day"
+msgstr ""
+
+#. HU: 08-20
+msgid "Saint Stephen's Day"
+msgstr ""
+
+#. RS: julian 06-15
+msgid "Saint Vitus Day"
+msgstr ""
+
+#. CZ, MK, SK: 07-05
+msgid "Saints Cyril and Methodius Day"
+msgstr ""
+
+#. CH, CL, CO, GT, IT, MT, PE, VA: 06-29
+msgid "Saints Peter and Paul"
+msgstr ""
+
+#. WF: 06-29
+msgid "Saints Peter and Paul Day"
+msgstr ""
+
+#. TW: chinese 10-0-15
+msgid "Saisiat Festival"
+msgstr ""
+
+#. GT: 04-27
+msgid "San Benito de Palermo"
+msgstr ""
+
+#. ES: 12-26
+msgid "San Esteban"
+msgstr ""
+
+#. ES: 05-16
+msgid "San Isidro Labrador"
+msgstr ""
+
+#. US: 04-21
+msgid "San Jacinto Day"
+msgstr ""
+
+#. GT: 03-19
+msgid "San José Obrero"
+msgstr ""
+
+#. ES: 06-24
+msgid "San Juan"
+msgstr ""
+
+#. GT: 06-24
+msgid "San Juan Bautista"
+msgstr ""
+
+#. GT: 09-29
+msgid "San Miguel Arcángel"
+msgstr ""
+
+#. GT: 06-29
+msgid "San Pedro Apóstol"
+msgstr ""
+
+#. GT: 01-23
+msgid "San Raymundo Peñafort"
+msgstr ""
+
+#. ES: 12-26
+msgid "Sant Esteve"
+msgstr ""
+
+#. GT: 11-25
+msgid "Santa Catarina de Alejandría"
+msgstr ""
+
+#. GT: 05-03
+msgid "Santa Cruz"
+msgstr ""
+
+#. BO: 09-24
+msgid "Santa Cruz Day"
+msgstr ""
+
+#. BO: substitutes 09-24 if sunday then next monday
+msgid "Santa Cruz Day (substitutes)"
+msgstr ""
+
+#. ES: 2016-02-12
+msgid "Santa Eulalia"
+msgstr ""
+
+#. PE: 08-30
+msgid "Santa Rosa de Lima"
+msgstr ""
+
+#. GT: 08-04
+msgid "Santo Domingo de Guzmán"
+msgstr ""
+
+#. MY: 07-22
+msgid "Sarawak Independence Day"
+msgstr ""
+
+#. MY: 2nd Saturday in October
+msgid "Sarawak State Governor's Birthday"
+msgstr ""
+
+#. IN: 10-31
+msgid "Sardar Vallabhbhai Patel Jayanti"
+msgstr ""
+
+#. CA: 1st monday in August
+msgid "Saskatchewan Day"
+msgstr ""
+
+#. LC: 01-02
+msgid "Second New Year's Day"
+msgstr ""
+
+#. NO, SJ: 3rd sunday before 12-25
+msgid "Second Sunday of Advent"
+msgstr ""
+
+#. CC: 04-06
+msgid "Self Determination Day"
+msgstr ""
+
+#. IN: 11-23
+msgid "Seng Kut Snem"
+msgstr ""
+
+#. PA: 11-03 and if sunday then next monday
+msgid "Separation Day (from Columbia)"
+msgstr ""
+
+#. US: friday before 1st monday before 06-01 since 2009 and prior to 2016
+msgid "Service Reduction Day"
+msgstr ""
+
+#. RU: 06-14
+msgid "Sevastopol City Foundation Day"
+msgstr ""
+
+#. JP: 11-15
+msgid "Seven-Five-Three Festival"
+msgstr ""
+
+#. IL: 17 Tamuz if Saturday then next Sunday
+msgid "Seventeenth of Tamuz, fast"
+msgstr ""
+
+#. US: monday before April
+msgid "Seward's Day"
+msgstr ""
+
+#. RU: 2024-02-10
+msgid "Shagaa"
+msgstr ""
+
+#. IN: 03-23
+msgid "Shaheed Diwas"
+msgstr ""
+
+#. IN: 12-26
+msgid "Shaheed Udham Singh Jayanti"
+msgstr ""
+
+#. EG: orthodox 1
+msgid "Sham El Nessim"
+msgstr ""
+
+#. IL: 6 Sivan
+msgid "Shavuot (Feast of Weeks)"
+msgstr ""
+
+#. JP: 04-29 and if sunday then next monday #2
+msgid "Showa Day"
+msgstr ""
+
+#. AD, AR, AW, BL, BO, DE, FR, PA: easter -48 prior to 2024
+msgid "Shrove Monday"
+msgstr ""
+
+#. AD, AO, AR, BL, BO, CV, DE, EC, FR, HR, LI, PA, PL, PT, UY, VE: 02-20 since 2024 and prior to 2025
+msgid "Shrove Tuesday"
+msgstr ""
+
+#. IL: 29 Cheshvan
+msgid "Sigd"
+msgstr ""
+
+#. IL: 22 Tishrei
+msgid "Simchat Torah/ Shmini Atzeret"
+msgstr ""
+
+#. EG: 04-25
+msgid "Sinai Liberation Day"
+msgstr ""
+
+#. LK: 04-14
+msgid "Sinhala and Tamil New Year"
+msgstr ""
+
+#. SX: 11-11
+msgid "Sint Maarten Day"
+msgstr ""
+
+#. BW: 07-01
+msgid "Sir Seretse Khama Day"
+msgstr ""
+
+#. IR: 13 Farvardin
+msgid "Sizdah Bedar"
+msgstr ""
+
+#. SK: 08-29
+msgid "Slovak National Uprising anniversary"
+msgstr ""
+
+#. SI: 09-23
+msgid "Slovenian Sports Day"
+msgstr ""
+
+#. HN, SV: 10-03
+msgid "Soldier's Day"
+msgstr ""
+
+#. VA: 01-01
+msgid "Solemnity of Mary, Mother of God"
+msgstr ""
+
+#. BM: friday before 08-05
+msgid "Somers' Day"
+msgstr ""
+
+#. TH: 04-14
+msgid "Songkran Festival"
+msgstr ""
+
+#. SI: 10-25
+msgid "Sovereignty Day"
+msgstr ""
+
+#. VG: 2nd Friday after 06-02 since 2020
+msgid "Sovereign’s Birthday"
+msgstr ""
+
+#. TT: 03-30 and if Sunday then next Monday
+msgid "Spiritual Baptist Liberation Day"
+msgstr ""
+
+#. JP: 2nd monday in October #1
+msgid "Sports Day"
+msgstr ""
+
+#. IS: easter -47
+msgid "Sprengidagur"
+msgstr ""
+
+#. JP: substitutes march equinox in +09:00 and if sunday then next monday
+msgid "Spring Equinox Day"
+msgstr ""
+
+#. AZ, CN: 03-20
+msgid "Spring Festival"
+msgstr ""
+
+#. RU: 05-01
+msgid "Spring and Labour Day"
+msgstr ""
+
+#. GB, GG, GI, IM, JE: 1st monday before 06-01
+msgid "Spring bank holiday"
+msgstr ""
+
+#. RO: 11-30
+msgid "St Andrew's Day"
+msgstr ""
+
+#. GB: 11-30
+msgid "St Andrew’s Day"
+msgstr ""
+
+#. NL: 12-05
+msgid "St Nicholas' Eve"
+msgstr ""
+
+#. GB: 03-17
+msgid "St Patrick’s Day"
+msgstr ""
+
+#. IS: 12-23
+msgid "St Þorlákur's Day"
+msgstr ""
+
+#. IE: 02-01 if Tuesday,Wednesday,Thursday,Saturday,Sunday then next Monday since 2023
+msgid "St. Brigid’s Day"
+msgstr ""
+
+#. BZ: 09-10 if sunday then next monday
+msgid "St. George's Caye Day"
+msgstr ""
+
+#. BG, SI: 05-06
+msgid "St. George's Day"
+msgstr ""
+
+#. VA: 12-27
+msgid "St. John"
+msgstr ""
+
+#. LT: 06-24
+msgid "St. John's Day"
+msgstr ""
+
+#. SI: 11-11
+msgid "St. Martin's Day"
+msgstr ""
+
+#. AW, BQ: 12-05
+msgid "St. Nicholas' Eve"
+msgstr ""
+
+#. US: 03-17
+msgid "St. Patrick's Day"
+msgstr ""
+
+#. CA, IE: 03-17
+msgid "St. Patrick’s Day"
+msgstr ""
+
+#. MK: 01-27
+msgid "St. Sava"
+msgstr ""
+
+#. IE: 12-26
+msgid "St. Stephen’s Day"
+msgstr ""
+
+#. VG: 10-21 if Sunday then next Monday if Saturday then previous Friday if Tuesday,Wednesday then previous Monday if Thursday then next Friday
+msgid "St. Ursula’s Day"
+msgstr ""
+
+#. AM: easter -52
+msgid "St. Vartan the good work and the duty days"
+msgstr ""
+
+#. CZ: 09-28
+msgid "St. Wenceslas Day (Czech Statehood Day)"
+msgstr ""
+
+#. FO: 07-29
+msgid "St.Olav's Day"
+msgstr ""
+
+#. FO: 07-28 12:00 if sunday then 00:00
+msgid "St.Olav's Eve"
+msgstr ""
+
+#. AT, LI: 05-01
+msgid "Staatsfeiertag"
+msgstr ""
+
+#. IN: 05-16
+msgid "State Day"
+msgstr ""
+
+#. JP: 1989-02-24
+msgid "State Funeral of Emperor Showa"
+msgstr ""
+
+#. US: friday after 4th thursday in November #2
+msgid "State Holiday"
+msgstr ""
+
+#. BA, HR, LT, ME, RS, SI, UA, US: 11-25
+msgid "Statehood Day"
+msgstr ""
+
+#. RU: 09-01
+msgid "Statehood Day of the Kabardino-Balkar Republic"
+msgstr ""
+
+#. BQ: 11-16
+msgid "Statia Day"
+msgstr ""
+
+#. CZ, SK: 11-17
+msgid "Struggle for Freedom and Democracy Day"
+msgstr ""
+
+#. BO: 09-21
+msgid "Student's Day"
+msgstr ""
+
+#. AL: 03-22 and if saturday,sunday then next monday
+msgid "Sultan Nevruz's Day"
+msgstr ""
+
+#. MY: 03-23
+msgid "Sultan of Johor's Birthday"
+msgstr ""
+
+#. MY: 3rd Sunday in June
+msgid "Sultan of Kedah's Birthday"
+msgstr ""
+
+#. MY: 11-11
+msgid "Sultan of Kelantan's Birthday"
+msgstr ""
+
+#. MY: 07-30
+msgid "Sultan of Pahang's Birthday"
+msgstr ""
+
+#. MY: 1st Friday in November
+msgid "Sultan of Perak's Birthday"
+msgstr ""
+
+#. MY: 12-11
+msgid "Sultan of Selangor's Birthday"
+msgstr ""
+
+#. MY: 04-26
+msgid "Sultan of Terengganu's Birthday"
+msgstr ""
+
+#. BN: 07-15
+msgid "Sultan's Birthday"
+msgstr ""
+
+#. JE: 1st monday before 09-01
+msgid "Summer Bank Holiday"
+msgstr ""
+
+#. AL: 03-14 and if saturday,sunday then next monday
+msgid "Summer Day"
+msgstr ""
+
+#. GB: 1st monday before 09-01
+msgid "Summer bank holiday"
+msgstr ""
+
+#. VA: 08-14
+msgid "Summer holiday"
+msgstr ""
+
+#. TW: 11-12
+msgid "Sun Yat-sen's Birthday"
+msgstr ""
+
+#. US: 02-15
+msgid "Susan B. Anthony Day"
+msgstr ""
+
+#. GE: 10-14
+msgid "Svetitskhovloba"
+msgstr ""
+
+#. IN: 01-12
+msgid "Swami Vivekananda Jayanti"
+msgstr ""
+
+#. BR: 06-24
+msgid "São João"
+msgstr ""
+
+#. BR: 06-29
+msgid "São Pedro"
+msgstr ""
+
+#. ST: 12-21 and if Saturday then previous Friday if Sunday then next Monday
+msgid "São Tomé Day"
+msgstr ""
+
+#. GM, SL: 10 Dhu al-Hijjah
+msgid "Tabaski"
+msgstr ""
+
+#. MY: 05-30
+msgid "Tadau Kaamatan"
+msgstr ""
+
+#. AT: 10-10
+msgid "Tag der Volksabstimmung"
+msgstr ""
+
+#. TW: 10-25
+msgid "Taiwan Retrocession Day"
+msgstr ""
+
+#. LK: 01-15
+msgid "Tamil Thai Pongal Day"
+msgstr ""
+
+#. BO: 04-15
+msgid "Tarija Day"
+msgstr ""
+
+#. BO: substitutes 04-15 if sunday then next monday
+msgid "Tarija Day (substitutes)"
+msgstr ""
+
+#. IR: 9 Muharram
+msgid "Tasoua"
+msgstr ""
+
+#. GU, PR, US, VI: 04-15 if friday then next monday if saturday,sunday then next tuesday
+msgid "Tax Day"
+msgstr ""
+
+#. AL, BO, GT, HN, PY, VE: 03-07
+msgid "Teacher's Day"
+msgstr ""
+
+#. UZ: 10-01 and if saturday,sunday then next monday
+msgid "Teachers and Mentors Day"
+msgstr ""
+
+#. TW: 09-28
+msgid "Teachers' Day"
+msgstr ""
+
+#. IN: 06-02
+msgid "Telangana Formation Day"
+msgstr ""
+
+#. IL: 10 Tevet
+msgid "Tenth of Tevet"
+msgstr ""
+
+#. AU: 2026-04-03 P17D
+msgid "Term 1 holidays"
+msgstr ""
+
+#. AU: 2026-06-27 P16D
+msgid "Term 2 holidays"
+msgstr ""
+
+#. AU: 2026-09-19 P16D
+msgid "Term 3 holidays"
+msgstr ""
+
+#. AU: 2026-12-19 P12D
+msgid "Term 4 holidays"
+msgstr ""
+
+#. CX, WF: 10-06
+msgid "Territory Day"
+msgstr ""
+
+#. CA: 1st monday in August
+msgid "Terry Fox Day"
+msgstr ""
+
+#. US: 03-02
+msgid "Texas Independence Day"
+msgstr ""
+
+#. MU: 02-01 since 2020 prior to 2050
+msgid "Thaipoosam Cavadee"
+msgstr ""
+
+#. MY: 2016-01-24
+msgid "Thaipusam"
+msgstr ""
+
+#. CA, LC, LR: 2nd monday after 10-01
+msgid "Thanksgiving"
+msgstr ""
+
+#. AS, GD, GU, NF, PR, US, VI: 4th thursday in November
+msgid "Thanksgiving Day"
+msgstr ""
+
+#. VG: Monday before 03-08
+msgid "The Anniversary of the Birth of Hamilton Lavity Stoutt"
+msgstr ""
+
+#. EC: 05-24
+msgid "The Battle of Pichincha"
+msgstr ""
+
+#. EC: 07-24
+msgid "The Birthday of Simón Bolívar"
+msgstr ""
+
+#. AR: 10-12 if tuesday,wednesday then previous monday if thursday,friday then next monday #1
+msgid "The Day of the Race"
+msgstr ""
+
+#. SM: 09-03
+msgid "The Feast of San Marino and the Republic"
+msgstr ""
+
+#. TH: 08-12
+msgid "The Queen Mother's Birthday"
+msgstr ""
+
+#. IS: 1st sunday in June
+msgid "The Seamen's Day"
+msgstr ""
+
+#. HK: substitutes chinese 04-0-08 if Sunday then next Monday
+msgid "The day following Birthday of the Buddha"
+msgstr ""
+
+#. HK: substitutes chinese 5-01 solarterm if Sunday then next Monday
+msgid "The day following Ching Ming Festival"
+msgstr ""
+
+#. HK: substitutes chinese 09-0-09 if Sunday then next Monday
+msgid "The day following Chung Yeung Festival"
+msgstr ""
+
+#. HK: 2026-04-07
+msgid "The day following Easter Monday"
+msgstr ""
+
+#. HK: easter -1
+msgid "The day following Good Friday"
+msgstr ""
+
+#. HK: substitutes 07-01 if Sunday then next Monday
+msgid "The day following Hong Kong Special Administrative Region Establishment Day"
+msgstr ""
+
+#. HK: substitutes 05-01 if Sunday then next Monday
+msgid "The day following Labour Day"
+msgstr ""
+
+#. HK: substitutes 10-01 if Sunday then next Monday
+msgid "The day following National Day"
+msgstr ""
+
+#. HK: substitutes chinese 05-0-05 if Sunday then next Monday
+msgid "The day following Tuen Ng Festival"
+msgstr ""
+
+#. HK: chinese 08-0-16 not on Sunday
+msgid "The day following the Chinese Mid-Autumn Festival"
+msgstr ""
+
+#. HK: substitutes 01-01 if Sunday then next Monday
+msgid "The day following the first day of January"
+msgstr ""
+
+#. AM: 06-01
+msgid "The day of protection of children rights"
+msgstr ""
+
+#. HK: 01-01 not on Sunday
+msgid "The first day of January"
+msgstr ""
+
+#. HK: 12-26 not on Sunday
+msgid "The first weekday after Christmas Day"
+msgstr ""
+
+#. TW: chinese 01-0-04
+msgid "The forth day of the Chinese New Year"
+msgstr ""
+
+#. HK: substitutes chinese 01-0-03 if Sunday then next Monday
+msgid "The fourth day of Lunar New Year"
+msgstr ""
+
+#. HK: substitutes chinese 08-0-16 if Sunday then next Monday
+msgid "The second day following the Chinese Mid-Autumn Festival"
+msgstr ""
+
+#. HK: chinese 01-0-02 not on Sunday
+msgid "The second day of Lunar New Year"
+msgstr ""
+
+#. TW: chinese 01-0-02
+msgid "The second day of the Chinese New Year"
+msgstr ""
+
+#. HK: substitutes 12-25 if Sunday then next Tuesday
+msgid "The second weekday after Christmas Day"
+msgstr ""
+
+#. HK: chinese 01-0-03 not on Sunday
+msgid "The third day of Lunar New Year"
+msgstr ""
+
+#. TW: chinese 01-0-03
+msgid "The third day of the Chinese New Year"
+msgstr ""
+
+#. IL: 16 Tishrei P6D
+msgid "The week of Sukkot"
+msgstr ""
+
+#. NO, SJ: 2nd sunday before 12-25
+msgid "Third Sunday of Advent"
+msgstr ""
+
+#. VI: 01-06
+msgid "Three Kings Day"
+msgstr ""
+
+#. BR: 04-21
+msgid "Tiradentes' Day"
+msgstr ""
+
+#. IL: 9 Av if Saturday then next Sunday
+msgid "Tisha B'Av, fast"
+msgstr ""
+
+#. TW: chinese 5-01 solarterm and if Sunday then next Monday
+msgid "Tomb Sweeping Day"
+msgstr ""
+
+#. DE: 5th sunday before 12-25
+msgid "Totensonntag"
+msgstr ""
+
+#. TW: chinese 01-0-15 #1
+msgid "Tourism Day"
+msgstr ""
+
+#. AR: 2026-12-07
+msgid "Tourism Purposes Non-Working Day"
+msgstr ""
+
+#. UY: easter -6 P5D
+msgid "Tourism Week"
+msgstr ""
+
+#. IM: 2nd friday in June
+msgid "Tourist Trophy, Senior Race Day"
+msgstr ""
+
+#. US: 1st tuesday in March
+msgid "Town Meeting Day"
+msgstr ""
+
+#. VI: 03-31
+msgid "Transfer Day"
+msgstr ""
+
+#. AM: 2nd saturday in October
+msgid "Translator's Day"
+msgstr ""
+
+#. RU: orthodox 50
+msgid "Trinity Sunday"
+msgstr ""
+
+#. CU: 01-01
+msgid "Triumph of the Revolution"
+msgstr ""
+
+#. US: 05-08
+msgid "Truman Day"
+msgstr ""
+
+#. RU: 2026-02-18
+msgid "Tsagan Sar"
+msgstr ""
+
+#. IL: 15 Av
+msgid "Tu B'Av (Fifteenth of Av)"
+msgstr ""
+
+#. IL: 15 Shvat
+msgid "Tu Bishvat (Arbor Day)"
+msgstr ""
+
+#. HK: chinese 05-0-05 not on Sunday
+msgid "Tuen Ng Festival"
+msgstr ""
+
+#. MK: 12-21
+msgid "Turkish Language Day"
+msgstr ""
+
+#. SE: 01-05 12:00
+msgid "Twelfth Night"
+msgstr ""
+
+#. IM: 07-05
+msgid "Tynwald Day"
+msgstr ""
+
+#. MU: 04-01 since 2020 prior to 2050
+msgid "Ugadi"
+msgstr ""
+
+#. CZ: easter -4
+msgid "Ugly Wednesday"
+msgstr ""
+
+#. SZ: 1st Monday in September
+msgid "Umhlanga Reed Dance"
+msgstr ""
+
+#. LK: 12-23
+msgid "Unduvap Full Moon Poya Day"
+msgstr ""
+
+#. BG: 09-06
+msgid "Unification Day"
+msgstr ""
+
+#. SI: 08-17
+msgid "Unification of Prekmurje Slovenes with the Mother Nation"
+msgstr ""
+
+#. RU: 2026-04-21
+msgid "Unified Day of Remembrance of the Departed"
+msgstr ""
+
+#. TZ: 04-26
+msgid "Union Day"
+msgstr ""
+
+#. NO, SJ: 06-07
+msgid "Union Dissolution Day"
+msgstr ""
+
+#. BI, RU, ZM, ZW: 02-05
+msgid "Unity Day"
+msgstr ""
+
+#. RU: 2026-04-21
+msgid "Unity Day of Remembrance"
+msgstr ""
+
+#. RU: 1 Shawwal
+msgid "Uraza-Bayram"
+msgstr ""
+
+#. AG: 12-09
+msgid "V.C Bird Day"
+msgstr ""
+
+#. IN: 04-21
+msgid "Vaisakhi"
+msgstr ""
+
+#. AS, BE, CA, DE, GU, NL, NO, PL, PR, SJ, US, VI: 02-14
+msgid "Valentine's Day"
+msgstr ""
+
+#. LK: 10-25
+msgid "Vap Full Moon Poya Day"
+msgstr ""
+
+#. SE: 1st sunday in March
+msgid "Vasaloppet"
+msgstr ""
+
+#. VE: 12-10
+msgid "Venezuelan Air Force Day"
+msgstr ""
+
+#. ID, MY, SG, TH: 2001-05-07
+msgid "Vesak Day"
+msgstr ""
+
+#. AS, GU, PR, US, VI: 11-11
+msgid "Veterans Day"
+msgstr ""
+
+#. NL: 06-29 since 2005 and prior to 2009
+msgid "Veterans' Day"
+msgstr ""
+
+#. FR, GP, MQ: 07-21
+msgid "Victor Schoelcher Day"
+msgstr ""
+
+#. CA: monday before 05-25
+msgid "Victoria Day"
+msgstr ""
+
+#. BA, BL, BY, EE, FR, GE, GF, GP, KZ, MD, MF, MQ, MT, NC, PF, PM, RE, RS, RU, TR, UA, US, WF, YT: 05-09
+msgid "Victory Day"
+msgstr ""
+
+#. HR: 08-05
+msgid "Victory and Homeland Thanksgiving Day and the Day of Croatian defenders"
+msgstr ""
+
+#. AM: 05-09
+msgid "Victory and Peace Day"
+msgstr ""
+
+#. ET: 03-02
+msgid "Victory at Adwa Day"
+msgstr ""
+
+#. IL: 05-09
+msgid "Victory in Europe Day"
+msgstr ""
+
+#. GI: 2020-05-08
+msgid "Victory in Europe Day (VE Day)"
+msgstr ""
+
+#. CU: 01-02
+msgid "Victory of Armed Forces Day"
+msgstr ""
+
+#. VN: vietnamese 1-0-5
+msgid "Victory of Ngọc Hồi-Đống Đa"
+msgstr ""
+
+#. VN: 04-21
+msgid "Vietnam Book Day"
+msgstr ""
+
+#. VN: 06-28
+msgid "Vietnamese Family Day"
+msgstr ""
+
+#. VN: vietnamese 1-0-1
+msgid "Vietnamese New Year"
+msgstr ""
+
+#. VN: 1 day before vietnamese 1-0-1 P5D
+msgid "Vietnamese New Year Holidays"
+msgstr ""
+
+#. VN: 11-20
+msgid "Vietnamese Teacher's Day"
+msgstr ""
+
+#. VN: 10-20
+msgid "Vietnamese Women's Day"
+msgstr ""
+
+#. GT: 02-02
+msgid "Virgen de la Candelaria y Sagrado Corazón de Jesús"
+msgstr ""
+
+#. VG: 07-01 if Sunday,Thursday then next Monday if Saturday then previous Friday if Tuesday,Wednesday then previous Monday
+msgid "Virgin Islands Day"
+msgstr ""
+
+#. VI: 2nd monday in October
+msgid "Virgin Islands–Puerto Rico Friendship Day"
+msgstr ""
+
+#. PY: 12-08
+msgid "Virgin of Caacupe"
+msgstr ""
+
+#. CO: monday after 07-09 since 2026
+msgid "Virgin of Chiquinquirá"
+msgstr ""
+
+#. BJ: 01-10 since 1998 and prior to 2025
+msgid "Vodoun Festival"
+msgstr ""
+
+#. ZA: 2024-05-29
+msgid "Voting Day"
+msgstr ""
+
+#. CH: 1st sunday in June
+msgid "Vätertag"
+msgstr ""
+
+#. NZ: 02-06 and if saturday,sunday then next monday
+msgid "Waitangi Day"
+msgstr ""
+
+#. SE: 04-30 12:00
+msgid "Walpurgis Night"
+msgstr ""
+
+#. PL: 04-19
+msgid "Warsaw Ghetto Uprising Remembrance Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Washington and Lincoln Day"
+msgstr ""
+
+#. AS, PR, US: 3rd monday in February
+msgid "Washington's Birthday"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Washington's Birthday/President's Day"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Washington's and Lincoln's Birthday"
+msgstr ""
+
+#. US: 3rd monday in February
+msgid "Washington-Lincoln Day"
+msgstr ""
+
+#. US: 06-20
+msgid "West Virginia Day"
+msgstr ""
+
+#. AU: 1st monday in June
+msgid "Western Australia Day"
+msgstr ""
+
+#. AD, AG, AI, AT, BB, BE, BJ, BL, BS, CF, CG, CH, CI, DE, DK, DM, ES, FO, FR, GA, GD, GF, GL, GP, GR, HU, IS, IT, KN, LC, LI, LU, MC, MF, MG, MQ, MS, NC, NL, NO, PF, PM, RE, RO, SE, SH, SJ, SN, TG, VC, VG, WF, YT: easter 50
+msgid "Whit Monday"
+msgstr ""
+
+#. RU: 2026-02-18
+msgid "White Month Festival (Sagaalgan)"
+msgstr ""
+
+#. GT: 02-11
+msgid "White Nun Day"
+msgstr ""
+
+#. AS: 2nd sunday in October
+msgid "White Sunday"
+msgstr ""
+
+#. SE: easter 48
+msgid "Whitsun Eve"
+msgstr ""
+
+#. LR: 11-29
+msgid "William Tubman's Birthday"
+msgstr ""
+
+#. MD: 1st saturday in October P2D
+msgid "Wine Day"
+msgstr ""
+
+#. HU: 2024-01-05
+msgid "Winter school holiday"
+msgstr ""
+
+#. IS: 02-18
+msgid "Woman's Day"
+msgstr ""
+
+#. DE: easter -52
+msgid "Women's Carnival Day"
+msgstr ""
+
+#. GA: 04-17
+msgid "Women's Day"
+msgstr ""
+
+#. MZ, ZM: 04-07
+msgid "Women’s Day"
+msgstr ""
+
+#. NG: 05-01 and if Saturday then next Monday
+msgid "Worker's Day"
+msgstr ""
+
+#. NA: 05-01
+msgid "Workers Day"
+msgstr ""
+
+#. GI: 04-28
+msgid "Workers Memorial Day"
+msgstr ""
+
+#. LS, MZ, ZA: 05-01
+msgid "Workers' Day"
+msgstr ""
+
+#. NL: 10-04
+msgid "World Animal Day"
+msgstr ""
+
+#. RS: 10-21
+msgid "World War II Serbian Victims Remembrance Day"
+msgstr ""
+
+#. IN: 06-15
+msgid "YMA Day"
+msgstr ""
+
+#. MY: 1st Monday in June
+msgid "Yang di-Pertuan Agong's Birthday"
+msgstr ""
+
+#. MY: 01-14
+msgid "Yang di-Pertuan Besar of Negeri Sembilan's Birthday"
+msgstr ""
+
+#. AM: 05-08
+msgid "Yerkrapah Day"
+msgstr ""
+
+#. HR, ME, MK, RS: 1 Tishrei
+msgid "Yom Kippur"
+msgstr ""
+
+#. PK: 05-28
+msgid "Youm-e-Takbeer"
+msgstr ""
+
+#. GY: 12 Rabi al-awwal
+msgid "Youman Nabi"
+msgstr ""
+
+#. AL, CM, CN, MA, TW, ZA, ZM: 12-08 and if saturday,sunday then next monday
+msgid "Youth Day"
+msgstr ""
+
+#. RU: 06-21
+msgid "Ysyakh National Holiday"
+msgstr ""
+
+#. TZ: 01-02
+msgid "Zanzibar Revolution Day"
+msgstr ""
+
+#. RU: 2024-12-25
+msgid "Zul"
+msgstr ""
+
+#. AX: sunday before May
+msgid "Åland Flag Day"
+msgstr ""
+
+#. TN: 03-20
+msgid "عيد الإستقلال"
+msgstr ""
+
+#. TN: 01-14
+msgid "عيد الثورة و الشباب"
+msgstr ""
+
+#. TN: 10-15
+msgid "عيد الجلاء"
+msgstr ""
+
+#. TN: 07-25
+msgid "عيد الجمهورية"
+msgstr ""
+
+#. TN: 04-09
+msgid "عيد الشهداء"
+msgstr ""
+
+#. TN: 08-13
+msgid "عيد المرأة"
+msgstr ""

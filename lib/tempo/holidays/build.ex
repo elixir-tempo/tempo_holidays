@@ -311,7 +311,26 @@ defmodule Tempo.Holidays.Build do
       |> subdivisions_of(code)
       |> Map.new(fn {state, data} -> {state, compile_state(bundle, data, names, language)} end)
 
-    write_country(directory, code, %{country: country, states: states})
+    write_country(directory, code, %{
+      country: country,
+      states: states,
+      languages: territory_languages(bundle, code)
+    })
+  end
+
+  defp languages_as_cldr(languages) do
+    languages
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&DateHolidays.language_code/1)
+    |> Enum.uniq()
+  end
+
+  # The languages the dataset names a territory's holidays in, its own first.
+  defp territory_languages(bundle, code) do
+    case get_in(bundle, ["holidays", code, "langs"]) do
+      languages when is_list(languages) -> languages_as_cldr(languages)
+      _none -> []
+    end
   end
 
   # A country's first level of subdivisions: its `states`, and its `regions`

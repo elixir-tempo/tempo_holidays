@@ -47,7 +47,7 @@ defmodule Tempo.Holidays do
 
   """
 
-  alias Tempo.Holidays.{Data, DayStart, Holiday, Locale}
+  alias Tempo.Holidays.{Data, DayStart, Holiday, Locale, Names}
   alias Tempo.Interval
   alias Tempo.IntervalSet
   alias Tempo.RecurrenceSet
@@ -142,7 +142,10 @@ defmodule Tempo.Holidays do
     is Saudi Arabia).
 
   * `:locale` — a BCP 47 locale identifier or `t:Localize.LanguageTag.t/0` whose
-    territory is derived (`locale: "en-US-u-sd-usca"` selects California).
+    territory is derived (`locale: "en-US-u-sd-usca"` selects California), and
+    the language holidays are named in (`Tempo.Holidays.Names`). With
+    `:territory`, it names the language alone (`territory: :US, locale: "de"`).
+    The default is `Localize.get_locale/0`'s language, for the names.
 
   * `:subdivision` — a subdivision code, the ISO 3166-2 part after the
     territory's (`"ENG"`, `"CA"`), or the whole code (`"GB-ENG"`), in place of
@@ -192,6 +195,10 @@ defmodule Tempo.Holidays do
       iex> Tempo.metadata(holidays)
       %{territory: "AU", dates: :substitute}
 
+      iex> {:ok, austria} = Tempo.Holidays.holidays(locale: "de-AT")
+      iex> austria |> Tempo.RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1).name) |> Enum.take(2)
+      ["Neujahr", "Heilige Drei Könige"]
+
       iex> {:ok, banking} = Tempo.Holidays.holidays(:AT, include: :bank)
       iex> banking |> Tempo.RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1).type) |> Enum.uniq()
       [:bank]
@@ -220,11 +227,44 @@ defmodule Tempo.Holidays do
          {:ok, subdivision} <- Data.subdivision(resolved.territory, resolved.subdivision),
          {:ok, changes} <- configured_changes(resolved.territory, subdivision),
          {:ok, dataset} <- read_holidays(resolved.territory, subdivision, dates),
-         {:ok, territorial} <- with_own(dataset, changes, dates) do
-      members = selected_members(territorial, types, dates)
+         {:ok, territorial} <- with_own(dataset, changes, dates),
+         {:ok, locale} <- names_locale(target, options),
+         {:ok, languages} <- Data.languages(resolved.territory) do
+      named = in_locale(territorial, locale, languages)
+      members = selected_members(named, types, dates)
       metadata = set_metadata(resolved.territory, subdivision, dates)
       RecurrenceSet.new(members, metadata: metadata)
     end
+  end
+
+  # The locale a request's holiday names are read in: the target's, when it
+  # is a locale, the `:locale` option's, or the process's.
+  defp names_locale(%Localize.LanguageTag{} = target, _options) do
+    {:ok, target}
+  end
+
+  defp names_locale(_target, options) do
+    case Keyword.fetch(options, :locale) do
+      {:ok, locale} -> validated_locale(locale)
+      :error -> {:ok, Localize.get_locale()}
+    end
+  end
+
+  defp validated_locale(locale) do
+    case Localize.validate_locale(locale) do
+      {:ok, tag} -> {:ok, tag}
+      {:error, _exception} -> {:error, {:invalid_locale, locale}}
+    end
+  end
+
+  # Each holiday named as the locale reads it (`Tempo.Holidays.Names`), on
+  # its expression's metadata too.
+  defp in_locale(territorial, locale, languages) do
+    Enum.map(territorial, fn {holiday, expression} ->
+      name = Names.name(holiday, locale, languages)
+      metadata = Map.put(Tempo.metadata(expression), :name, name)
+      {%{holiday | name: name}, Tempo.put_metadata(expression, metadata)}
+    end)
   end
 
   # A request's members: the territory's holidays, the dataset's and the
@@ -436,8 +476,9 @@ defmodule Tempo.Holidays do
     end
   end
 
-  defp named_in?({_holiday, expression}, names) do
-    named?(expression, names)
+  # A configured name removes a holiday by its name in any language.
+  defp named_in?({holiday, expression}, names) do
+    named?(expression, names) or Enum.any?(Map.values(holiday.names), &(&1 in names))
   end
 
   defp named?(expression, names) do

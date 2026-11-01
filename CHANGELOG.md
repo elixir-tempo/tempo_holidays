@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.2.0] — Unreleased
+
+### Added
+
+* Holiday names in the request's locale (`Tempo.Holidays.Names`): the dataset's in 77 languages, a Gettext catalog of MF2 messages (`Tempo.Holidays.Gettext`), then English, then the territory's own languages.
+
+* `mix tempo.holidays.gettext` writes the catalog's template, `priv/gettext/holidays.pot`; `config :tempo_holidays, gettext: …` names an application's own backend. `Tempo.Holidays.Data.languages/1` gives a territory's own languages.
+
+### Changed
+
+* A holiday's `:name` is in the language of the `:locale` option, else of `Localize.get_locale/0`: an `en-US` process reads US names (`"Labor Day"`) where it read the dataset's generic English.
+
+* A removal configured by name removes a holiday by its name in any language the dataset gives.
+
+### Fixed
+
+* A holiday the dataset names in no English reads in the territory's language (Glarus' `"Näfelser Fahrt"`), where its name was its rule; Czech, Japanese, Georgian, Latin and Norwegian names are kept under CLDR's codes.
+
+* A territory code of other than two letters never names a file to read, where `Tempo.Holidays.Data.for_territory/2` read a path built from any string.
+
 ## [v0.1.0] — 2026-10-28
 
 First release: public holidays for every territory in the [date-holidays](https://github.com/commenthol/date-holidays) dataset, as Tempo recurrences for any window. The [README](https://hexdocs.pm/tempo_holidays/readme.html) and the [user guide](https://hexdocs.pm/tempo_holidays/user-guide.html) describe it in full.

@@ -33,6 +33,15 @@ defmodule Tempo.Holidays.DateHolidays do
     "observance" => :observance
   }
 
+  # The language codes date-holidays writes that are not CLDR's, and the
+  # CLDR code each is: Japanese, Czech, Georgian, Latin and Norwegian
+  # Bokmål. A name is kept under the CLDR code a locale names it by.
+  @language_codes %{"jp" => "ja", "cz" => "cs", "ge" => "ka", "lat" => "la", "no" => "nb"}
+
+  # Keys of a name map that are no language: date-holidays writes a
+  # holiday's `type` among its names in a few places.
+  @not_languages ["type"]
+
   @doc """
   Compile a country's `days` map into a list of holidays.
 
@@ -120,6 +129,7 @@ defmodule Tempo.Holidays.DateHolidays do
   def compile_day(rule, meta, language, names) when is_binary(rule) and is_map(meta) do
     holiday = %Holiday{
       name: name(meta, language, names, rule),
+      names: translations(meta, names),
       type: type(meta),
       rule: rule,
       active: active_ranges(meta),
@@ -165,6 +175,73 @@ defmodule Tempo.Holidays.DateHolidays do
       _absent ->
         nil
     end
+  end
+
+  # Every name the dataset gives a holiday: its `_name` reference's, and its
+  # own inline names, which win for a language both give.
+  defp translations(meta, names) do
+    meta
+    |> referenced_translations(names)
+    |> Map.merge(inline_translations(meta))
+    |> Map.drop(@not_languages)
+    |> Enum.reduce(%{}, &by_language_code/2)
+  end
+
+  # A name under the CLDR code of its language; where date-holidays writes a
+  # language under both codes (`cs` and `cz`), the CLDR code's name is kept.
+  defp by_language_code({code, name}, kept) do
+    cldr = language_code(code)
+
+    if code != cldr and Map.has_key?(kept, cldr) do
+      kept
+    else
+      Map.put(kept, cldr, name)
+    end
+  end
+
+  @doc """
+  The CLDR code of a language code date-holidays writes: `"ja"` for its
+  `"jp"`, and any code that is already CLDR's unchanged.
+
+  ### Arguments
+
+  * `code` is a language code from the dataset, such as `"jp"` or `"de-ch"`.
+
+  ### Returns
+
+  * The code as CLDR writes it.
+
+  ### Examples
+
+      iex> Tempo.Holidays.DateHolidays.language_code("jp")
+      "ja"
+
+      iex> Tempo.Holidays.DateHolidays.language_code("de-ch")
+      "de-ch"
+
+  """
+  @spec language_code(String.t()) :: String.t()
+  def language_code(code) when is_binary(code) do
+    Map.get(@language_codes, code, code)
+  end
+
+  defp inline_translations(%{"name" => translations}) when is_map(translations) do
+    translations
+  end
+
+  defp inline_translations(_meta) do
+    %{}
+  end
+
+  defp referenced_translations(%{"_name" => reference}, names) when is_binary(reference) do
+    case Map.get(names, reference) do
+      %{"name" => translations} when is_map(translations) -> translations
+      _absent -> %{}
+    end
+  end
+
+  defp referenced_translations(_meta, _names) do
+    %{}
   end
 
   defp type(%{"type" => type}) when is_binary(type), do: Map.get(@types, type, :public)

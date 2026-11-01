@@ -4,13 +4,11 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
-* [ ] **Hebrew holidays are not projected by `day_start/2`** — `Tempo.to_elixir/1` refuses an interval whose ends are written with a traditional month (`5786Y7m15D/7m15D[u-ca=hebrew]`), so `DayStart.project/3` errors and `projected_or_as_is/2` returns the day unprojected, silently. A Tempo defect; also, the fallback hides any projection error, not only an absent `tz_world`.
-
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
 
-* [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
-
 ## Blocked
+
+* [ ] **Hebrew holidays are not projected by `day_start/2`** — `Tempo.to_elixir/1` refuses an interval whose ends are written with a traditional month (`5786Y7m15D/7m15D[u-ca=hebrew]`), so `DayStart.project/3` errors and `projected_or_as_is/2` returns the day unprojected, silently. Fixed in Tempo (`to_elixir/1`, 2.2.1 unreleased); blocked on ex_tempo 2.2.1. Then narrow the fallback, which hides any projection error, not only an absent `tz_world`, and add the `DayStart` tests.
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
 
@@ -23,6 +21,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Localized names (MF2)** — names in the request's locale: the dataset's (77 languages, under CLDR codes), a Gettext MF2 catalog (`mix tempo.holidays.gettext` writes its template), English, the territory's own languages. 2026-11-01.
 
 * [x] **Conformance harness speed** — ~25 min → 223 s on the public path → 49 s on the current upstreams → 4 s with a fixture to a task across the schedulers, results identical. 2026-11-01.
 

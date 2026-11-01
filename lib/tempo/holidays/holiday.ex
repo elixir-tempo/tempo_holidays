@@ -10,7 +10,9 @@ defmodule Tempo.Holidays.Holiday do
   and `:type` — and `Tempo.to_interval/2` converts that set to occurrences
   tagged the same way.
 
-  The fields are the holiday's `:name` and `:type`; its `:rule`, as
+  The fields are the holiday's `:name`, its `:names` in every language the
+  dataset gives (an ISO 639-1 code, or one with a territory such as
+  `"de-at"`, to the name in it), and its `:type`; its `:rule`, as
   date-holidays writes it; the `:active` windows, `:disable`d and `:enable`d
   dates the dataset gives beside the rule, which `Tempo.DateRule.parse/2`
   takes as options; and whether it is a `:substitute` entry, a rule that
@@ -30,6 +32,7 @@ defmodule Tempo.Holidays.Holiday do
 
   @type t :: %__MODULE__{
           name: String.t(),
+          names: %{String.t() => String.t()},
           type: type(),
           rule: String.t(),
           active: [{Date.t() | nil, Date.t() | nil}],
@@ -39,5 +42,14 @@ defmodule Tempo.Holidays.Holiday do
         }
 
   @enforce_keys [:name, :rule]
-  defstruct [:name, :rule, type: :public, active: [], disable: [], enable: [], substitute: false]
+  defstruct [
+    :name,
+    :rule,
+    names: %{},
+    type: :public,
+    active: [],
+    disable: [],
+    enable: [],
+    substitute: false
+  ]
 end

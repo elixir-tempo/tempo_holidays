@@ -20,9 +20,10 @@ defmodule Tempo.Holidays.Data do
   # Bump it with any change to that struct, or to the values it holds (3:
   # Hebrew months are traditional month numbers; 4: a dated period carries its
   # length; 5: a holiday holds its rule's text and dataset dates, read by
-  # `Tempo.DateRule`), so every build regenerates the data instead of loading
-  # structs of an older shape.
-  @data_format 5
+  # `Tempo.DateRule`; 6: a holiday holds its names in every language, and a
+  # territory its own languages), so every build regenerates the data instead
+  # of loading structs of an older shape.
+  @data_format 6
 
   @doc """
   Return the compiled holidays for a territory, or one of its subdivisions.
@@ -239,6 +240,69 @@ defmodule Tempo.Holidays.Data do
   end
 
   @doc """
+  The languages a territory's holidays are named in, in the order the
+  dataset gives them: its own, the first most used.
+
+  ### Arguments
+
+  * `territory` is a CLDR territory code, such as `"CH"` or `:CH`.
+
+  ### Returns
+
+  * `{:ok, languages}`, a list of language codes such as
+    `["de-ch", "de", "fr", "it"]`, empty where the dataset names none, or
+
+  * `{:error, {:unknown_territory, territory}}`.
+
+  ### Examples
+
+      iex> Tempo.Holidays.Data.languages("CH")
+      {:ok, ["de-ch", "de", "fr", "it"]}
+
+      iex> Tempo.Holidays.Data.languages("ZZ")
+      {:error, {:unknown_territory, "ZZ"}}
+
+  """
+  @spec languages(String.t() | atom()) ::
+          {:ok, [String.t()]} | {:error, {:unknown_territory, term()}}
+  def languages(territory) when is_binary(territory) or is_atom(territory) do
+    case prepared(upcase(territory)) do
+      {:ok, data} -> {:ok, Map.get(data, :languages, [])}
+      :error -> {:error, {:unknown_territory, territory}}
+    end
+  end
+
+  def languages(territory) do
+    {:error, {:unknown_territory, territory}}
+  end
+
+  @doc false
+  # Every holiday a territory's data holds, its states' and regions' own
+  # among them: the names the Gettext catalog has a message for.
+  @spec every_holiday(String.t() | atom()) ::
+          {:ok, [Holiday.t()]} | {:error, {:unknown_territory, term()}}
+  def every_holiday(territory) when is_binary(territory) or is_atom(territory) do
+    case prepared(upcase(territory)) do
+      {:ok, data} -> {:ok, data.country ++ subdivisions_holidays(Map.get(data, :states, %{}))}
+      :error -> {:error, {:unknown_territory, territory}}
+    end
+  end
+
+  def every_holiday(territory) do
+    {:error, {:unknown_territory, territory}}
+  end
+
+  defp subdivisions_holidays(states) do
+    Enum.flat_map(states, fn {_state, level} ->
+      Map.get(level, :holidays, []) ++ regions_holidays(Map.get(level, :regions, %{}))
+    end)
+  end
+
+  defp regions_holidays(regions) do
+    Enum.flat_map(regions, fn {_region, level} -> Map.get(level, :holidays, []) end)
+  end
+
+  @doc """
   The date-holidays release the loaded data was built from.
 
   The data is the package's own, built from the release `Tempo.Holidays`
@@ -278,7 +342,21 @@ defmodule Tempo.Holidays.Data do
   # A territory's data, loaded once and kept for the life of the VM. Each
   # territory is a single `:persistent_term` entry written once, which costs
   # no global GC.
+  # Only a code of two letters names a territory's file, so a code from
+  # outside never names a path elsewhere.
+  defp prepared(code) when not is_binary(code) do
+    :error
+  end
+
   defp prepared(code) do
+    if String.match?(code, ~r/\A[A-Z]{2}\z/) do
+      prepared_territory(code)
+    else
+      :error
+    end
+  end
+
+  defp prepared_territory(code) do
     key = {__MODULE__, code}
 
     case :persistent_term.get(key, nil) do

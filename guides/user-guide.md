@@ -39,6 +39,23 @@ iex> Tempo.metadata(california)
 
 A subdivision is found at whichever level the data holds it: a state, or a region by its own code or by its path from its state (`"CA-LA"`, where `"LA"` alone is Louisiana). A code the data does not hold is an error, `{:unknown_subdivision, code}`, never the territory's holidays in its place. Territories inherit as in the dataset (Jersey takes Great Britain's set).
 
+## Names in a locale's language
+
+A holiday's `:name` is in the language of the request's locale: the `:locale` option's, or the process's (`Localize.get_locale/0`). date-holidays names holidays in seventy-seven languages, and where it has no name in the locale's language the name comes from the Gettext catalog of holiday names, then English, then the territory's own languages, so a holiday the dataset names only in German reads in German. `Tempo.Holidays.Names` gives the order in full.
+
+```elixir
+iex> {:ok, austria} = Tempo.Holidays.holidays(locale: "de-AT")
+iex> austria |> Tempo.RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1).name) |> Enum.take(2)
+["Neujahr", "Heilige Drei Könige"]
+iex> {:ok, united_states} = Tempo.Holidays.holidays(territory: :US, locale: "fr")
+iex> united_states |> Tempo.RecurrenceSet.members() |> Enum.map(&Tempo.metadata(&1).name) |> Enum.take(1)
+["Nouvel An"]
+```
+
+> *Austria's holidays, **named in Austrian German**; the United States', **in French**.*
+
+With `:territory` beside it, `:locale` names the language alone. An application that translates names the dataset lacks names its own Gettext backend, one that uses `Localize.Gettext.Interpolation`, with a `"holidays"` domain: `config :tempo_holidays, gettext: MyApp.Gettext`. `mix tempo.holidays.gettext` writes the template of every name, and a removal configured by name removes a holiday by its name in any language.
+
 ## Holidays compose
 
 Because the holidays are a Tempo value, they meet anything else through set algebra. A set operation converts them over the other operand, keeping every occurrence that overlaps it.
