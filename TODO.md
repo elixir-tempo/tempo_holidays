@@ -4,7 +4,7 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Blocked
 
-* [ ] **Day-start projection through Tempo** — `DayStart.project/3` becomes a call to `Tempo.day_start/3`, which projects over Calendrical's new `day_bounds/2` (Tempo's decision 91, `tempo/plans/day-start.md`): its astronomy, evening clock and canonical places go, and the holiday-set logic stays. Blocked on `Tempo.day_start/3`, itself blocked on Calendrical. Also: a territory's own location (derive its zone or point from the locale).
+* [ ] **Day-start projection through Tempo** — `day_start/2` projects through `Tempo.day_start/1`, over Calendrical's `day_bounds/1` (Tempo's decision 91, `tempo/plans/day-start.md`): a day start is the calendar's, so its astronomy, evening clock, canonical places, `{:evening, …}`, `{:sunset, location}` and `tz_world` go, and the holiday-set logic stays. Blocked on `Tempo.day_start/1`, itself blocked on Calendrical.
 
 * [ ] **Hebrew holidays are not projected by `day_start/2`** — `Tempo.to_elixir/1` refuses an interval whose ends are written with a traditional month (`5786Y7m15D/7m15D[u-ca=hebrew]`), so `DayStart.project/3` errors and `projected_or_as_is/2` returns the day unprojected, silently. Fixed in Tempo (`to_elixir/1`, 2.2.1 unreleased); blocked on ex_tempo 2.2.1. Then narrow the fallback, which hides any projection error, not only an absent `tz_world`, and add the `DayStart` tests.
 
