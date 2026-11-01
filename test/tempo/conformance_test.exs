@@ -23,8 +23,9 @@ defmodule Tempo.Holidays.ConformanceTest do
   alias Tempo.Holidays.{Conformance, Fixtures}
 
   @moduletag :conformance
-  # The full corpus is ~171k rule-checks and runs for minutes; this is an
-  # opt-in exhaustive test, so let it run to completion.
+  # The full corpus is ~171k rule-checks, run a fixture to a task across
+  # the schedulers (about 4 s on ten cores); this is an opt-in exhaustive
+  # test, so let it run to completion.
   @moduletag timeout: :infinity
 
   test "our computed dates match date-holidays across the full corpus" do

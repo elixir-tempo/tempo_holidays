@@ -29,7 +29,41 @@ defmodule Tempo.Holidays.Conformance do
   @spec run([Tempo.Holidays.Fixtures.fixture()], keyword()) :: stats()
   def run(fixtures, options \\ []) do
     sample_limit = Keyword.get(options, :samples, 25)
-    Enum.reduce(fixtures, initial(), &check_fixture(&1, &2, sample_limit))
+
+    # Each fixture is checked apart from the others, one task each across
+    # the schedulers, and the stats are merged in fixture order, so the
+    # samples kept are the first the sequential walk would keep.
+    fixtures
+    |> Task.async_stream(&check_fixture(&1, initial(), sample_limit),
+      ordered: true,
+      timeout: :infinity,
+      max_concurrency: System.schedulers_online()
+    )
+    |> Enum.reduce(initial(), fn {:ok, stats}, acc -> merged(acc, stats, sample_limit) end)
+  end
+
+  # Two runs' stats as one: counts summed, and the samples of the first
+  # followed by those of the second, up to the limit. Samples are kept
+  # newest first, as `add_sample/3` prepends them.
+  defp merged(acc, stats, limit) do
+    samples =
+      (Enum.reverse(acc.samples) ++ Enum.reverse(stats.samples))
+      |> Enum.take(limit)
+      |> Enum.reverse()
+
+    %{
+      rules: acc.rules + stats.rules,
+      matched: acc.matched + stats.matched,
+      unsupported: summed(acc.unsupported, stats.unsupported),
+      known_unsupported: summed(acc.known_unsupported, stats.known_unsupported),
+      mismatched: summed(acc.mismatched, stats.mismatched),
+      divergent: summed(acc.divergent, stats.divergent),
+      samples: samples
+    }
+  end
+
+  defp summed(a, b) do
+    Map.merge(a, b, fn _category, left, right -> left + right end)
   end
 
   defp initial do

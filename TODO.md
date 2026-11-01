@@ -10,10 +10,6 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
 
-## In progress
-
-* [ ] **Conformance harness speed** — ~25 min → ~5.4 min (Tempo's parser) → 230 s (astro 2.6.1) → 542 s (`materialise/2` on parsed recurrences) → 213 s with the Calendrical and Tempo lunation fixes (below; Astro's share arrives with astro 2.6.2) → 223 s on the public path (`holidays/2`, each territory read once). Then: harness parallelism.
-
 ## Blocked
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
@@ -27,6 +23,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Conformance harness speed** — ~25 min → 223 s on the public path → 49 s on the current upstreams → 4 s with a fixture to a task across the schedulers, results identical. 2026-11-01.
 
 * [x] **Coverage to 90%** — 90.9% with the build-time and test-support modules excluded in `mix.exs`; the CI lint row runs `mix test --cover --include conformance`. 2026-11-01.
 
