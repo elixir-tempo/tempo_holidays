@@ -4,11 +4,11 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Open
 
+* [ ] **Hebrew holidays are not projected by `day_start/2`** — `Tempo.to_elixir/1` refuses an interval whose ends are written with a traditional month (`5786Y7m15D/7m15D[u-ca=hebrew]`), so `DayStart.project/3` errors and `projected_or_as_is/2` returns the day unprojected, silently. A Tempo defect; also, the fallback hides any projection error, not only an absent `tz_world`.
+
 * [ ] **Day-start projection → Tempo-native** — `Tempo.Holidays.DayStart.project/3` (a calendar day → a Gregorian sunset/evening-bounded datetime interval) belongs natively in Tempo eventually, per the user; it is written self-contained to lift with little change. Also: a territory's own location (derive its zone or point from the locale) as a follow-up to the current canonical and explicit locations.
 
 * [ ] **Localized names (MF2)** — holiday names in the requested locale's language, beyond the current English/`_name` resolution. date-holidays names some holidays in one language only, so the English name falls back to the rule (Glarus' Näfelser Fahrt reads as its rule string).
-
-* [ ] **Coverage to 90%** — the CI lint row runs plain `mix test` until coverage reaches the default 90% threshold, then takes the reference workflow's `mix test --cover`. 83% today with the build-time and test-support modules ignored (`Mix.Tasks.*`, `Build`, `Conformance`, `Fixtures`); the gaps are `DayStart` (65%) and `DateHolidays` (74%).
 
 ## In progress
 
@@ -27,6 +27,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Coverage to 90%** — 90.9% with the build-time and test-support modules excluded in `mix.exs`; the CI lint row runs `mix test --cover --include conformance`. 2026-11-01.
 
 * [x] **Lunations** — the lunisolar workload from 53.1 s to 2.07 s, results identical; Tempo finds a traditional month's ordinal with Calendrical's `month_from_traditional`, which reads the year's leap month and builds no date. 2026-11-01.
 

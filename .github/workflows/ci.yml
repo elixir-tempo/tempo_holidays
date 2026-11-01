@@ -144,10 +144,12 @@ jobs:
       # The lint entry also runs the :conformance suite (excluded from
       # default runs in test_helper.exs), so every compiled rule is checked
       # against the date-holidays fixture corpus on every push. Its fixture
-      # tarball is cached under _build after the first run.
-      - name: Run tests with conformance
+      # tarball is cached under _build after the first run. It runs under
+      # coverage, held to the default 90% threshold (the build-time and
+      # test-support modules are excluded in mix.exs).
+      - name: Run tests with conformance and coverage
         if: matrix.lint
-        run: mix test --include conformance
+        run: mix test --cover --include conformance
 
       - name: Restore PLT cache
         if: matrix.lint

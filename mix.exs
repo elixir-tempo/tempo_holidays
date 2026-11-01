@@ -12,6 +12,23 @@ defmodule Tempo.Holidays.MixProject do
       source_url: @source_url,
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
+      # Excluded from coverage:
+      #  * `Mix.Tasks.Compile.Holidays`, `Mix.Tasks.Tempo.Holidays.Update`
+      #    and `Tempo.Holidays.Build` — the compiler that writes
+      #    priv/holidays from the pinned date-holidays bundle, and its task
+      #    to fetch a new one. They run when the data is built, not in the
+      #    test suite, which reads what they wrote.
+      #  * `Tempo.Holidays.Conformance` and `Tempo.Holidays.Fixtures` —
+      #    test-support modules under test/support.
+      test_coverage: [
+        ignore_modules: [
+          Mix.Tasks.Compile.Holidays,
+          Mix.Tasks.Tempo.Holidays.Update,
+          Tempo.Holidays.Build,
+          Tempo.Holidays.Conformance,
+          Tempo.Holidays.Fixtures
+        ]
+      ],
       start_permanent: Mix.env() == :prod,
       # The `:holidays` compiler generates priv/holidays/<CC>.etf from the
       # pinned date-holidays bundle (see Tempo.Holidays.Build). It runs after

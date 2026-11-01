@@ -165,8 +165,6 @@ defmodule Tempo.Holidays.DayStart do
     end
   end
 
-  defp projected(interval, _calendar, :midnight), do: {:ok, interval}
-
   # The occurrence's days begin at the boundary of the evening before its
   # first, and end at the boundary of the evening of its last.
   defp projected(interval, calendar, {boundary, location}) do
@@ -203,7 +201,7 @@ defmodule Tempo.Holidays.DayStart do
   end
 
   # `:evening` / `:sunset` use the canonical location; a pair names its own.
-  defp normalise(:midnight), do: :midnight
+  # `:midnight` is answered before a day start is normalised.
   defp normalise(boundary) when boundary in [:evening, :sunset], do: {boundary, :canonical}
   defp normalise({boundary, location}), do: {boundary, location}
 
