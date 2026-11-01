@@ -1,7 +1,7 @@
 defmodule Tempo.Holidays.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
   @source_url "https://github.com/elixir-tempo/tempo_holidays"
 
   def project do
@@ -121,12 +121,13 @@ defmodule Tempo.Holidays.MixProject do
 
   defp deps do
     [
-      # Tempo 2.3, whose Tempo.DateRule reads the dataset's rules and whose
-      # Tempo.day_start/1 places a day of a sunset calendar. It requires
-      # Calendrical 2.4, whose day_bounds/1 gives that day's sunsets, and
-      # Astro 2.10, whose sunsets they are.
-      {:ex_tempo, path: "../tempo", override: true},
-      {:calendrical, path: "../../localize/calendrical", override: true},
+      # Tempo 2.4, whose Tempo.DateRule reads the dataset's rules, the
+      # Bengali calendar's among them, and whose Tempo.day_start/1 places a
+      # day of a sunset calendar. It requires Calendrical 2.5, whose Bangla
+      # calendar and day_bounds/1 those rest on, and Astro 2.10, whose
+      # sunsets they are.
+      {:ex_tempo, "~> 2.4"},
+      {:calendrical, "~> 2.5"},
       {:astro, "~> 2.10"},
       # Tz, which Tempo brings and asks where nothing else is configured: an
       # equinox or solstice in a named IANA zone (Chile's solstice `in
@@ -135,7 +136,7 @@ defmodule Tempo.Holidays.MixProject do
       {:tz, "~> 0.28"},
       # LanguageTag resolution (territory + language in one tag), locale-aware
       # date/time formatting, and MF2 for any templated holiday notes.
-      {:localize, path: "../../localize/localize", override: true},
+      {:localize, "~> 1.6"},
       # Holiday names the data lacks in a language come from a Gettext
       # catalog of MF2 messages, read through Localize's interpolator.
       {:gettext, "~> 1.0"},

@@ -12,7 +12,7 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 
 ## Done
 
-* [x] **Bengali (`bengali-revised`) calendar dates** — Bangladesh's eight national days, read in Calendrical's `Calendrical.Bangla.Revised1987` through Tempo's reader; conformance has no unsupported rule left. 2026-11-01, on Calendrical 2.5 and Tempo 2.4 (unreleased).
+* [x] **Bengali (`bengali-revised`) calendar dates** — Bangladesh's eight national days, read in Calendrical's `Calendrical.Bangla.Revised1987` through Tempo's reader; conformance has no unsupported rule left. 2026-11-01, v0.3.0, on Calendrical 2.5 and Tempo 2.4.
 
 * [x] **Release 0.2.0** — holiday names in the request's locale, `day_start/1` through `Tempo.day_start/1`, on ex_tempo 2.3 and Calendrical 2.4. 2026-11-01, v0.2.0.
 

@@ -131,7 +131,7 @@ Calendrical.Islamic.UmmAlQura
 
 ## A holiday from a rule
 
-Every holiday in the data is a rule in the date-holidays grammar, which Tempo reads with `Tempo.DateRule`. The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days; [its reference](https://hexdocs.pm/ex_tempo/date-rule-grammar.html) gives every form. `Tempo.Holidays.compile/2` reads a rule of your own into a holiday, tagged as the dataset's holidays are.
+Every holiday in the data is a rule in the date-holidays grammar, which Tempo reads with `Tempo.DateRule`. The grammar covers fixed and weekday dates, Islamic/Hebrew/Persian/Julian/Bengali, Chinese/Korean/Vietnamese lunisolar and Chinese solar terms, equinox and solstice dates, Easter, observed-date substitution ("if it falls on a weekend, observe the Monday"), and inter-holiday bridge days; [its reference](https://hexdocs.pm/ex_tempo/date-rule-grammar.html) gives every form. `Tempo.Holidays.compile/2` reads a rule of your own into a holiday, tagged as the dataset's holidays are.
 
 ```elixir
 iex> import Tempo.Sigils

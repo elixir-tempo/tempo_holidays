@@ -10,7 +10,7 @@ Public holidays for every territory as [Tempo](https://hexdocs.pm/ex_tempo) recu
 
 * **Holidays as rules, not lists** — each holiday is a recurrence tagged with its id, name and type; `Tempo.to_interval/2` gives the days in any window, and a set operation meets a diary, a calendar or another territory's holidays.
 
-* **Every calendar the data uses** — Islamic (Umm al-Qura), Hebrew, Persian and Julian dates, Chinese, Korean and Vietnamese lunisolar dates, solar terms, equinoxes and Easter, each holiday read in its own calendar and given as the Gregorian days it falls on.
+* **Every calendar the data uses** — Islamic (Umm al-Qura), Hebrew, Persian, Julian and Bengali (Bangladesh's revised Bangla calendar) dates, Chinese, Korean and Vietnamese lunisolar dates, solar terms, equinoxes and Easter, each holiday read in its own calendar and given as the Gregorian days it falls on.
 
 * **Substitute days, bridges and moves** — a holiday observed on another day is given on that day, its own date or both (`:dates`); a bridge day, or a holiday moved off another, is decided against the rest of the set.
 
@@ -35,7 +35,7 @@ Add `tempo_holidays` to the dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:tempo_holidays, "~> 0.2"}
+    {:tempo_holidays, "~> 0.3"}
   ]
 end
 ```
@@ -87,4 +87,4 @@ Full API documentation is available on [HexDocs](https://hexdocs.pm/tempo_holida
 
 ## License
 
-The code is licensed under the Apache License 2.0, and the holiday data, which derives from [date-holidays](https://github.com/commenthol/date-holidays), is redistributed under CC-BY-SA-3.0; [LICENSE.md](https://github.com/elixir-tempo/tempo_holidays/blob/v0.2.0/LICENSE.md) gives both.
+The code is licensed under the Apache License 2.0, and the holiday data, which derives from [date-holidays](https://github.com/commenthol/date-holidays), is redistributed under CC-BY-SA-3.0; [LICENSE.md](https://github.com/elixir-tempo/tempo_holidays/blob/v0.3.0/LICENSE.md) gives both.
