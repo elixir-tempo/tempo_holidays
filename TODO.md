@@ -2,10 +2,6 @@
 
 Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more than a line here. Conformance against the full date-holidays fixture corpus (`mix test --include conformance`) holds every rule `Tempo.DateRule` reads to correct dates (zero mismatched), with the Bengali calendar the one accepted `known_unsupported` gap and the `divergent` differences the Conformance guide lists.
 
-## In progress
-
-* [ ] **Release 0.2.0** — on ex_tempo 2.3 and Calendrical 2.4 from hex. Reviewed 2026-11-01, every gate green; it waits on its commit, tag and publish.
-
 ## Blocked
 
 * [ ] **Bengali (`bengali-revised`) calendar dates** — no Bengali calendar in Calendrical (closest is `Calendrical.Indian`, the Saka calendar). Blocked on a Bengali calendar upstream; 8 Bangladesh rules, accepted `known_unsupported` in conformance meanwhile.
@@ -19,6 +15,8 @@ Work on `tempo_holidays`. Design notes live in `plans/` once a topic needs more 
 * [ ] **NSW Anzac Day on a Saturday before 2026** — the date-holidays data gives NSW an additional day for a Saturday Anzac Day before 2026 (Monday 27 April 2020), but Term 2 of 2020 started that Monday. Not reported upstream (user, 2026-09-30).
 
 ## Done
+
+* [x] **Release 0.2.0** — holiday names in the request's locale, `day_start/1` through `Tempo.day_start/1`, on ex_tempo 2.3 and Calendrical 2.4. 2026-11-01, v0.2.0.
 
 * [x] **Day-start projection through Tempo** — `day_start/1` places a holiday of a sunset calendar through `Tempo.day_start/1` and Calendrical's `day_bounds/1`, calendar-relative; `DayStart` and `tz_world` removed. Built on path dependencies to ex_tempo and Calendrical until they are published. 2026-11-01.
 
